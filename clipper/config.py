@@ -29,7 +29,7 @@ class Config:
 
     # --- Whisper (the "listener") ---
     # base.en = fast, small.en = better, medium.en / large-v3 = best (needs more VRAM).
-    whisper_model: str = os.environ.get("WHISPER_MODEL", "base.en")
+    whisper_model: str = os.environ.get("WHISPER_MODEL", "small")
     whisper_compute: str = os.environ.get("WHISPER_COMPUTE", "int8")
     whisper_device: str = os.environ.get("WHISPER_DEVICE", "auto")  # auto|cuda|cpu
 

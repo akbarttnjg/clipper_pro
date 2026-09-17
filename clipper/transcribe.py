@@ -41,7 +41,13 @@ def transcribe(media_path: str, cfg: Config) -> dict:
     if device == "cuda":
         _add_cuda_dlls()
     model = WhisperModel(cfg.whisper_model, device=device, compute_type=compute)
-    segments, info = model.transcribe(media_path, word_timestamps=True, vad_filter=True)
+    segments, info = model.transcribe(
+    media_path,
+    language="id",
+    task="transcribe",
+    word_timestamps=True,
+    vad_filter=True
+)
 
     words: list[dict] = []
     text_parts: list[str] = []
