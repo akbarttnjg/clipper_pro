@@ -11,7 +11,6 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from .config import Config
-from .ffmpeg_util import ass_filter, encoder_args, final_audio_args
 
 _SEARCH = "https://api.pexels.com/videos/search"
 _STOP = {"the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "for", "is", "are",
@@ -119,12 +118,12 @@ def add_broll(base: str, ass_path: str, items: list[tuple[str, float, float]],
         parts.append(f"{prev}[b{i}]overlay=enable='between(t,{a:.3f},{b:.3f})'[o{i}]")
         prev = f"[o{i}]"
     esc = ass_path.replace("\\", "/").replace(":", "\\:")
-    parts.append(f"{prev}{ass_filter(ass_path, cfg)}[v]")
+    parts.append(f"{prev}ass='{esc}'[v]")
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(parts),
-         "-map", "[v]", "-map", "0:a?", "-c:v", cfg.video_codec, *encoder_args(cfg.video_codec), "-pix_fmt", "yuv420p",
-         "-c:a", "aac", *final_audio_args(cfg, base), "-shortest", "-movflags", "+faststart", dst],
+         "-map", "[v]", "-map", "0:a?", "-c:v", cfg.video_codec, "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-shortest", "-movflags", "+faststart", dst],
         capture_output=True, check=True,
     )
     return dst

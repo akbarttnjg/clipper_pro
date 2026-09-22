@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -30,7 +29,7 @@ class Config:
 
     # --- Whisper (the "listener") ---
     # base.en = fast, small.en = better, medium.en / large-v3 = best (needs more VRAM).
-    whisper_model: str = os.environ.get("WHISPER_MODEL", "base.en")
+    whisper_model: str = os.environ.get("WHISPER_MODEL", "small")
     whisper_compute: str = os.environ.get("WHISPER_COMPUTE", "int8")
     whisper_device: str = os.environ.get("WHISPER_DEVICE", "auto")  # auto|cuda|cpu
 
@@ -83,25 +82,9 @@ class Config:
     work_dir: str = os.environ.get("WORK_DIR", "work")
     out_dir: str = os.environ.get("OUT_DIR", "clips")
 
-    # Pro Local: stable typography and a sequential 4 GB VRAM profile.
-    language: str = os.environ.get("TRANSCRIPT_LANGUAGE", "id")
-    processing_mode: str = "auto"
-    job_id: str = ""
-    caption_position: str = os.environ.get("CAPTION_POSITION", "auto")
-    caption_scale: float = _env_float("CAPTION_SCALE", 1.0)
-    audio_normalize: bool = os.environ.get("AUDIO_NORMALIZE", "1") == "1"
-    ollama_num_gpu: int = _env_int("OLLAMA_NUM_GPU", 16)
-    ollama_num_ctx: int = _env_int("OLLAMA_NUM_CTX", 4096)
-    ollama_timeout: int = _env_int("OLLAMA_TIMEOUT", 1200)
-    whisper_isolate: bool = os.environ.get("WHISPER_ISOLATE", "1") == "1"
-    editorial_words: int = _env_int("EDITORIAL_WORDS", 6)
-    editorial_phrase_s: float = _env_float("EDITORIAL_PHRASE_S", 2.6)
-    fonts_dir: str = str(Path(__file__).parent / "fonts")
-
     @property
     def video_codec(self) -> str:
-        from .ffmpeg_util import nvenc_available
-        return "h264_nvenc" if self.use_nvenc and nvenc_available() else "libx264"
+        return "h264_nvenc" if self.use_nvenc else "libx264"
 
 
 ASPECTS: dict[str, tuple[int, int]] = {
@@ -109,7 +92,7 @@ ASPECTS: dict[str, tuple[int, int]] = {
     "1:1": (1080, 1080),
     "16:9": (1920, 1080),
 }
-CAPTION_STYLES: tuple[str, ...] = ("editorial", "clean", "karaoke", "boxed", "bold")
+CAPTION_STYLES: tuple[str, ...] = ("karaoke", "boxed", "bold")
 LAYOUTS: tuple[str, ...] = ("fill", "split", "stream")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
@@ -129,12 +112,6 @@ def validate_overrides(form: dict) -> dict:
         out["caption_style"] = form["caption_style"]
     if form.get("layout") in LAYOUTS:
         out["layout"] = form["layout"]
-    if form.get("processing_mode") in ("auto", "full"):
-        out["processing_mode"] = form["processing_mode"]
-    if form.get("caption_position") in ("auto", "left", "right", "bottom"):
-        out["caption_position"] = form["caption_position"]
-    if form.get("language") in ("id", "en", "auto"):
-        out["language"] = form["language"]
     if form.get("length") in LENGTHS:
         out["min_clip_s"], out["max_clip_s"] = LENGTHS[form["length"]]
     if form.get("trim") is not None:

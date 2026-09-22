@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Steezy Pro Local</title>
+<title>clipper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --asphalt:#14171E; --asphalt-2:#0A0C10; --asphalt-line:#282D38; --asphalt-line-2:#353B47;
@@ -166,7 +169,7 @@
   @media (hover:hover) and (pointer:fine){
     .card:hover{border-color:var(--asphalt-line-2);transform:translateY(-3px)}
   }
-  .card video{width:100%;aspect-ratio:var(--video-ratio,9/16);background:#000;display:block;object-fit:contain}
+  .card video{width:100%;aspect-ratio:9/16;background:#000;display:block;object-fit:cover}
   .card .meta{padding:14px 14px 15px}
   .card .head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
   .card .t{font-family:var(--display);font-weight:700;font-size:15px;margin:0;
@@ -218,42 +221,30 @@
   .anim{animation:rise .6s both}
   .anim.d1{animation-delay:.05s}.anim.d2{animation-delay:.12s}
   .anim.d3{animation-delay:.19s}.anim.d4{animation-delay:.26s}
-
-select{font:inherit;background:var(--paper);color:var(--ink);padding:8px;border:1px solid var(--paper-line-2);border-radius:6px;max-width:280px}
-.review-edit{background:transparent;color:var(--cream-soft);border:1px solid var(--asphalt-line-2);border-radius:5px;padding:5px 8px;cursor:pointer}
-.warning{color:#ffcc70;font-size:12px;white-space:pre-wrap}
-dialog{width:min(850px,94vw);max-height:90vh;background:var(--paper);color:var(--ink);border:1px solid var(--paper-line-2);border-radius:12px;padding:24px}
-dialog::backdrop{background:#0009} .edit-row{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}
-dialog input{font:inherit;max-width:100%;padding:7px;border:1px solid #999;border-radius:5px} .word-grid{max-height:42vh;overflow:auto;margin:15px 0}
-.word-grid table{width:100%;border-collapse:collapse}.word-grid th,.word-grid td{padding:5px;text-align:left}.word-grid input{width:100%;box-sizing:border-box}.word-grid .time{width:115px}.edit-actions{display:flex;gap:12px;justify-content:flex-end}
 </style>
 </head>
 <body>
 <header class="rail">
   <div class="mark">clip<i>•</i>per</div>
-  <div class="badge"><span class="live"></span>Pro Local · Tanpa langganan</div>
+  <div class="badge"><span class="live"></span>Local · Ollama</div>
 </header>
 
 <main class="sheet grid-light">
 <div class="wrap">
-  <p class="eyebrow anim d1">// podcast · edukasi · keuangan</p>
-  <h1 class="anim d1">Potongan tepat.<br><span class="grey">Tipografi yang bercerita.</span></h1>
-  <p class="lede anim d2">Pilih format 16:9 atau 9:16, tambahkan tipografi per frasa, lalu koreksi kata dan waktu sebelum render ulang. Pemrosesan berlangsung di komputer kamu.</p>
+  <p class="eyebrow anim d1">// long video in, shorts out</p>
+  <h1 class="anim d1">Splice the good parts.<br><span class="grey">Nothing leaves your machine.</span></h1>
+  <p class="lede anim d2">Drop a talk, podcast, or stream. It transcribes, picks the strongest
+    moments, tracks the speaker into vertical, and burns word-by-word captions — all on
+    your own GPU.</p>
 
   <label class="drop anim d3" id="drop" tabindex="0" role="button" aria-label="Choose a video to clip">
     <div class="ic">⊕</div>
-    <strong>Letakkan video di sini</strong>
-    <span>atau klik untuk memilih — MP4, MOV, MKV</span>
+    <strong>Drop a video to clip</strong>
+    <span>or click to choose — MP4, MOV, MKV</span>
     <input type="file" id="file" accept="video/*" />
   </label>
 
   <div class="controls" id="controls">
-    <div class="ctrl"><label class="clab" for="processingMode">Proses</label>
-      <select id="processingMode"><option value="auto">Pilih clip dengan AI lokal</option><option value="full">Video utuh + tipografi</option></select></div>
-    <div class="ctrl"><label class="clab" for="captionPosition">Posisi teks</label>
-      <select id="captionPosition"><option value="auto">Otomatis</option><option value="left">Kiri (landscape)</option><option value="right">Kanan (landscape)</option><option value="bottom">Bawah</option></select></div>
-    <div class="ctrl"><label class="clab" for="language">Bahasa</label>
-      <select id="language"><option value="id">Indonesia / campuran</option><option value="en">Inggris</option><option value="auto">Deteksi otomatis</option></select></div>
     <div class="ctrl">
       <span class="clab">Aspect</span>
       <div class="seg" id="aspect" role="group" aria-label="Aspect ratio">
@@ -265,9 +256,7 @@ dialog input{font:inherit;max-width:100%;padding:7px;border:1px solid #999;borde
     <div class="ctrl">
       <span class="clab">Captions</span>
       <select id="capStyle">
-        <option value="editorial">Editorial Kinetic · putih/kuning</option>
-        <option value="clean">Clean · subtitle rapi</option>
-        <option value="karaoke">Karaoke klasik</option>
+        <option value="karaoke">Karaoke</option>
         <option value="boxed">Boxed</option>
         <option value="bold">Bold</option>
       </select>
@@ -291,11 +280,11 @@ dialog input{font:inherit;max-width:100%;padding:7px;border:1px solid #999;borde
     </div>
     <div class="ctrl">
       <span class="clab">Clips</span>
-      <input type="number" id="numClips" min="1" max="12" value="4" />
+      <input type="number" id="numClips" min="1" max="12" value="6" />
     </div>
     <div class="ctrl">
       <span class="clab">Trim</span>
-      <label class="chk"><input type="checkbox" id="trim" /> Silence</label>
+      <label class="chk"><input type="checkbox" id="trim" checked /> Silence</label>
     </div>
     <div class="ctrl">
       <span class="clab">B-roll</span>
@@ -311,12 +300,10 @@ dialog input{font:inherit;max-width:100%;padding:7px;border:1px solid #999;borde
     <summary>Brand kit</summary>
     <div class="brandrow">
       <label class="clab2">Accent <input type="color" id="bAccent" value="#FF5C38" /></label>
-      <label class="clab2">Font klasik <input type="text" id="bFont" value="Arial" /></label>
+      <label class="clab2">Font <input type="text" id="bFont" value="Arial" /></label>
       <label class="clab2">Default captions
         <select id="bStyle">
-          <option value="editorial">Editorial Kinetic · putih/kuning</option>
-        <option value="clean">Clean · subtitle rapi</option>
-        <option value="karaoke">Karaoke klasik</option>
+          <option value="karaoke">Karaoke</option>
           <option value="boxed">Boxed</option>
           <option value="bold">Bold</option>
         </select>
@@ -348,17 +335,7 @@ dialog input{font:inherit;max-width:100%;padding:7px;border:1px solid #999;borde
 </div>
 </main>
 
-<dialog id="editorDialog">
-  <h2>Koreksi subtitle dan batas clip</h2>
-  <p>Waktu menggunakan detik pada video sumber. Simpan koreksi, lalu tekan ↻ pada clip untuk merender dengan pengaturan di atas.</p>
-  <div class="edit-row"><label>Mulai <input id="editStart" type="number" min="0" step="0.01"></label><label>Selesai <input id="editEnd" type="number" min="0" step="0.01"></label></div>
-  <label>Kata penekanan (pisahkan koma) <input id="editKeywords" style="width:100%"></label>
-  <div class="word-grid"><table><thead><tr><th>Kata</th><th>Mulai</th><th>Selesai</th></tr></thead><tbody id="editWords"></tbody></table></div>
-  <p id="editError" role="alert"></p><div class="edit-actions"><button id="editClose" type="button">Tutup</button><button id="editSave" type="button">Simpan koreksi</button></div>
-</dialog>
 <script>
-function escapeHtml(v){const n=document.createElement('span');n.textContent=String(v??'');return n.innerHTML;}
-
 const STAGES = ["Listen","Select","Reframe","Caption","Export"];
 const drop = document.getElementById("drop");
 const fileInput = document.getElementById("file");
@@ -435,7 +412,7 @@ async function loadBrand(){
     if(b.font_name) document.getElementById("bFont").value = b.font_name;
     if(b.caption_style){
       document.getElementById("bStyle").value = b.caption_style;
-      // Per-job typography starts in Editorial mode; saved brand remains available.
+      document.getElementById("capStyle").value = b.caption_style;  // default the per-job control too
     }
   }catch{}
 }
@@ -463,9 +440,6 @@ async function start(file){
   const fd = new FormData();
   fd.append("file", file);
   fd.append("aspect", aspect);
-  fd.append("processing_mode", document.getElementById("processingMode").value);
-  fd.append("caption_position", document.getElementById("captionPosition").value);
-  fd.append("language", document.getElementById("language").value);
   fd.append("caption_style", document.getElementById("capStyle").value);
   fd.append("length", document.getElementById("length").value);
   fd.append("num_clips", document.getElementById("numClips").value);
@@ -486,11 +460,9 @@ async function start(file){
 function poll(job){
   let shown = 0;
   const timer = setInterval(async ()=>{
-    if(currentJob !== job){clearInterval(timer);return;}
     let s;
     try{ s = await (await fetch("/api/status/"+job)).json(); }
     catch{ return; }
-    if(currentJob !== job){clearInterval(timer);return;}
     fill.style.width = s.percent + "%";
     pctEl.textContent = s.percent;
     msgEl.textContent = s.message;
@@ -520,17 +492,16 @@ function render(clips){
     const cls = s>=75 ? "s-hi" : s>=50 ? "s-mid" : "s-lo";
     return `
     <div class="card" data-i="${i}" style="animation-delay:${i*0.06}s">
-      <video style="--video-ratio:${Number(c.width)||1080}/${Number(c.height)||1920}" src="/clips/${encodeURIComponent(c.file)}" controls preload="metadata"></video>
+      <video src="/clips/${encodeURIComponent(c.file)}" controls preload="metadata"></video>
       <div class="meta">
         <div class="head">
-          <p class="t">${escapeHtml(c.hook || c.title)}</p>
+          <p class="t">${c.hook || c.title}</p>
           <span class="badge-score num ${cls}" style="--score:${s}">${s}</span>
         </div>
-        <p class="r">${escapeHtml(c.reason||"")}</p><p class="warning">${escapeHtml((c.warnings||[]).join(" "))}</p>
+        <p class="r">${c.reason||""}</p>
         <div class="row">
           <span class="len num">${c.length}s</span>
           <span class="actions">
-            <button class="review-edit" data-i="${i}" type="button">Koreksi teks</button>
             <button class="regen" data-i="${i}" type="button" title="Re-render with current settings">↻</button>
             <a class="dl" href="/clips/${encodeURIComponent(c.file)}" download>Download</a>
           </span>
@@ -546,19 +517,14 @@ grid.addEventListener("click", async (e)=>{
   btn.disabled = true; btn.textContent = "…";
   const fd = new FormData();
   fd.append("aspect", aspect);
-  fd.append("processing_mode", document.getElementById("processingMode").value);
-  fd.append("caption_position", document.getElementById("captionPosition").value);
-  fd.append("language", document.getElementById("language").value);
   fd.append("caption_style", document.getElementById("capStyle").value);
   fd.append("layout", layoutSel.value);
   fd.append("trim", document.getElementById("trim").checked ? "1" : "0");
   try{
     const res = await fetch(`/api/regenerate/${currentJob}/${i}`, {method:"POST", body:fd});
-    if(!res.ok){const detail=await res.json(); throw new Error(detail.detail||"Render ulang gagal.");}
+    if(!res.ok) throw new Error("Regenerate failed.");
     const c = await res.json();
     const s = c.score ?? 50;
-    card.querySelector("video").style.setProperty("--video-ratio", `${c.width}/${c.height}`);
-    card.querySelector(".len").textContent = `${c.length}s`;
     card.querySelector("video").src = `/clips/${encodeURIComponent(c.file)}?t=${Date.now()}`;
     card.querySelector(".t").textContent = c.hook || c.title;
     const badge = card.querySelector(".badge-score");
@@ -569,32 +535,6 @@ grid.addEventListener("click", async (e)=>{
   }catch(err){ showError(err.message); }
   finally{ btn.disabled = false; btn.textContent = "↻"; }
 });
-
-let editingIndex=null;
-const editorDialog=document.getElementById('editorDialog');
-grid.addEventListener('click',async e=>{
-  const b=e.target.closest('.review-edit');if(!b||!currentJob)return;
-  editingIndex=Number(b.dataset.i);b.disabled=true;
-  try{
-    const r=await fetch(`/api/editor/${currentJob}/${editingIndex}`);const d=await r.json();if(!r.ok)throw new Error(d.detail);
-    document.getElementById('editStart').value=d.clip.start;
-    document.getElementById('editEnd').value=d.clip.end;
-    document.getElementById('editKeywords').value=(d.clip.keywords||[]).join(', ');
-    const body=document.getElementById('editWords');body.replaceChildren();
-    d.words.forEach(w=>{const tr=document.createElement('tr');['word','start','end'].forEach(k=>{const td=document.createElement('td'),input=document.createElement('input');input.dataset.key=k;input.value=w[k];if(k!=='word'){input.type='number';input.step='.01';td.className='time';}td.append(input);tr.append(td);});body.append(tr);});
-    document.getElementById('editError').textContent='';editorDialog.showModal();
-  }catch(e){showError(e.message);}finally{b.disabled=false;}
-});
-document.getElementById('editClose').onclick=()=>editorDialog.close();
-document.getElementById('editSave').onclick=async()=>{
-  const b=document.getElementById('editSave');b.disabled=true;
-  try{
-    const words=[...document.querySelectorAll('#editWords tr')].map(tr=>Object.fromEntries([...tr.querySelectorAll('input')].map(x=>[x.dataset.key,x.dataset.key==='word'?x.value:Number(x.value)])));
-    const data={start:Number(document.getElementById('editStart').value),end:Number(document.getElementById('editEnd').value),keywords:document.getElementById('editKeywords').value.split(',').map(x=>x.trim()).filter(Boolean),words};
-    const r=await fetch(`/api/editor/${currentJob}/${editingIndex}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();if(!r.ok)throw new Error(d.detail);
-    editorDialog.close();
-  }catch(e){document.getElementById('editError').textContent=e.message;}finally{b.disabled=false;}
-};
 </script>
 </body>
 </html>

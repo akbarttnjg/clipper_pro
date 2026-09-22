@@ -1,12 +1,11 @@
 """Orchestrates the five stages and reports progress as it goes."""
 from __future__ import annotations
 import re
-import json
 from pathlib import Path
 from typing import Callable
 
 from .config import Config
-from . import ffmpeg_util, transcribe, score, crop, captions, trim, layout, broll, qc, editorial
+from . import ffmpeg_util, transcribe, score, crop, captions, trim, layout, broll
 
 Progress = Callable[[int, str], None]
 
@@ -19,41 +18,27 @@ def _slug(text: str, fallback: str) -> str:
 def analyze(media_path: str, cfg: Config, on_progress: Progress = lambda p, m: None) -> tuple[dict, list]:
     """Stages 1-2: transcribe + score. Returns (transcript, clips). The slow, reusable work."""
     ffmpeg_util.ensure_ffmpeg()
-    if cfg.processing_mode == "auto":
-        editorial.release(cfg)
     on_progress(8, "Transcribing audio")
     transcript = transcribe.transcribe(media_path, cfg)
     if not transcript["words"]:
         raise RuntimeError("No speech found in this file.")
 
     on_progress(32, "Finding the best moments")
-    if cfg.processing_mode == "full":
-        clips = [{"start": 0.0, "end": transcript["duration"], "title": Path(media_path).stem,
-                  "hook": "", "reason": "Video utuh dengan tipografi pilihan.", "score": 0,
-                  "keywords": [], "selection_source": "full"}]
-    else:
-        clips = score.score(transcript, cfg)
+    clips = score.score(transcript, cfg)
     if not clips:
         raise RuntimeError("The model returned no usable clips. Try a longer source video.")
-    for clip in clips:
-        clip["warnings"] = list(clip.get("warnings", [])) + transcript.get("warnings", [])
-    work = Path(cfg.work_dir)
-    work.mkdir(parents=True, exist_ok=True)
-    (work / "transcript.json").write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
-    (work / "clip-decisions.json").write_text(json.dumps(clips, ensure_ascii=False, indent=2), encoding="utf-8")
     return transcript, clips
 
 
 def clip_name(clip: dict, i: int) -> str:
-    # render_clip adds the job prefix to keep outputs from different uploads apart.
+    # ponytail: not job-namespaced (single-user/localhost tool); if concurrent jobs are ever
+    # supported, prefix with the job id.
     return f"{i+1:02d}-{_slug(clip['title'], f'clip-{i+1}')}"
 
 
 def render_clip(media_path: str, words: list[dict], clip: dict, name: str, cfg: Config) -> dict:
     """Stages 3-4 for ONE clip: cut (drop silence) -> reframe/compose -> burn captions.
     Reused by the full run and by single-clip regeneration."""
-    if cfg.job_id:
-        name = cfg.job_id + "-" + name
     work = Path(cfg.work_dir); work.mkdir(parents=True, exist_ok=True)
     out = Path(cfg.out_dir); out.mkdir(parents=True, exist_ok=True)
 
@@ -69,11 +54,7 @@ def render_clip(media_path: str, words: list[dict], clip: dict, name: str, cfg: 
                                     segpath, codec=cfg.video_codec)
 
     cw = trim.remap(abs_words, spans)
-    anchors = crop.caption_anchors(seg, cfg) if cfg.layout == "fill" and cfg.caption_style in ("editorial", "clean") else []
-    ass = captions.write_ass(cw, str(work / f"{name}.ass"), cfg, hook=clip.get("hook", ""),
-                             keywords=clip.get("keywords", []), anchors=anchors)
-    timeline = {"timebase": "source_seconds", "spans": spans, "output_words": cw}
-    (work / f"{name}.timeline.json").write_text(json.dumps(timeline, ensure_ascii=False, indent=2), encoding="utf-8")
+    ass = captions.write_ass(cw, str(work / f"{name}.ass"), cfg, hook=clip.get("hook", ""))
     zoom_at = captions.emphasis_times(cw, cfg) if cfg.punch_zoom else None
 
     use_split = (cfg.layout == "split" and cfg.background_path
@@ -107,7 +88,6 @@ def render_clip(media_path: str, words: list[dict], clip: dict, name: str, cfg: 
         # reframe burns the captions in the same encode pass (no separate caption round trip)
         final = crop.reframe(seg, str(out / f"{name}.mp4"), cfg, ass_path=ass, zoom_at=zoom_at)
 
-    checked = qc.inspect(final, cfg, sum(b - a for a, b in spans))
     return {
         "file": Path(final).name,
         "title": clip["title"],
@@ -116,10 +96,7 @@ def render_clip(media_path: str, words: list[dict], clip: dict, name: str, cfg: 
         "score": clip.get("score", 50),
         "start": clip["start"],
         "end": clip["end"],
-        "length": round(checked["duration"], 2),
-        "width": cfg.target_w, "height": cfg.target_h,
-        "selection_source": clip.get("selection_source", "unknown"),
-        "warnings": clip.get("warnings", []), "qc": checked,
+        "length": round(clip["end"] - clip["start"], 1),
     }
 
 

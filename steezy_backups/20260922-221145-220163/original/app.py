@@ -4,18 +4,16 @@ import json
 import shutil
 import threading
 import uuid
-import math
 from dataclasses import replace
 from pathlib import Path
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 # load a local .env (e.g. PEXELS_API_KEY) BEFORE importing config, which snapshots env vars
 load_dotenv()
-load_dotenv(Path(__file__).parent / ".env.pro", override=True)
 
 from clipper.config import Config, validate_overrides, validate_brand
 from clipper import pipeline
@@ -39,22 +37,15 @@ UPLOADS = Path("uploads"); UPLOADS.mkdir(exist_ok=True)
 JOBS: dict[str, dict] = {}
 # internal per-job state for single-clip regeneration (not sent to the UI / not JSON)
 JOB_STATE: dict[str, dict] = {}
-PROCESS_LOCK = threading.Lock()
 
 
 def _run(job_id: str, path: str, cfg: Config) -> None:
-    with PROCESS_LOCK:
-        JOBS[job_id]["status"] = "running"
-        _process(job_id, path, cfg)
-
-
-def _process(job_id: str, path: str, cfg: Config) -> None:
     def progress(percent: int, message: str) -> None:
         JOBS[job_id].update(percent=percent, message=message)
     try:
         transcript, scored = pipeline.analyze(path, cfg, progress)
         # keep the slow-stage results so a single clip can be re-rendered later
-        JOB_STATE[job_id] = {"transcript": transcript, "scored": scored, "media": path, "cfg": cfg, "edits": {}}
+        JOB_STATE[job_id] = {"transcript": transcript, "scored": scored, "media": path, "cfg": cfg}
         JOBS[job_id]["clips"] = []   # filled incrementally so the UI shows clips as they finish
         pipeline.render_all(path, transcript, scored, cfg, progress,
                             on_clip=lambda r: JOBS[job_id]["clips"].append(r))
@@ -72,13 +63,10 @@ def index() -> str:
 async def upload(file: UploadFile = File(...),
                  background: UploadFile = File(None),
                  aspect: str = Form("9:16"),
-                 caption_style: str = Form("editorial"),
-                 processing_mode: str = Form("auto"),
-                 caption_position: str = Form("auto"),
-                 language: str = Form("id"),
+                 caption_style: str = Form("karaoke"),
                  layout: str = Form("fill"),
                  length: str = Form("auto"),
-                 trim: str = Form("0"),
+                 trim: str = Form("1"),
                  broll: str = Form("0"),
                  num_clips: str = Form(None)) -> JSONResponse:
     if not file.filename:
@@ -93,12 +81,10 @@ async def upload(file: UploadFile = File(...),
         with bg_dest.open("wb") as out:
             shutil.copyfileobj(background.file, out)
         bg_path = str(bg_dest)
-    job_cfg = replace(base_cfg, background_path=bg_path, job_id=job_id,
-                      work_dir=str(Path(base_cfg.work_dir) / job_id), **validate_overrides(
+    job_cfg = replace(base_cfg, background_path=bg_path, **validate_overrides(
         {"aspect": aspect, "caption_style": caption_style, "layout": layout,
-         "processing_mode": processing_mode, "caption_position": caption_position, "language": language,
          "length": length, "trim": trim, "broll": broll, "num_clips": num_clips}))
-    JOBS[job_id] = {"status": "queued", "percent": 0, "message": "Queued — menunggu proses sebelumnya",
+    JOBS[job_id] = {"status": "running", "percent": 0, "message": "Queued",
                     "clips": [], "error": None}
     threading.Thread(target=_run, args=(job_id, str(dest), job_cfg), daemon=True).start()
     return JSONResponse({"job": job_id})
@@ -115,87 +101,22 @@ def status(job_id: str) -> JSONResponse:
 @app.post("/api/regenerate/{job_id}/{idx}")
 def regenerate(job_id: str, idx: int,
                aspect: str = Form("9:16"),
-               caption_style: str = Form("editorial"),
-               caption_position: str = Form("auto"),
+               caption_style: str = Form("karaoke"),
                layout: str = Form("fill"),
-               trim: str = Form("0")) -> JSONResponse:
+               trim: str = Form("1")) -> JSONResponse:
     st, job = JOB_STATE.get(job_id), JOBS.get(job_id)
     if not st or not job:
         raise HTTPException(404, "Unknown job.")
     if idx < 0 or idx >= len(st["scored"]):
         raise HTTPException(404, "Unknown clip.")
     cfg = replace(st["cfg"], **validate_overrides(
-        {"aspect": aspect, "caption_style": caption_style, "layout": layout, "trim": trim,
-         "caption_position": caption_position}))
+        {"aspect": aspect, "caption_style": caption_style, "layout": layout, "trim": trim}))
     clip = st["scored"][idx]
-    if not PROCESS_LOCK.acquire(blocking=False):
-        raise HTTPException(409, "Tunggu proses video yang sedang berjalan.")
-    try:
-        words = st.get("edits", {}).get(idx, st["transcript"]["words"])
-        res = pipeline.render_clip(st["media"], words, clip, pipeline.clip_name(clip, idx), cfg)
-    except Exception as exc:
-        raise HTTPException(500, str(exc)) from exc
-    finally:
-        PROCESS_LOCK.release()
+    res = pipeline.render_clip(st["media"], st["transcript"]["words"], clip,
+                              pipeline.clip_name(clip, idx), cfg)
     if idx < len(job.get("clips", [])):
         job["clips"][idx] = res
     return JSONResponse(res)
-
-
-@app.get("/api/editor/{job_id}/{idx}")
-def editor_get(job_id: str, idx: int):
-    st = JOB_STATE.get(job_id)
-    if not st or not 0 <= idx < len(st["scored"]):
-        raise HTTPException(404, "Clip tidak ditemukan.")
-    c = st["scored"][idx]
-    words = st.get("edits", {}).get(idx, st["transcript"]["words"])
-    return {"clip": c, "duration": st["transcript"]["duration"],
-            "words": [w for w in words if w["end"] > c["start"] and w["start"] < c["end"]]}
-
-
-@app.post("/api/editor/{job_id}/{idx}")
-def editor_save(job_id: str, idx: int, data: dict = Body(...)):
-    st, job = JOB_STATE.get(job_id), JOBS.get(job_id)
-    if not st or not job or not 0 <= idx < len(st["scored"]):
-        raise HTTPException(404, "Clip tidak ditemukan.")
-    if job["status"] not in ("done", "error"):
-        raise HTTPException(409, "Tunggu proses selesai sebelum mengedit.")
-    if not PROCESS_LOCK.acquire(blocking=False):
-        raise HTTPException(409, "Tunggu proses video yang sedang berjalan.")
-    try:
-        source_duration = st["transcript"]["duration"]
-        start, end = float(data["start"]), float(data["end"])
-        if not all(math.isfinite(v) for v in (start, end)) or not 0 <= start < end <= source_duration + .05:
-            raise ValueError("Batas clip di luar durasi video.")
-        raw = data["words"]
-        if not isinstance(raw, list) or not raw or len(raw) > 10000:
-            raise ValueError("Daftar kata tidak valid.")
-        words, previous = [], -1.
-        for w in raw:
-            a, b, text = float(w["start"]), float(w["end"]), str(w["word"]).strip()
-            if not text or len(text) > 120 or not all(math.isfinite(v) for v in (a, b)) or not 0 <= a < b <= source_duration + .05 or a < previous:
-                raise ValueError("Periksa urutan waktu dan teks setiap kata.")
-            words.append({"word": text, "start": a, "end": b})
-            previous = a
-        keys = data.get("keywords", [])
-        if not isinstance(keys, list):
-            raise ValueError("Keywords harus berupa daftar.")
-        c = {**st["scored"][idx], "start": start, "end": end,
-             "keywords": [str(k)[:80] for k in keys[:20]], "selection_source": "reviewed"}
-        # Keep source words outside the original clip so extending boundaries still works.
-        old = st["scored"][idx]
-        existing = st.get("edits", {}).get(idx, st["transcript"]["words"])
-        outside = [w for w in existing if w["end"] <= old["start"] or w["start"] >= old["end"]]
-        combined = sorted(outside + words, key=lambda w: w["start"])
-        st.setdefault("edits", {})[idx] = combined
-        st["scored"][idx] = c
-        p = Path(st["cfg"].work_dir) / f"edit-{idx}.json"
-        p.write_text(json.dumps({"clip": c, "words": combined}, ensure_ascii=False, indent=2), encoding="utf-8")
-        return {"ok": True}
-    except (KeyError, ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-    finally:
-        PROCESS_LOCK.release()
 
 
 @app.get("/api/brand")

@@ -3,41 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from functools import lru_cache
 from pathlib import Path
-
-
-@lru_cache(maxsize=1)
-def nvenc_available() -> bool:
-    try:
-        r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i",
-                            "color=s=64x64:d=0.1", "-frames:v", "1", "-c:v",
-                            "h264_nvenc", "-f", "null", "-"], capture_output=True, timeout=15)
-        return r.returncode == 0
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-
-
-def encoder_args(codec):
-    return (["-preset", "p4", "-rc", "vbr", "-cq", "19", "-b:v", "0"]
-            if codec == "h264_nvenc" else ["-preset", "fast", "-crf", "18"])
-
-
-def ass_filter(path, cfg):
-    def esc(p):
-        return str(Path(p).resolve()).replace("\\", "/").replace(":", "\\:").replace("'", "'\\\\\\''")
-    return f"ass=filename='{esc(path)}':fontsdir='{esc(cfg.fonts_dir)}'"
-
-
-def final_audio_args(cfg, source_path):
-    if not cfg.audio_normalize:
-        return []
-    duration = probe(str(source_path))["duration"]
-    # Short, completely silent inputs can produce NaN samples in loudnorm.
-    # Analyze with a silent tail, then remove it and fix the output sample rate.
-    filters = ("apad=pad_dur=3,loudnorm=I=-16:TP=-1.5:LRA=11,"
-               f"aresample=48000,atrim=duration={duration:.6f}")
-    return ["-af", filters]
 
 
 def ensure_ffmpeg() -> None:
@@ -74,7 +40,7 @@ def cut(src: str, start: float, end: float, dst: str, codec: str = "libx264") ->
 
     Pass the GPU codec (h264_nvenc) to keep this off the CPU when a GPU is present.
     """
-    preset = encoder_args(codec)
+    preset = ["-preset", "fast"] if "nvenc" in codec else ["-preset", "veryfast"]
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["ffmpeg", "-y", "-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", src,
@@ -90,7 +56,7 @@ def cut_spans(src: str, start: float, end: float, rel_spans: list[tuple[float, f
     silence. Fast input seek to the clip window first, so only the clip is decoded; trim +
     concat keep audio and video sample-accurate.
     """
-    preset = encoder_args(codec)
+    preset = ["-preset", "fast"] if "nvenc" in codec else ["-preset", "veryfast"]
     parts = []
     for i, (a, b) in enumerate(rel_spans):
         parts.append(f"[0:v]trim={a:.3f}:{b:.3f},setpts=PTS-STARTPTS[v{i}]")

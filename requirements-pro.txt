@@ -1,0 +1,2 @@
+# Hanya tambahan untuk instalasi Steezy yang sudah berjalan.
+Pillow>=10.4,<13

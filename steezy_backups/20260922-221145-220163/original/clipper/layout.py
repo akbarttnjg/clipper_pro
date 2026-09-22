@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 from .config import Config
-from .ffmpeg_util import even, ass_filter, encoder_args, final_audio_args
+from .ffmpeg_util import even
 
 
 def split_dims(target_w: int, target_h: int, ratio: float) -> tuple[int, int]:
@@ -28,12 +28,12 @@ def compose_split(head_path: str, bg_path: str, ass_path: str, dst: str,
     fc = (f"[0:v]setsar=1[hd];"
           f"[1:v]scale={cfg.target_w}:{bottom_h}:force_original_aspect_ratio=increase,"
           f"crop={cfg.target_w}:{bottom_h},setsar=1[bg];"
-          f"[hd][bg]vstack=inputs=2[stk];[stk]{ass_filter(ass_path, cfg)}[v]")
+          f"[hd][bg]vstack=inputs=2[stk];[stk]ass='{esc}'[v]")
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["ffmpeg", "-y", "-i", head_path, "-stream_loop", "-1", "-i", bg_path,
          "-filter_complex", fc, "-map", "[v]", "-map", "0:a?",
-         "-c:v", cfg.video_codec, *encoder_args(cfg.video_codec), "-pix_fmt", "yuv420p", "-c:a", "aac", *final_audio_args(cfg, head_path),
+         "-c:v", cfg.video_codec, "-pix_fmt", "yuv420p", "-c:a", "aac",
          "-shortest", "-movflags", "+faststart", dst],
         capture_output=True, check=True,
     )
@@ -51,11 +51,11 @@ def compose_stream(src: str, rect: tuple[int, int, int, int], ass_path: str, dst
           f"crop={cfg.target_w}:{top_h},setsar=1[top];"
           f"[0:v]scale={cfg.target_w}:{bottom_h}:force_original_aspect_ratio=increase,"
           f"crop={cfg.target_w}:{bottom_h},setsar=1[bot];"
-          f"[top][bot]vstack=inputs=2[stk];[stk]{ass_filter(ass_path, cfg)}[v]")
+          f"[top][bot]vstack=inputs=2[stk];[stk]ass='{esc}'[v]")
     Path(dst).parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["ffmpeg", "-y", "-i", src, "-filter_complex", fc, "-map", "[v]", "-map", "0:a?",
-         "-c:v", cfg.video_codec, *encoder_args(cfg.video_codec), "-pix_fmt", "yuv420p", "-c:a", "aac", *final_audio_args(cfg, src),
+         "-c:v", cfg.video_codec, "-pix_fmt", "yuv420p", "-c:a", "aac",
          "-movflags", "+faststart", dst],
         capture_output=True, check=True,
     )

@@ -51,9 +51,9 @@ def remap(words: list[dict], spans: list[tuple[float, float]]) -> list[dict]:
     out = []
     for w in words:
         for i, (a, b) in enumerate(spans):
-            if w["end"] > a and w["start"] < b:
-                ns = max(w["start"], a) - a + offsets[i]
+            if a <= w["start"] < b:
+                ns = w["start"] - a + offsets[i]
                 ne = min(w["end"], b) - a + offsets[i]
-                out.append({**w, "start": ns, "end": max(ns, ne)})
+                out.append({"word": w["word"], "start": ns, "end": max(ns, ne)})
                 break
     return out

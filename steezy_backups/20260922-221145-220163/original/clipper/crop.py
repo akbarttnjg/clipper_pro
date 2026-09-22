@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 from .config import Config
-from .ffmpeg_util import even, ass_filter, encoder_args, final_audio_args
+from .ffmpeg_util import even
 
 # YuNet is the higher-quality detector but ships via Git LFS, so we download the real
 # binary from the media endpoint. If that fails for any reason we fall back to the Haar
@@ -23,28 +23,17 @@ _YUNET_URL = (
     "face_detection_yunet/face_detection_yunet_2023mar.onnx"
 )
 _YUNET_PATH = Path(__file__).parent / "models" / "face_detection_yunet.onnx"
-_YUNET_DOWNLOAD_FAILED = False
 _DETECT_W = 640  # downscale frames to this width for face detection (speed)
 
 
 def _try_yunet(w: int, h: int):
     """Return a YuNet detector, or None if the model can't be fetched/loaded."""
-    global _YUNET_DOWNLOAD_FAILED
     try:
         if not _YUNET_PATH.exists() or _YUNET_PATH.stat().st_size < 10000:
-            if _YUNET_DOWNLOAD_FAILED:
-                return None
             _YUNET_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with urllib.request.urlopen(_YUNET_URL, timeout=10) as response:
-                model = response.read()
-            if len(model) < 10000:
-                raise ValueError("Unduhan model wajah tidak lengkap.")
-            pending = _YUNET_PATH.with_suffix(".download")
-            pending.write_bytes(model)
-            pending.replace(_YUNET_PATH)
+            urllib.request.urlretrieve(_YUNET_URL, _YUNET_PATH)
         return cv2.FaceDetectorYN.create(str(_YUNET_PATH), "", (w, h), score_threshold=0.6)
     except Exception:
-        _YUNET_DOWNLOAD_FAILED = True
         return None
 
 
@@ -244,9 +233,6 @@ def reframe(clip_path: str, dst: str, cfg: Config, ass_path: str | None = None,
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if not cap.isOpened() or min(w, h, n_frames) <= 0:
-        cap.release()
-        raise RuntimeError("Video tidak dapat dibaca untuk reframe.")
 
     crop_w, crop_h, axis = _crop_plan(w, h, ow, oh)
     centers = _track_centers(cap, n_frames, w, h, axis, crop_w, crop_h, cfg)
@@ -259,13 +245,11 @@ def reframe(clip_path: str, dst: str, cfg: Config, ass_path: str | None = None,
            "-i", "-", "-i", clip_path,
            "-map", "0:v:0", "-map", "1:a:0?"]
     if ass_path:
-        cmd += ["-vf", ass_filter(ass_path, cfg)]
-    codec = cfg.video_codec
-    cmd += ["-c:v", codec, *encoder_args(codec), "-pix_fmt", "yuv420p", "-c:a", "aac",
-            *(final_audio_args(cfg, clip_path) if ass_path else []), "-shortest", "-movflags", "+faststart", dst]
-    log = open(str(dst) + ".ffmpeg.log", "wb")
+        esc = ass_path.replace("\\", "/").replace(":", "\\:")
+        cmd += ["-vf", f"ass='{esc}'"]
+    cmd += ["-c:v", cfg.video_codec, "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", dst]
     ff = subprocess.Popen(
-        cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log,
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -284,67 +268,9 @@ def reframe(clip_path: str, dst: str, cfg: Config, ass_path: str | None = None,
         x0 = max(0, min(x0, w - zw)); y0 = max(0, min(y0, h - zh))
         window = frame[y0:y0 + zh, x0:x0 + zw]
         out = cv2.resize(window, (ow, oh), interpolation=cv2.INTER_AREA)
-        try:
-            ff.stdin.write(out.tobytes())
-        except BrokenPipeError:
-            break
+        ff.stdin.write(out.tobytes())
 
     cap.release()
-    try:
-        ff.stdin.close()
-    except BrokenPipeError:
-        pass
-    code = ff.wait()
-    log.close()
-    if code:
-        detail = Path(str(dst) + ".ffmpeg.log").read_text(errors="replace")[-2000:]
-        raise RuntimeError("FFmpeg gagal merender. " + detail)
+    ff.stdin.close()
+    ff.wait()
     return dst
-
-
-def caption_anchors(path, cfg):
-    """Choose empty left/right space on landscape shots; fall back to subtitles below."""
-    if cfg.target_w <= cfg.target_h or cfg.caption_position != "auto":
-        return []
-    cap = cv2.VideoCapture(path)
-    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps, n = cap.get(cv2.CAP_PROP_FPS) or 30, int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if not cap.isOpened() or min(w, h, n) <= 0:
-        cap.release()
-        return []
-    scale = min(1., 640 / w)
-    dw, dh = round(w * scale), round(h * scale)
-    detector, kind = _make_detector(dw, dh)
-    # Side panels are only used when source/output aspects match; crop transforms
-    # otherwise change the empty space, so bottom is the honest safe fallback.
-    if abs(w / h - cfg.target_w / cfg.target_h) > .08:
-        cap.release()
-        return []
-    anchors = []
-    step = max(1, int(fps * 1.5))
-    for frame_id in range(0, n, step):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
-        ok, frame = cap.read()
-        if not ok:
-            break
-        small = cv2.resize(frame, (dw, dh))
-        if kind == "yunet":
-            _, found = detector.detect(small)
-            boxes = [] if found is None else [f[:4] for f in found]
-        else:
-            boxes = detector.detectMultiScale(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), 1.1, 5)
-        choices = []
-        for pos, left, right in (("left", .045, .465), ("right", .535, .955)):
-            conflict = 0.
-            for fx, fy, fw, fh in boxes:
-                fx, fy, fw, fh = fx / dw, fy / dh, fw / dw, fh / dh
-                # Include a margin around the face, not just the detector box.
-                ix = max(0., min(right, fx + fw + .05) - max(left, fx - .05))
-                iy = max(0., min(.71, fy + fh + .08) - max(.25, fy - .05))
-                conflict += ix * iy
-            choices.append((conflict, pos))
-        best = min(choices)
-        pos = best[1] if len(boxes) and best[0] < .004 else "bottom"
-        anchors.append({"time": frame_id / fps, "position": pos})
-    cap.release()
-    return anchors

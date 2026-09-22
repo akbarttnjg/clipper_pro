@@ -22,8 +22,10 @@ _STOP = {"the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "for", "i
 
 def _emphasis(line: list[dict]) -> set[int]:
     """Indices of up to 2 content words to keep tinted in the accent color."""
-    from .typography import emphasis_indices
-    return emphasis_indices(line)
+    idx = [i for i, w in enumerate(line)
+           if len(w["word"].strip(".,!?'\"")) >= 4
+           and w["word"].strip(".,!?'\"").lower() not in _STOP]
+    return set(idx[:2])
 
 
 def _ass_color(hex_str: str) -> str:
@@ -34,13 +36,15 @@ def _ass_color(hex_str: str) -> str:
 
 
 def _ts(seconds: float) -> str:
-    from .captions_pro import ts
-    return ts(seconds)
+    seconds = max(0.0, seconds)
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = seconds % 60
+    return f"{h}:{m:02d}:{s:05.2f}"
 
 
 def _safe(word: str) -> str:
-    from .captions_pro import safe
-    return safe(word)
+    return word.replace("{", "(").replace("}", ")").replace("\n", " ")
 
 
 def _lines(words: list[dict], cfg: Config) -> list[list[dict]]:
@@ -91,10 +95,7 @@ def _events(words: list[dict], cfg: Config) -> list[str]:
     return out
 
 
-def write_ass(words: list[dict], path: str, cfg: Config, hook: str = "", keywords=(), position="bottom", anchors=None) -> str:
-    if cfg.caption_style in ("editorial", "clean"):
-        from .captions_pro import write_ass as write_pro
-        return write_pro(words, path, cfg, hook, keywords, position, anchors)
+def write_ass(words: list[dict], path: str, cfg: Config, hook: str = "") -> str:
     base = _ass_color(cfg.base_hex)
     st = STYLES.get(cfg.caption_style, STYLES["karaoke"])
     size = int(cfg.font_size * st["size_mult"])
