@@ -45,16 +45,14 @@ def _run(media_path, cfg):
                 language=None if cfg.language == 'auto' else cfg.language,
                 task='transcribe', word_timestamps=True, vad_filter=True, beam_size=5,
                 condition_on_previous_text=False)
-            words, text, sentences = [], [], []
+            words, text = [], []
             for seg in segments:
                 text.append(seg.text.strip())
-                sentences.append({'id': len(sentences), 'start': float(seg.start),
-                                  'end': float(seg.end), 'text': seg.text.strip()})
                 for w in seg.words or []:
                     words.append({'word_id': len(words), 'word': w.word.strip(),
                                   'start': float(w.start), 'end': float(w.end),
                                   'probability': float(w.probability)})
-            return {'words': valid_words(words), 'text': ' '.join(text), 'segments': sentences,
+            return {'words': valid_words(words), 'text': ' '.join(text),
                     'duration': float(info.duration), 'language': info.language,
                     'device': dev, 'warnings': warnings}
         finally:

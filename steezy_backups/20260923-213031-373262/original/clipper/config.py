@@ -30,14 +30,14 @@ class Config:
 
     # --- Whisper (the "listener") ---
     # base.en = fast, small.en = better, medium.en / large-v3 = best (needs more VRAM).
-    whisper_model: str = os.environ.get("WHISPER_MODEL", "medium")
-    whisper_compute: str = os.environ.get("WHISPER_COMPUTE", "int8_float16")
+    whisper_model: str = os.environ.get("WHISPER_MODEL", "base.en")
+    whisper_compute: str = os.environ.get("WHISPER_COMPUTE", "int8")
     whisper_device: str = os.environ.get("WHISPER_DEVICE", "auto")  # auto|cuda|cpu
 
     # --- Clip selection ---
-    num_clips: int = _env_int("NUM_CLIPS", 10)
-    min_clip_s: float = _env_float("MIN_CLIP_S", 30.0)
-    max_clip_s: float = _env_float("MAX_CLIP_S", 120.0)
+    num_clips: int = _env_int("NUM_CLIPS", 6)
+    min_clip_s: float = _env_float("MIN_CLIP_S", 15.0)
+    max_clip_s: float = _env_float("MAX_CLIP_S", 60.0)
 
     # --- Auto B-roll (Pexels stock video) ---
     broll: bool = os.environ.get("BROLL", "0") == "1"
@@ -48,11 +48,11 @@ class Config:
 
     # --- Silence trimming ---
     trim_silence: bool = os.environ.get("TRIM_SILENCE", "1") == "1"
-    silence_max: float = _env_float("SILENCE_MAX", 1.2)
-    silence_keep: float = _env_float("SILENCE_KEEP", 0.25)
+    silence_max: float = _env_float("SILENCE_MAX", 0.5)    # collapse gaps longer than this
+    silence_keep: float = _env_float("SILENCE_KEEP", 0.15)  # pad left around each cut
 
     # --- Layout ---
-    layout: str = os.environ.get("LAYOUT", "auto")
+    layout: str = os.environ.get("LAYOUT", "fill")        # fill | split
     split_ratio: float = _env_float("SPLIT_RATIO", 0.5)   # top (talking-head) fraction
     background_path: str = ""   # set per-job when layout=split; path to the gameplay/B-roll clip
 
@@ -65,16 +65,16 @@ class Config:
     # --- Punch-in zoom (subtle motion on emphasis) ---
     punch_zoom: bool = os.environ.get("PUNCH_ZOOM", "1") == "1"
     zoom_amount: float = _env_float("ZOOM_AMOUNT", 0.08)   # max extra zoom at a punch (8%)
-    zoom_gap: float = _env_float("ZOOM_GAP", 10.0)
+    zoom_gap: float = _env_float("ZOOM_GAP", 2.5)          # min seconds between punches
 
     # --- Captions ---
-    accent_hex: str = os.environ.get("ACCENT_HEX", "#F6CF69")  # active word color
+    accent_hex: str = os.environ.get("ACCENT_HEX", "#FF5C38")  # active word color
     base_hex: str = os.environ.get("BASE_HEX", "#FFFFFF")      # inactive words
     words_per_caption: int = _env_int("WORDS_PER_CAPTION", 3)
     caption_gap_s: float = _env_float("CAPTION_GAP_S", 0.6)    # break line on pauses
     font_name: str = os.environ.get("FONT_NAME", "Arial")
     font_size: int = _env_int("FONT_SIZE", 120)
-    caption_style: str = os.environ.get("CAPTION_STYLE", "editorial")
+    caption_style: str = os.environ.get("CAPTION_STYLE", "karaoke")
 
     # --- Encoding ---
     use_nvenc: bool = os.environ.get("USE_NVENC", "1") == "1"
@@ -97,22 +97,6 @@ class Config:
     editorial_words: int = _env_int("EDITORIAL_WORDS", 6)
     editorial_phrase_s: float = _env_float("EDITORIAL_PHRASE_S", 2.6)
     fonts_dir: str = str(Path(__file__).parent / "fonts")
-    # Studio: one resource-heavy stage at a time on a 4 GB GPU.
-    adaptive_clips: bool = True
-    topic_grace_s: float = 20.0
-    output_fps: int = 30
-    music_path: str = ""
-    music_db: float = -24.0
-    sfx_path: str = ""
-    sfx_db: float = -25.0
-    cold_open: bool = True
-    title_card: bool = True
-    accent_font: bool = True
-    framing_x: float = -1.0  # -1 = detected; otherwise normalized horizontal focus
-    analysis_window_s: float = 240.0
-    analysis_overlap_s: float = 130.0
-    selection_floor: int = 3
-    preview_seconds: float = 0.0
 
     @property
     def video_codec(self) -> str:
@@ -126,11 +110,10 @@ ASPECTS: dict[str, tuple[int, int]] = {
     "16:9": (1920, 1080),
 }
 CAPTION_STYLES: tuple[str, ...] = ("editorial", "clean", "karaoke", "boxed", "bold")
-LAYOUTS: tuple[str, ...] = ("auto", "fill", "fit", "stream", "split")
+LAYOUTS: tuple[str, ...] = ("fill", "split", "stream")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
-    "auto": (30.0, 120.0),
-    "60to120": (60.0, 120.0),
+    "auto": (15.0, 60.0),
     "under30": (8.0, 30.0),
     "30to60": (30.0, 60.0),
     "60to90": (60.0, 90.0),
@@ -161,23 +144,9 @@ def validate_overrides(form: dict) -> dict:
     n = form.get("num_clips")
     if n is not None:
         try:
-            out["num_clips"] = max(1, min(10, int(n)))
+            out["num_clips"] = max(1, min(12, int(n)))
         except (TypeError, ValueError):
             pass
-    for key in ("punch_zoom", "cold_open", "title_card", "accent_font", "adaptive_clips"):
-        if key in form:
-            out[key] = str(form[key]).lower() in ("1", "true")
-    for key, lo, hi in (("music_db", -40, -10), ("sfx_db", -40, -12),
-                        ("caption_scale", .7, 1.3), ("framing_x", -1, 1)):
-        if key in form:
-            try:
-                value = float(form[key])
-                if __import__('math').isfinite(value):
-                    out[key] = max(lo, min(hi, value))
-            except (TypeError, ValueError):
-                pass
-    if form.get("accent_hex") and _HEX.match(str(form["accent_hex"])):
-        out["accent_hex"] = form["accent_hex"]
     return out
 
 

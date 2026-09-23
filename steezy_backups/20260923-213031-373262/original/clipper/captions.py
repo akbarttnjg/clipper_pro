@@ -21,14 +21,9 @@ _STOP = {"the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "for", "i
 
 
 def _emphasis(line: list[dict]) -> set[int]:
-    """Keep legacy karaoke emphasis; Studio editorial uses grounded keywords."""
-    from .typography import STOP, emphasis_indices, token
-    selected = emphasis_indices(line)
-    if selected:
-        return selected
-    candidates = [(len(token(w['word'])), i) for i, w in enumerate(line)
-                  if len(token(w['word'])) > 3 and token(w['word']) not in STOP]
-    return {i for _, i in sorted(candidates, reverse=True)[:2]}
+    """Indices of up to 2 content words to keep tinted in the accent color."""
+    from .typography import emphasis_indices
+    return emphasis_indices(line)
 
 
 def _ass_color(hex_str: str) -> str:

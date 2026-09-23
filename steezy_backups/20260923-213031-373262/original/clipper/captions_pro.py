@@ -30,7 +30,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Editorial,DejaVu Sans,60,&H00FFFFFF,&H00FFFFFF,&H50101010,&H70000000,-1,0,0,0,100,100,0,0,1,2.0,2.5,5,0,0,0,1
+Style: Editorial,DejaVu Sans,60,&H00FFFFFF,&H00FFFFFF,&H80202020,&H90000000,-1,0,0,0,100,100,0,0,1,1.0,1.0,5,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -38,7 +38,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     events = []
     for phrase in plan["phrases"]:
         for w in phrase["words"]:
-            start = phrase["start"]
+            start = w["start"] if cfg.caption_style == "editorial" else phrase["start"]
             end = phrase["end"]
             if end - start < .02:
                 continue
@@ -47,26 +47,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             enter = min(120, max(1, dur_ms // 3))
             fade = min(65, dur_ms // 4)
             # Each word occupies a fixed measured box; later words never shift it.
-            active = max(0, round((w['start'] - start) * 1000))
-            # Entire phrase is readable from the beginning; emphasis changes at spoken time.
-            anim = (f"\\fscx100\\fscy100\\t({active},{active + enter},\\c{paint})"
+            anim = (f"\\fscx96\\fscy96\\blur1.4\\t(0,{enter},\\fscx100\\fscy100\\blur0)"
                     if cfg.caption_style == "editorial" else "")
-            family = 'DejaVu Serif' if w.get('family') == 'serif' else 'DejaVu Sans'
-            initial = color(cfg.base_hex) if cfg.caption_style == 'editorial' else paint
-            tags = f"\\an5\\pos({w['x']},{w['y']})\\fn{family}\\fs{w['ass_size']}\\c{initial}\\fad({fade},{fade}){anim}"
+            tags = f"\\an5\\pos({w['x']},{w['y']})\\fs{w['size']}\\c{paint}\\fad({fade},{fade}){anim}"
             events.append(f"Dialogue: 0,{ts(start)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{safe(w['text'])}")
-    if hook and cfg.title_card:
-        # A restrained top title for the first three seconds; no synthetic spoken claim.
-        from .typography import font
-        label = safe(hook.strip())[:100]
-        size = round(min(cfg.target_w, cfg.target_h) * .044)
-        while size > 14 and font(cfg.fonts_dir, size).getlength(label) > cfg.target_w * .78:
-            size -= 1
-        end = min(3., max((p['end'] for p in plan['phrases']), default=3.))
-        tags = f"\\an8\\pos({cfg.target_w * .47},{cfg.target_h * .105})\\fs{size}\\c{color(cfg.base_hex)}\\bord2\\shad2\\fad(120,180)"
-        events.append(f"Dialogue: 1,{ts(0)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{label}")
-        plan['title'] = {'text': label, 'start': 0, 'end': end, 'size': size,
-                         'x': cfg.target_w * .47, 'y': cfg.target_h * .105}
     dst = Path(path)
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(header + "\n".join(events) + "\n", encoding="utf-8")

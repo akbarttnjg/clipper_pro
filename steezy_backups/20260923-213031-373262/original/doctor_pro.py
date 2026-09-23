@@ -8,17 +8,14 @@ import urllib.request
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / '.env.pro', override=True)
 from clipper.config import Config
-from clipper.ffmpeg_util import nvenc_available, nvenc_diagnostic
+from clipper.ffmpeg_util import nvenc_available
 cfg = Config()
 print('Python:', sys.version.split()[0])
-for name in ('faster_whisper', 'cv2', 'PIL', 'requests', 'fastapi', 'uvicorn', 'multipart', 'pycapcut'):
+for name in ('faster_whisper', 'cv2', 'PIL', 'requests', 'fastapi', 'uvicorn', 'multipart'):
     print(name + ':', 'OK' if importlib.util.find_spec(name) else 'BELUM TERPASANG')
 for name in ('ffmpeg', 'ffprobe'):
     print(name + ':', 'OK' if shutil.which(name) else 'TIDAK DITEMUKAN')
 print('Encoder:', 'NVENC tersedia' if nvenc_available() else 'CPU libx264 (fallback)')
-print('FFmpeg yang diuji:', nvenc_diagnostic()['ffmpeg'])
-if not nvenc_available():
-    print('Alasan probe NVENC:', nvenc_diagnostic()['detail'])
 print('Whisper:', cfg.whisper_model, '/', cfg.whisper_device, '/', cfg.whisper_compute)
 try:
     with urllib.request.urlopen(cfg.ollama_url + '/api/tags', timeout=5) as r:
@@ -30,5 +27,3 @@ try:
 except Exception:
     print('Ollama belum berjalan. Buka aplikasi Ollama; mode video utuh tidak membutuhkan Ollama.')
 print('Font:', 'OK' if (Path(cfg.fonts_dir) / 'DejaVuSans-Bold.ttf').exists() else 'TIDAK DITEMUKAN')
-print('Studio 2.0: analisis -> review -> render -> proyek editable')
-print('Native CapCut/Resolve: periksa satu proyek percobaan pada editor Anda.')

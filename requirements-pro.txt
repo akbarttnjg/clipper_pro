@@ -1,2 +1,6 @@
-# Hanya tambahan untuk instalasi Steezy yang sudah berjalan.
+# Tambahan/kompatibilitas untuk instalasi Steezy yang sudah berjalan.
 Pillow>=10.4,<13
+pycapcut==0.0.3
+fastapi>=0.115.6,<1
+starlette>=0.41.3,<2
+python-multipart>=0.0.20

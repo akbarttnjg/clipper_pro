@@ -7,7 +7,7 @@ from __future__ import annotations
 def test_validate_overrides():
     from clipper.config import validate_overrides
     o = validate_overrides({"aspect": "1:1", "caption_style": "bold", "num_clips": "99"})
-    assert o == {"target_w": 1080, "target_h": 1080, "caption_style": "bold", "num_clips": 10}, o
+    assert o == {"target_w": 1080, "target_h": 1080, "caption_style": "bold", "num_clips": 12}, o
     assert validate_overrides({"aspect": "bogus", "caption_style": "x", "num_clips": "abc"}) == {}
     assert validate_overrides({"num_clips": "0"})["num_clips"] == 1
     assert validate_overrides({"aspect": "16:9"}) == {"target_w": 1920, "target_h": 1080}
@@ -15,14 +15,14 @@ def test_validate_overrides():
 
 def test_config_has_caption_style():
     from clipper.config import Config
-    assert Config().caption_style == "editorial"
+    assert Config().caption_style == "karaoke"
 
 
 def test_validate_overrides_length():
     from clipper.config import validate_overrides
     assert validate_overrides({"length": "under30"}) == {"min_clip_s": 8.0, "max_clip_s": 30.0}
     assert validate_overrides({"length": "60to90"}) == {"min_clip_s": 60.0, "max_clip_s": 90.0}
-    assert validate_overrides({"length": "auto"}) == {"min_clip_s": 30.0, "max_clip_s": 120.0}
+    assert validate_overrides({"length": "auto"}) == {"min_clip_s": 15.0, "max_clip_s": 60.0}
     assert validate_overrides({"length": "bogus"}) == {}
 
 
@@ -36,7 +36,7 @@ def test_validate_overrides_trim():
 def test_keep_spans_and_remap():
     from clipper.trim import keep_spans, remap
     from clipper.config import Config
-    cfg = Config(silence_max=.5, silence_keep=.15)  # explicitly exercise the legacy trim profile
+    cfg = Config()  # silence_max 0.5, silence_keep 0.15
     words = [
         {"word": "a", "start": 10.0, "end": 10.3},
         {"word": "b", "start": 10.3, "end": 10.6},
@@ -66,7 +66,7 @@ def test_keep_spans_no_gaps_single_span():
 def test_zoom_track():
     from clipper.crop import _zoom_track
     from clipper.config import Config
-    cfg = Config(zoom_gap=2.5)  # explicitly exercise the legacy camera helper
+    cfg = Config()  # zoom_amount 0.08, zoom_gap 2.5
     fps, n = 30, 300  # 10s
     z = _zoom_track(n, fps, [1.0, 1.2, 5.0], cfg)  # 1.2 is within 2.5s of 1.0 -> skipped
     cap = 1.0 + cfg.zoom_amount
@@ -171,7 +171,7 @@ def test_validate_brand():
 def test_clean_score_hook_sort():
     from clipper.score import _clean
     from clipper.config import Config
-    cfg = Config(min_clip_s=15, max_clip_s=60)
+    cfg = Config()
     raw = [
         {"start": 0, "end": 20, "title": "A", "reason": "r", "score": 40},
         {"start": 30, "end": 55, "title": "B", "hook": "Big hook here", "reason": "r", "score": 90},
@@ -223,3 +223,4 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
+

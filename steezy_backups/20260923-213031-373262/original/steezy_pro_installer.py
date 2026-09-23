@@ -6,7 +6,6 @@ import os
 import shutil
 import subprocess
 import sys
-import socket
 from datetime import datetime
 from pathlib import Path
 
@@ -51,13 +50,6 @@ def install(target, package, dry_run=False, install_deps=True):
     print(f'Target: {target}\nFile yang diperbarui: {len(changes)}')
     if dry_run:
         return None
-    try:
-        connection = socket.create_connection(('127.0.0.1', 8765), timeout=.3)
-    except OSError:
-        pass
-    else:
-        connection.close()
-        raise ValueError('Tutup server Clipper pada port 8765 (Ctrl+C di terminal) sebelum memasang upgrade.')
     if not changes:
         print('Versi paket ini sudah terpasang.')
         return None
@@ -100,7 +92,7 @@ def install(target, package, dry_run=False, install_deps=True):
         journal.write_text(json.dumps(record, indent=2), encoding='utf-8')
         raise
     print('Pemasangan selesai. Cadangan: ' + str(backup))
-    print('Jalankan CEK_PRO.cmd, kemudian JALANKAN_PRO.cmd di folder Steezy.')
+    print('Jalankan JALANKAN_PRO.cmd di folder Steezy.')
     return backup
 
 

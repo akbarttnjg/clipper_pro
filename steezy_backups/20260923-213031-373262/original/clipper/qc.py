@@ -18,9 +18,6 @@ def inspect(path, cfg, expected_duration):
         issues.append("Output tidak mempunyai audio.")
     if duration <= 0 or abs(duration - expected_duration) > max(.35, expected_duration * .015):
         issues.append("Durasi output berbeda dari timeline pemotongan.")
-    for stream in (video, audio):
-        if stream and 'duration' in stream and abs(float(stream['duration']) - expected_duration) > .20:
-            issues.append('Durasi track ' + stream['codec_type'] + ' tidak sesuai rencana edit.')
     report = {"passed": not issues, "issues": issues, "duration": duration,
               "width": video.get("width") if video else 0,
               "height": video.get("height") if video else 0,

@@ -8,38 +8,14 @@ from pathlib import Path
 
 
 @lru_cache(maxsize=1)
-def nvenc_diagnostic() -> dict:
+def nvenc_available() -> bool:
     try:
         r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i",
-                            "color=s=1280x720:r=30:d=0.2", "-frames:v", "6", "-pix_fmt", "yuv420p", "-c:v",
-                            "h264_nvenc", "-f", "null", "-"], capture_output=True, timeout=25)
-        return {"available": r.returncode == 0, "ffmpeg": shutil.which("ffmpeg"),
-                "detail": r.stderr.decode("utf-8", "replace")[-1600:]}
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"available": False, "ffmpeg": shutil.which("ffmpeg"), "detail": str(exc)}
-
-
-def nvenc_available() -> bool:
-    return nvenc_diagnostic()["available"]
-
-
-def encode(command, codec, log_path):
-    """Log real failures; retry a failed NVENC encode once with CPU, transparently."""
-    command = [str(x) for x in command]
-    attempt = subprocess.run(command, capture_output=True)
-    warnings = []
-    log = attempt.stderr.decode("utf-8", "replace")
-    if attempt.returncode and codec == "h264_nvenc":
-        warnings.append("NVENC gagal saat render; hasil ini menggunakan CPU. Lihat render.log.")
-        pos = command.index("h264_nvenc")
-        command[pos:pos + 1 + len(encoder_args(codec))] = ["libx264", *encoder_args("libx264")]
-        attempt = subprocess.run(command, capture_output=True)
-        log += "\nCPU RETRY\n" + attempt.stderr.decode("utf-8", "replace")
-        codec = "libx264"
-    Path(log_path).write_text(log, encoding="utf-8")
-    if attempt.returncode:
-        raise RuntimeError("Render FFmpeg gagal: " + log[-1600:])
-    return codec, warnings
+                            "color=s=64x64:d=0.1", "-frames:v", "1", "-c:v",
+                            "h264_nvenc", "-f", "null", "-"], capture_output=True, timeout=15)
+        return r.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 
 def encoder_args(codec):
@@ -90,7 +66,6 @@ def probe(path: str) -> dict:
         "height": int(vstream["height"]),
         "fps": fps if fps > 0 else 30.0,
         "duration": float(data["format"]["duration"]),
-        "has_audio": any(s["codec_type"] == "audio" for s in data["streams"]),
     }
 
 
