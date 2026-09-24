@@ -39,8 +39,6 @@ def install(target, package, dry_run=False, install_deps=True):
     if not (target / 'app.py').is_file() or not (target / 'clipper').is_dir():
         raise ValueError('Folder harus berisi app.py dan folder clipper dari instalasi Steezy.')
     manifest = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if manifest.get('requires_studio_2') and not all((target / name).is_file() for name in ('clipper/story.py', 'clipper/editplan.py')):
-        raise ValueError('Paket perbaikan ini membutuhkan Clipper Studio 2.0 yang sudah terpasang.')
     payload = package / 'payload'
     entries = manifest['files']
     for row in entries:
@@ -143,7 +141,6 @@ def main():
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--rollback', action='store_true')
     parser.add_argument('--skip-deps', action='store_true', help='Untuk pengujian/offline jika Pillow sudah terpasang.')
-    parser.add_argument('--install-deps', action='store_true', help='Pasang ulang dependensi bila CEK_PRO melaporkan modul belum tersedia.')
     args = parser.parse_args()
     if sys.version_info < (3, 10):
         raise ValueError('Gunakan Python 3.10 atau lebih baru.')
@@ -156,10 +153,7 @@ def main():
     if args.rollback:
         rollback(Path(target))
     else:
-        package = Path(__file__).resolve().parent
-        manifest = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-        deps = args.install_deps or (not args.skip_deps and not manifest.get('offline_update', False))
-        install(Path(target), package, args.dry_run, deps)
+        install(Path(target), Path(__file__).resolve().parent, args.dry_run, not args.skip_deps)
 
 
 if __name__ == '__main__':

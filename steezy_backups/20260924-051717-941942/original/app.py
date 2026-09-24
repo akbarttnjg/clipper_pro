@@ -17,14 +17,14 @@ ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
 load_dotenv(ROOT / '.env.pro', override=True)
 from clipper.config import Config, validate_overrides, validate_brand
-from clipper import pipeline, boundaries, story, editorial
+from clipper import pipeline
 from clipper.storage import read_json, write_json
 
 BRAND_FILE = ROOT / 'brand.json'
 base_cfg = replace(Config(), **validate_brand(read_json(BRAND_FILE, {})))
 base_cfg = replace(base_cfg, work_dir=str((ROOT / base_cfg.work_dir).resolve()),
                    out_dir=str((ROOT / base_cfg.out_dir).resolve()))
-app = FastAPI(title='Clipper Studio Local', version='2.2.0')
+app = FastAPI(title='Clipper Studio Local', version='2.0.0')
 STATIC = ROOT / 'static'
 UPLOADS = ROOT / 'uploads'
 UPLOADS.mkdir(exist_ok=True)
@@ -33,7 +33,7 @@ STATES.mkdir(parents=True, exist_ok=True)
 JOBS, JOB_STATE = {}, {}
 PROCESS_LOCK = threading.Lock()
 STATE_LOCK = threading.RLock()
-ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting'}
+ACTIVE = {'queued', 'analyzing', 'rendering', 'previewing', 'exporting'}
 
 
 def persist(job_id):
@@ -52,8 +52,6 @@ def restore():
             st, job = data['state'], data['job']
             st['cfg'] = Config(**{k: v for k, v in st['cfg'].items() if k in {f.name for f in fields(Config)}})
             st['edits'] = {int(k): v for k, v in st.get('edits', {}).items()}
-            st['scored'] = [boundaries.annotate(c, st.get('edits', {}).get(i, st.get('transcript', {}).get('words', [])),
-                                              st['cfg'].max_clip_s) for i, c in enumerate(st.get('scored', []))]
             if job['status'] in ACTIVE:
                 job.update(status='interrupted', message='Sesi terhenti. Kandidat dan koreksi yang tersimpan tetap ada.')
             JOB_STATE[file.stem], JOBS[file.stem] = st, job
@@ -101,47 +99,17 @@ def worker(job_id, action, indices=None):
                 transcript, clips = pipeline.analyze(st['media'], st['cfg'], progress)
                 st.update(transcript=transcript, scored=clips, edits={})
                 job.update(status='review', percent=100, message='Periksa pembuka, penutup, dan teks; pilih clip untuk render.')
-            elif action == 'reviewing':
-                try:
-                    for n, idx in enumerate(indices):
-                        progress(round(100 * n / len(indices)), f'Periksa batas {n+1}/{len(indices)} — transkrip tersimpan')
-                        transcript = {**st['transcript'], 'words': st.get('edits', {}).get(idx, st['transcript']['words'])}
-                        st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, st['cfg'])
-                        persist(job_id)
-                finally:
-                    editorial.release(st['cfg'])
-                job.pop('export', None)
-                job.update(status='review', percent=100, message='Pemeriksaan batas selesai. Kandidat bermasalah ditandai untuk review.')
             elif action == 'rendering':
-                pipeline.ffmpeg_util.filter_file_args('preflight')
-                job['failures'] = []
-                completed = 0
                 for n, idx in enumerate(indices):
                     c = st['scored'][idx]
-                    prior = next((r for r in job['clips'] if r.get('index') == idx and
-                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == '2.2.0'
-                        and (Path(st['cfg'].out_dir) / r.get('file', '')).is_file()), None)
-                    if prior:
-                        completed += 1
-                        continue
                     progress(round(100 * n / len(indices)), f'Render {n+1}/{len(indices)} — {c["title"]}')
                     cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
-                    try:
-                        res = pipeline.render_clip(st['media'], st.get('edits', {}).get(idx, st['transcript']['words']),
-                            c, pipeline.clip_name(c, idx), cfg,
-                            lambda p, m: progress(round((100*n+p)/len(indices)), f'Clip {n+1}/{len(indices)} · {m}'))
-                    except Exception as exc:
-                        job['failures'].append({'index': idx, 'title': c['title'], 'error': str(exc)})
-                        persist(job_id)
-                        continue
+                    res = pipeline.render_clip(st['media'], st.get('edits', {}).get(idx, st['transcript']['words']),
+                        c, pipeline.clip_name(c, idx), cfg)
                     job['clips'] = [r for r in job['clips'] if r.get('index') != idx] + [{**res, 'index': idx}]
                     job['clips'].sort(key=lambda r: r['index'])
-                    completed += 1
                     persist(job_id)
-                failed = len(job['failures'])
-                job.update(status='error' if failed else 'done', percent=100,
-                    error=job['failures'][0]['error'] if failed else None,
-                    message=f'{completed}/{len(indices)} clip selesai' + (f'; {failed} gagal. Render ulang hanya mengerjakan yang belum selesai.' if failed else '. Hasil tersimpan di folder clips.'))
+                job.update(status='done', percent=100, message=f'{len(indices)} clip selesai. Hasil tersimpan di folder clips.')
             elif action == 'previewing':
                 idx = indices[0]
                 c = dict(st['scored'][idx])
@@ -149,7 +117,7 @@ def worker(job_id, action, indices=None):
                 cfg = replace(cfg, preview_seconds=12, target_w=640 if cfg.target_w > cfg.target_h else 360,
                               target_h=360 if cfg.target_w > cfg.target_h else 640)
                 result = pipeline.render_clip(st['media'], st.get('edits', {}).get(idx, st['transcript']['words']),
-                                              c, 'preview-' + str(idx), cfg, progress)
+                                              c, 'preview-' + str(idx), cfg)
                 job.update(status='review', percent=100, message='Preview 12 detik siap. Pilih tab Preview.',
                            preview={**result, 'index': idx})
             elif action == 'exporting':
@@ -159,10 +127,9 @@ def worker(job_id, action, indices=None):
                 result = export_bundle(selected, st['cfg'], progress)
                 job.update(status='done', percent=100, message='Paket proyek editable siap.', export=result)
         except Exception as exc:
-            job.update(status='error', error=str(exc), message=f'Proses terhenti. {len(job["clips"])} clip tersimpan; transkrip dan kandidat tetap tersedia.')
+            job.update(status='error', error=str(exc), message='Proses terhenti; hasil clip yang sudah selesai tetap tersimpan.')
         finally:
             job['elapsed'] = round(time.time() - job['started'], 1)
-            job.setdefault('timings', {})[action] = job['elapsed']
             persist(job_id)
 
 
@@ -175,7 +142,7 @@ def enqueue(job_id, action, indices=None):
     threading.Thread(target=worker, args=(job_id, action, indices), daemon=True).start()
 
 
-def new_job(path, options, music='', sfx='', original_name=None):
+def new_job(path, options, music='', sfx=''):
     from clipper.ffmpeg_util import probe
     info = probe(str(path))
     if not info['has_audio']:
@@ -186,7 +153,7 @@ def new_job(path, options, music='', sfx='', original_name=None):
     JOB_STATE[job_id] = {'cfg': cfg, 'media': str(Path(path).resolve()), 'transcript': {},
                          'scored': [], 'edits': {}, 'clip_settings': {}, 'source_info': info}
     JOBS[job_id] = {'status': 'new', 'percent': 0, 'message': '', 'clips': [], 'error': None,
-                    'name': original_name or Path(path).name, 'created': time.time(), 'elapsed': 0}
+                    'name': Path(path).name, 'created': time.time(), 'elapsed': 0}
     enqueue(job_id, 'analyzing')
     return {'job': job_id}
 
@@ -196,34 +163,10 @@ def index():
     return (STATIC / 'index.html').read_text(encoding='utf-8')
 
 
-@app.get('/assets/{name}')
-def static_asset(name: str):
-    if name not in ('studio.css', 'studio.js'):
-        raise HTTPException(404, 'Aset tidak ditemukan.')
-    return FileResponse(STATIC / name, headers={'Cache-Control': 'no-cache'})
-
-
 @app.get('/api/jobs')
 def jobs():
     return [{'id': j, 'name': v.get('name', j), 'status': v['status'], 'created': v.get('created', 0)}
             for j, v in sorted(JOBS.items(), key=lambda row: row[1].get('created', 0), reverse=True)]
-
-
-@app.get('/api/templates')
-def typography_templates():
-    from clipper.motion import TEMPLATES
-    return [{**t, 'preview': '/api/template-preview/' + t['id']} for t in TEMPLATES]
-
-
-@app.get('/api/template-preview/{template_id}')
-def template_preview(template_id: str):
-    from clipper.motion import IDS
-    if template_id not in IDS:
-        raise HTTPException(404, 'Template tidak ditemukan.')
-    path = STATIC / 'templates' / (template_id + '.mp4')
-    if not path.is_file():
-        raise HTTPException(404, 'Preview template belum terpasang. Pasang paket upgrade lengkap.')
-    return FileResponse(path, media_type='video/mp4')
 
 
 @app.post('/api/upload')
@@ -254,7 +197,7 @@ async def upload(request: Request):
             else:
                 sfx = str(p.resolve())
     try:
-        return new_job(dest, options, music, sfx, Path(f.filename).name)
+        return new_job(dest, options, music, sfx)
     except HTTPException:
         raise
     except Exception as exc:
@@ -323,8 +266,7 @@ def editor_get(job_id: str, idx: int, start: float | None = None, end: float | N
     a, b = start if start is not None else c['start'] - 10, end if end is not None else c['end'] + 10
     words = st.get('edits', {}).get(idx, st['transcript']['words'])
     cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
-    settings = {k: v for k, v in asdict(cfg).items() if k not in ('pexels_key',)}
-    return {'clip': c, 'duration': st['transcript']['duration'], 'settings': settings,
+    return {'clip': c, 'duration': st['transcript']['duration'], 'settings': asdict(cfg),
             'words': [w for w in words if w['end'] > a and w['start'] < b]}
 
 
@@ -356,7 +298,6 @@ def editor_save(job_id: str, idx: int, data: dict = Body(...)):
         lo, hi = min(w['start'] for w in words), max(w['end'] for w in words)
         outside = [w for w in existing if w['end'] <= lo or w['start'] >= hi]
         combined = sorted(outside + words, key=lambda w: w['start'])
-        start, end = boundaries.snap_words(start, end, combined, duration)
         c = {**old, 'start': start, 'end': end, 'keywords': [str(k)[:80] for k in keys[:20]],
              'title': str(data.get('title', old['title'])).strip()[:120] or old['title'],
              'selection_source': 'reviewed', 'approved': True, 'revision': old.get('revision', 0) + 1}
@@ -372,14 +313,13 @@ def editor_save(job_id: str, idx: int, data: dict = Body(...)):
         settings = data.get('settings', {})
         if not isinstance(settings, dict):
             raise ValueError('Pengaturan clip harus berupa objek.')
-        overrides = {**st.get('clip_settings', {}).get(str(idx), {}), **validate_overrides(settings)}
-        c = boundaries.annotate(c, combined, st['cfg'].max_clip_s)
+        overrides = validate_overrides(settings)
         st.setdefault('edits', {})[idx] = combined
         st['scored'][idx] = c
         st.setdefault('clip_settings', {})[str(idx)] = overrides
         job.pop('export', None)
         persist(job_id)
-        return {'ok': True, 'revision': c['revision'], 'clip': c}
+        return {'ok': True, 'revision': c['revision']}
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -410,72 +350,13 @@ def selected_indices(data, st):
     return sorted(set(raw))
 
 
-@app.post('/api/apply-template/{job_id}')
-def apply_template(job_id: str, data: dict = Body(...)):
-    from clipper.motion import IDS
-    st, job = state(job_id)
-    if job['status'] in ACTIVE:
-        raise HTTPException(409, 'Tunggu proses selesai sebelum mengganti template.')
-    indices = selected_indices(data, st)
-    settings = data.get('settings', {})
-    if not isinstance(settings, dict) or settings.get('caption_style') not in (*IDS, 'editorial', 'clean'):
-        raise HTTPException(400, 'Pilih template yang tersedia.')
-    try:
-        allowed = {'caption_style', 'motion_intensity', 'caption_scale', 'accent_hex', 'accent_font'}
-        overrides = validate_overrides({k: v for k, v in settings.items() if k in allowed})
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-    for i in indices:
-        st.setdefault('clip_settings', {})[str(i)] = {**st.get('clip_settings', {}).get(str(i), {}), **overrides}
-        st['scored'][i]['revision'] = st['scored'][i].get('revision', 0) + 1
-    job.pop('export', None)
-    if job.get('preview', {}).get('index') in indices:
-        job.pop('preview', None)
-    persist(job_id)
-    return {'ok': True, 'count': len(indices)}
-
-
 @app.post('/api/render/{job_id}')
 def render_selected(job_id: str, data: dict = Body(...)):
     st, _ = state(job_id)
     indices = selected_indices(data, st)
+    for i in indices:
+        st['scored'][i]['approved'] = True
     enqueue(job_id, 'rendering', indices)
-    return {'ok': True}
-
-
-@app.post('/api/review-boundaries/{job_id}')
-def review_boundaries(job_id: str, data: dict = Body(...)):
-    st, _ = state(job_id)
-    indices = selected_indices(data, st)
-    enqueue(job_id, 'reviewing', indices)
-    return {'ok': True}
-
-
-@app.post('/api/audio/{job_id}')
-async def update_audio(job_id: str, request: Request):
-    st, job = state(job_id)
-    if job['status'] in ACTIVE:
-        raise HTTPException(409, 'Tunggu proses selesai sebelum mengganti audio.')
-    form = await request.form()
-    values = {}
-    for kind in ('music', 'sfx'):
-        asset = form.get(kind)
-        if asset and getattr(asset, 'filename', ''):
-            ext = Path(asset.filename).suffix.lower()
-            if ext not in ('.mp3', '.wav', '.m4a', '.flac', '.ogg'):
-                raise HTTPException(400, 'Format audio tidak didukung.')
-            path = UPLOADS / (uuid.uuid4().hex[:12] + '-' + kind + ext)
-            with path.open('wb') as out:
-                shutil.copyfileobj(asset.file, out)
-            values[kind + '_path'] = str(path.resolve())
-        elif form.get('remove_' + kind) == '1':
-            values[kind + '_path'] = ''
-    st['cfg'] = replace(st['cfg'], **values)
-    if values:
-        for c in st['scored']:
-            c['revision'] = c.get('revision', 0) + 1
-        job.pop('export', None)
-        persist(job_id)
     return {'ok': True}
 
 
@@ -530,9 +411,9 @@ def regenerate(job_id: str, idx: int, aspect: str = Form('9:16'), caption_style:
 
 @app.get('/api/health')
 def health():
-    from clipper.ffmpeg_util import nvenc_diagnostic, render_diagnostic
-    return {'nvenc': nvenc_diagnostic(), 'render': render_diagnostic(), 'model': base_cfg.model, 'whisper': base_cfg.whisper_model,
-            'version': '2.2.0', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
+    from clipper.ffmpeg_util import nvenc_diagnostic
+    return {'nvenc': nvenc_diagnostic(), 'model': base_cfg.model, 'whisper': base_cfg.whisper_model,
+            'version': '2.0.0', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
 
 
 @app.get('/api/brand')
@@ -552,13 +433,11 @@ def set_brand(accent_hex: str = Form(...), caption_style: str = Form(...), font_
 @app.get('/clips/{name}')
 def clip(name: str):
     p = Path(base_cfg.out_dir) / Path(name).name
-    if not p.is_file() or p.suffix not in ('.mp4', '.ass', '.srt'):
+    if not p.is_file() or p.suffix != '.mp4':
         raise HTTPException(404, 'Clip tidak ditemukan.')
-    if p.suffix == '.mp4':
-        return FileResponse(p, media_type='video/mp4')
-    return FileResponse(p, media_type='text/plain; charset=utf-8', filename=p.name)
+    return FileResponse(p, media_type='video/mp4')
 
 
 if __name__ == '__main__':
-    print('Clipper Studio Local 2.2 -> http://localhost:8765')
+    print('Clipper Studio Local 2.0 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

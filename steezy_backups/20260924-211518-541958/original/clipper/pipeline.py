@@ -1,6 +1,5 @@
 """Analyze once, review decisions, then execute an editable plan per selected clip."""
 import re
-import shutil
 import time
 from pathlib import Path
 from .config import Config
@@ -54,7 +53,7 @@ def clip_name(clip, i):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
-    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}-v22"
+    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}"
     work, out = Path(cfg.work_dir) / name, Path(cfg.out_dir)
     work.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
@@ -72,19 +71,12 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         raise ValueError('Tidak ada frame yang dapat dirender. Periksa batas clip.')
     ass = captions_pro.write_ass(plan['words'], work / 'captions.ass', cfg,
         hook=clip['title'] if cfg.title_card else '', keywords=clip.get('keywords', []),
-        anchors=[{'time': (s['start'] + s['end']) / 2, 'start': s['start'], 'end': s['end'],
-                  'position': s['position'], 'panel': s.get('caption_panel')} for s in plan['shots']])
+        anchors=[{'time': (s['start'] + s['end']) / 2, 'position': s['position']} for s in plan['shots']])
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
-    plan['style'] = {'accent': cfg.accent_hex, 'base': cfg.base_hex, 'caption_style': cfg.caption_style,
-                     'motion_intensity': cfg.motion_intensity}
-    plan['subtitle_path'] = str(Path(ass).resolve())
-    plan['render_config'] = {'zoom_amount': cfg.zoom_amount}
+    plan['style'] = {'accent': cfg.accent_hex, 'base': cfg.base_hex, 'caption_style': cfg.caption_style}
     plan_path = work / 'edit-plan.json'
     plan['status'] = 'preparing'
     write_json(plan_path, plan)
-    shutil.copy2(ass, out / (name + '.ass'))
-    from .projects import write_srt
-    write_srt(plan, out / (name + '.srt'))
     on_progress(25, 'Menyiapkan suara dan musik')
     mix = render.audio_stems(media_path, plan, cfg, work)
     plan['status'] = 'rendering'
@@ -106,7 +98,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         'start': clip['start'], 'end': clip['end'], 'length': round(checked['duration'], 2),
         'width': cfg.target_w, 'height': cfg.target_h, 'fps': cfg.output_fps, 'encoder': plan['encoder'],
         'revision': clip.get('revision', 0), 'plan_path': str(plan_path.resolve()),
-        'render_version': '2.2.0',
+        'render_version': '2.1.0',
         'render_seconds': plan['render_seconds'], 'selection_source': clip.get('selection_source'),
         'warnings': list(dict.fromkeys(clip.get('warnings', []) + plan['warnings'])), 'qc': checked}
 

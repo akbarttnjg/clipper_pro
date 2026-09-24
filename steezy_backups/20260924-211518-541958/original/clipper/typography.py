@@ -17,8 +17,7 @@ def token(text):
 
 @lru_cache(maxsize=96)
 def font(fonts_dir, size, family='sans'):
-    name = {'serif':'DejaVuSerif-Bold.ttf', 'regular':'DejaVuSans.ttf'}.get(family, 'DejaVuSans-Bold.ttf')
-    return ImageFont.truetype(str(Path(fonts_dir) / name), size)
+    return ImageFont.truetype(str(Path(fonts_dir) / ('DejaVuSerif-Bold.ttf' if family == 'serif' else 'DejaVuSans-Bold.ttf')), size)
 
 
 def valid_words(words):
@@ -36,9 +35,8 @@ def valid_words(words):
 
 def groups(words, cfg):
     result, current = [], []
-    for w in display_units(words):
+    for w in valid_words(words):
         if current and (len(current) >= cfg.editorial_words
-                        or w.get('part') != current[-1].get('part')
                         or w["start"] - current[-1]["end"] > cfg.caption_gap_s
                         or w["end"] - current[0]["start"] > cfg.editorial_phrase_s
                         or (len(current) >= 3 and re.search(r"[.!?;:]$", current[-1]["word"]))):
@@ -86,9 +84,6 @@ def panel(cfg, position):
 
 
 def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
-    from .motion import IDS
-    if cfg.caption_style in IDS:
-        return kinetic_plan(words, cfg, keywords, position, anchors)
     phrases = groups(words, cfg)
     plans = []
     for idx, phrase in enumerate(phrases):
@@ -140,103 +135,3 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
                       "panel": [x, y, width, height], "words": placed})
     return {"version": 2, "timebase": "output_seconds", "width": cfg.target_w,
             "height": cfg.target_h, "font": "DejaVu Sans", "phrases": plans}
-
-
-def display_units(words):
-    """Keep ASR decimal fragments, currencies and number units together for display.
-
-    Original transcript/timing objects are never modified. No missing digit is
-    inferred and no numeric value is changed.
-    """
-    units = []
-    suffixes = {'juta','miliar','milyar','triliun','ribu','persen','%','rupiah','tahun','bulan','kali'}
-    for original in valid_words(words):
-        w = {**original, 'word_ids':[original.get('word_id')]}
-        if units:
-            prior = units[-1]; a, b = prior['word'], w['word']
-            close = w['start'] - prior['end'] <= .65 and w.get('part') == prior.get('part')
-            currency = a.lower() in ('rp','rp.','$','usd') and bool(re.match(r'^\d', b))
-            decimal = bool(re.search(r'\d[.,]?$', a) and re.fullmatch(r'[.,]\d+[.,]?', b))
-            suffix = bool(re.search(r'\d[.,]?$', a)) and token(b) in suffixes
-            percent = b == '%' and bool(re.search(r'\d$', a))
-            if close and (currency or decimal or suffix or percent):
-                prior['word'] = (a.rstrip('.') if currency else a.rstrip('.,') if decimal else a) + ('' if currency or decimal or percent else ' ') + b
-                prior['end'] = max(prior['end'], w['end'])
-                prior['word_ids'] += w['word_ids']
-                continue
-        units.append(w)
-    return units
-
-
-def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
-    from .motion import frames
-    phrases = groups(words, cfg)
-    W, H = cfg.target_w, cfg.target_h
-    plans = []
-    for idx, phrase in enumerate(phrases):
-        middle = (phrase[0]['start']+phrase[-1]['end'])/2
-        pos = position
-        anchor = None
-        if anchors:
-            containing = [a for a in anchors if a.get('start', -1) <= middle < a.get('end', -1)]
-            anchor = containing[0] if containing else min(anchors,key=lambda a:abs(a['time']-middle))
-            pos = anchor['position']
-        if cfg.caption_position != 'auto':
-            pos = cfg.caption_position
-        side = pos in ('left','right') and W > H
-        panel_box = (W*(.055 if pos == 'left' else .54), H*.21, W*.385, H*.49) if side else (W*.085,H*(.57 if H>W else .62),W*.78,H*(.23 if H>W else .25))
-        if anchor and anchor.get('panel') and cfg.caption_position == 'auto':
-            panel_box = anchor['panel']
-        x,y,width,height = panel_box
-        emphasis = emphasis_indices(phrase, keywords)
-        if not emphasis:
-            choices = [(len(token(w['word'])),i) for i,w in enumerate(phrase) if token(w['word']) not in STOP]
-            emphasis = {max(choices)[1]} if choices else set()
-        focus = next(iter(emphasis), -1)
-        # Natural reading order remains intact; a highlighted token may get its own row.
-        line_indices = [list(range(len(phrase)))]
-        if focus >= 0 and len(phrase) > 1:
-            line_indices = [a for a in [list(range(focus)), [focus], list(range(focus+1,len(phrase)))] if a]
-        base = round(min(W,H)*(.073 if side else .070)*cfg.caption_scale)
-        for fs in range(max(18,base), 7, -1):
-            accent_size = 1.60 if cfg.caption_style == 'impact' else 1.35
-            sizes = [round(fs*(accent_size if i in emphasis else .83)) for i in range(len(phrase))]
-            families = ['sans' if i in emphasis else 'regular' for i in range(len(phrase))]
-            measures = [font(cfg.fonts_dir,sizes[i],families[i]).getlength(w['word']) for i,w in enumerate(phrase)]
-            space = fs*.29
-            rows = []
-            for indices in line_indices:
-                row=[]; used=0
-                for i in indices:
-                    if row and used+space+measures[i] > width*.88:
-                        rows.append(row);row=[];used=0
-                    used += measures[i]+(space if row else 0);row.append(i)
-                if row: rows.append(row)
-            heights = [max(sizes[i] for i in row)*1.18 for row in rows]
-            if len(rows)<=3 and sum(heights)<=height*.88 and max(measures)<=width*.88:
-                break
-        if len(rows)>3 or max(measures)>width*.88 or sum(heights)>height:
-            raise ValueError('Frasa terlalu panjang. Pecah teks pada transkrip atau kurangi ukuran teks.')
-        start = phrase[0]['start']
-        following = phrases[idx+1][0]['start'] if idx+1<len(phrases) else phrase[-1]['end']+.12
-        end = max(start+.02,min(phrase[-1]['end']+.14,following))
-        cy = y+(height-sum(heights))*(.5 if side else .85)
-        placed=[]
-        for row,rh in zip(rows,heights):
-            row_width=sum(measures[i] for i in row)+space*(len(row)-1)
-            cx=x+(width-row_width)/2
-            reveal=max(0,min(phrase[i]['start'] for i in row)-start-.055)
-            for i in row:
-                w=phrase[i]; size=sizes[i]
-                kind,samples=frames(cfg.caption_style,end-start,reveal,idx,i in emphasis,cfg)
-                placed.append({'text':w['word'],'word_id':w.get('word_id'),'word_ids':w.get('word_ids',[]),
-                    'start':w['start'],'end':w['end'],'x':round(cx+measures[i]/2,3),'y':round(cy+rh/2,3),
-                    'baseline':round(cy+rh*.8,3),'family':families[i], 'size':size,
-                    'ass_size':sum(font(cfg.fonts_dir,size,families[i]).getmetrics()),'width':measures[i],
-                    'emphasis':i in emphasis,'italic':bool(cfg.accent_font and i in emphasis and idx%3==1),
-                    'motion':kind,'keyframes':samples})
-                cx+=measures[i]+space
-            cy+=rh
-        plans.append({'start':start,'end':end,'position':pos,'panel':list(panel_box),'words':placed})
-    return {'version':3,'timebase':'output_seconds','width':W,'height':H,'font':'DejaVu Sans',
-            'template':cfg.caption_style,'motion_intensity':cfg.motion_intensity,'phrases':plans}

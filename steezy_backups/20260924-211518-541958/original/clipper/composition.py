@@ -35,9 +35,6 @@ def rectangle(area, face, aspect, focus=-1):
     rw, rh = min(aw, even(rw)), min(ah, even(rh))
     x = round(max(ax, min(cx - rw / 2, ax + aw - rw)))
     y = round(max(ay, min(cy - rh / 2, ay + ah - rh)))
-    if face:
-        # Face boxes exclude hair and can move down when someone reads a tablet.
-        y = min(y, max(ay, round(face[1]-face[3]*.65)))
     return [x, y, int(rw), int(rh)]
 
 
@@ -66,21 +63,6 @@ def material_panel(frame):
         coverage = cv2.contourArea(contour)/max(1,w*h)
         if .16 < share < .8 and w > width*.25 and h > height*.4 and coverage > .72:
             candidates.append((w*h, [x,y,w,h]))
-    # Writing and a bottom gradient can split a whiteboard into many contours.
-    # Projection recovers the panel only when there is a distinct darker side.
-    bright = (hsv[:, :, 2] > 170) & (hsv[:, :, 1] < 95)
-    columns = np.mean(bright, axis=0) > .43
-    edges = np.diff(np.r_[False, columns, False].astype(int))
-    for left, right in zip(np.where(edges == 1)[0], np.where(edges == -1)[0]):
-        if not .27 * width < right-left < .81 * width:
-            continue
-        rows = np.where(np.mean(bright[:, left:right], axis=1) > .42)[0]
-        if not len(rows) or rows[-1]-rows[0] < height*.45:
-            continue
-        top, bottom = int(rows[0]), int(rows[-1])+1
-        side = bright[:, :left] if left > width-right else bright[:, right:]
-        if side.size and np.mean(side) < .23 and np.mean(bright[top:bottom, left:right]) > .55:
-            candidates.append(((right-left)*(bottom-top), [int(left), top, int(right-left), bottom-top]))
     return max(candidates, default=(0, None), key=lambda r:r[0])[1]
 
 
@@ -169,12 +151,11 @@ def analyze(media, plan, cfg, info):
                 explicit_face = region(cfg.speaker_rect, W, H)
                 separated = material and face and not (material[0] <= face[0]+face[2]/2 <= material[0]+material[2]
                     and material[1] <= face[1]+face[3]/2 <= material[1]+material[3])
-                side_panel = material and max(material[0]-area[0], area[0]+area[2]-material[0]-material[2]) >= area[2]*.18
                 multiple = sum(len(r['faces']) > 1 for r in group) > len(group) * .3
                 small_face = face is not None and face[2] * face[3] / (area[2] * area[3]) < .012
                 mode = cfg.layout
                 if mode == 'auto':
-                    mode = 'stream' if cfg.target_h > cfg.target_w and (separated or side_panel or material and explicit_face) else (
+                    mode = 'stream' if cfg.target_h > cfg.target_w and (separated or material and explicit_face) else (
                         'fit' if material is not None or multiple or small_face or face is None else 'fill')
                 if mode == 'split':
                     mode = 'fit'
@@ -188,14 +169,6 @@ def analyze(media, plan, cfg, info):
                 start = (span['start_frame'] + left) / plan['fps']
                 end = (span['start_frame'] + right) / plan['fps']
                 pos = 'bottom'
-                caption_panel = None
-                if mode == 'stream' and cfg.target_h > cfg.target_w:
-                    top = round(cfg.target_h*cfg.material_share)//2*2
-                    shown_h = min(top, rect[3]*cfg.target_w/rect[2])
-                    gap = top-shown_h
-                    if gap > cfg.target_h*.17:
-                        margin = cfg.target_h*.012
-                        caption_panel = [cfg.target_w*.085, shown_h+margin, cfg.target_w*.78, gap-margin*2]
                 if cfg.target_w > cfg.target_h and face is not None and mode != 'stream':
                     relx = (face[0] + face[2] / 2 - rect[0]) / rect[2]
                     if relx < .35:
@@ -209,7 +182,7 @@ def analyze(media, plan, cfg, info):
                     'start': start, 'end': end, 'start_frame': span['start_frame'] + left,
                     'duration_frames': right - left, 'rect': rect, 'mode': mode, 'position': pos,
                     'face': face, 'zoom_at': zoom, 'zoom_amount': cfg.zoom_amount,
-                    'face_rect': face_rect, 'material_share': cfg.material_share, 'caption_panel': caption_panel})
+                    'face_rect': face_rect, 'material_share': cfg.material_share})
                 if mode == 'fit' and cfg.target_h > cfg.target_w:
                     plan['warnings'].append('Materi/tamu dipertahankan utuh. Periksa keterbacaan dalam format vertikal atau pilih 16:9.')
     finally:

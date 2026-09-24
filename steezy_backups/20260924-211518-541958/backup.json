@@ -1,0 +1,187 @@
+{
+  "version": "2.2.0",
+  "target": "C:\\AI\\clipper",
+  "status": "installed",
+  "files": [
+    {
+      "path": "CHANGELOG_STUDIO_2_2.md",
+      "sha256": "f491dd9ac11ea41df059af153f3cf5ac07a989cc692eef0d21d6f62bc39bfe91",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "PANDUAN_STUDIO_2_2.md",
+      "sha256": "22fb9b3a4669e3b5efe00a41f8a8df466309e5c1dcb42fa8039f2d5f95f00601",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "TEST_REPORT_STUDIO_2_2.md",
+      "sha256": "c785e2dd7a457a93cfc46918940842bfc6cd33f1e14c60ca768a310699e6e566",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "app.py",
+      "sha256": "8d7bad2dac9cb104661ec815f08327e84b218fbfea07d6b93c67bf90f401abdc",
+      "existed": true,
+      "original_sha256": "3cc99e3a73654fe3e7b4fcafffca42ecaedac75b313cb8e02c5e61b8817db15f"
+    },
+    {
+      "path": "clipper/captions.py",
+      "sha256": "c9367929f17f29795d5c72bd0a13916beaa3fc0c6b112d2546ac9ae1aecedb20",
+      "existed": true,
+      "original_sha256": "3d9f9b6751fa32f84d996b0af556e893e9a6bd6894f547c9211679d462e8f5f6"
+    },
+    {
+      "path": "clipper/captions_pro.py",
+      "sha256": "35580ffbcbff6f21efa0fc3ab175c37051ae2706a90196fe5a0f29394e01d1bb",
+      "existed": true,
+      "original_sha256": "97da8096797a00547631c2161f53b77e5941ff73707946e8509b7ec88ff22878"
+    },
+    {
+      "path": "clipper/composition.py",
+      "sha256": "82a4d9fef555998c3728e95bea4b9aa16d12d213a61515951f4cd7de17fea26c",
+      "existed": true,
+      "original_sha256": "7c03bcd4eec4db22068f340658bc194df551a2d02945244315828cb775c2a5fb"
+    },
+    {
+      "path": "clipper/config.py",
+      "sha256": "3990d4ed33b39910832479a6711e2b107555f5f7dba79af8e9a854d50f5ca5d0",
+      "existed": true,
+      "original_sha256": "c03b817f529a2cf47c029f11d58959ce3d48e57f161e9edf48edc6906c5a8bea"
+    },
+    {
+      "path": "clipper/fonts/DejaVuSans-BoldOblique.ttf",
+      "sha256": "6edf0283160186af451cbee71e7b845f2e4cabf264bb992ce668c83c25465e6f",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/DejaVuSans-Oblique.ttf",
+      "sha256": "ccdf74b350f11fd3dd5774de50e5e6346a1a5da1f5b7d5fb83590665e97a5213",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/DejaVuSans.ttf",
+      "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/motion.py",
+      "sha256": "617883caefea479bd8bf98a17f291f8b640847383206dce0d586493a2a33d30e",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/pipeline.py",
+      "sha256": "04e83db244b7ea3b108bb546de1c480854036d0597f6b2ff930757be98e94412",
+      "existed": true,
+      "original_sha256": "c9c68e98d84b05899107d2e22d3e5ee92912ba490397dc57c198cf9bb31296a1"
+    },
+    {
+      "path": "clipper/project_install.py",
+      "sha256": "c6febb414a2e588e30cda3b178e68a0c445bdbdf5ccd27495ca139af5cfc313f",
+      "existed": true,
+      "original_sha256": "cab93b64575646df5b5aa17df880ddb3c873fdb461d8e916d1d4729463b46bd1"
+    },
+    {
+      "path": "clipper/projects.py",
+      "sha256": "1ab39d80ef0f2932db33d2e71ffb04b046678eaeaf2b5b54372b58d36031b92b",
+      "existed": true,
+      "original_sha256": "ac2a346c49168f92aca1558686d6d4ade52f2c66fd05d3fdb5c96adbee1aec0c"
+    },
+    {
+      "path": "clipper/render.py",
+      "sha256": "8508731226bb46d5f1b8a7faa8da8cc337b1700f05d2c81b6da879f4e5904700",
+      "existed": true,
+      "original_sha256": "6f283d51025036e5459e03adaf729b01c7bc624aaf601c334a859d7e56101a2a"
+    },
+    {
+      "path": "clipper/tests/test_quality.py",
+      "sha256": "58a6b7b286e3c26b5be20364eff9334f44851131d1764d85a573ca0907a33258",
+      "existed": true,
+      "original_sha256": "018cd425c2f7971da8ed09e5e60b3cdb6aaf84ae7004c099702e6585a5f6f27b"
+    },
+    {
+      "path": "clipper/tests/test_recovery.py",
+      "sha256": "a60e0b2e62d21c1206cd5f4f400cef53e3a795f9d74e85b73722ef24acf9a4b4",
+      "existed": true,
+      "original_sha256": "8f1afe6eeb01d5abd23750db53972ed1843d06099926ecc699523296cf839c5e"
+    },
+    {
+      "path": "clipper/tests/test_typography22.py",
+      "sha256": "86a7d75ecce7536745ae17b3c75609fa3eac4522f1c2b8f3d28a512c7ac89463",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/typography.py",
+      "sha256": "f2e1a90f8cd2facde47097e501785cae9437808d3d3b0012b6bde8700763829f",
+      "existed": true,
+      "original_sha256": "5de3c93c3f9469b2d38cf2faece17973c592947755080414fb0f918425f4feda"
+    },
+    {
+      "path": "doctor_pro.py",
+      "sha256": "a3e13c697013d6cd4232a371ffe843ee567e8797cceb3e54ae50f302b7c4ed08",
+      "existed": true,
+      "original_sha256": "d6f15c78785d0c5ff6c790263531864775b8602cc70a515827b4836cb431badb"
+    },
+    {
+      "path": "static/index.html",
+      "sha256": "39837857a3fef4698544c6ff3dd58e98ac64a2268c2fad59e116b6015b1439f1",
+      "existed": true,
+      "original_sha256": "5d73d46255b9db276f229afbd0297883c3ea0792d8600188e7209647d0eb77de"
+    },
+    {
+      "path": "static/studio.css",
+      "sha256": "e015da5a275b1ae0d1ce63a687d7819045c64561ec9ad64b364b0803b40ad3a3",
+      "existed": true,
+      "original_sha256": "49cb8979942f6b30fa9dfaf16b7c91bfd9a8ca4404346a642f5d6254bdc9f7b6"
+    },
+    {
+      "path": "static/studio.js",
+      "sha256": "4c88d5e1a156397ab07b58610ca4cf64cf631660421a2051c2e611e696df0e70",
+      "existed": true,
+      "original_sha256": "ae49a6bec87259a17babfa0458f1f08ff4d82456c4d8f07f1b1329cf06b53802"
+    },
+    {
+      "path": "static/templates/blur.mp4",
+      "sha256": "93e6a71b306dc618906b1eb73d4c9fd74203a990f3521861ec576db048303b58",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/impact.mp4",
+      "sha256": "d39c7971a594fae9cfb5a7c6434414647c7cbf4d14f67431a7c196d1d83df6b7",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/narrative.mp4",
+      "sha256": "1ec33fb475882685e322af6b96b59f8e5056ad1e6e3855cf4f11c21ec3adc89a",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/pop.mp4",
+      "sha256": "1575838b7311f937c2b3af3665c8871ad84ffb0a882f245c5808cb90de4c2882",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/slide.mp4",
+      "sha256": "6da7e1d837664488a7ab77c2545de76b121d8df3856e9f82938ab0e3ce24af35",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "tools/build_template_previews.py",
+      "sha256": "7dc27294d076277212077c0c7db3c927e2bfa569c198c00faff1300cfdc19187",
+      "existed": false,
+      "original_sha256": null
+    }
+  ]
+}

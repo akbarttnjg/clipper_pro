@@ -5,8 +5,6 @@ CapCut uses pycapcut's native segments and a modern multi-timeline wrapper; its
 undocumented draft format is explicitly reported as experimental.
 """
 import copy
-from dataclasses import replace
-import hashlib
 import json
 import shutil
 import time
@@ -37,49 +35,25 @@ def lua_string(value):
 
 def fusion_comp(phrase, plan, path):
     """A native Text+ node per word, sharing baseline positions and source timing."""
-    count = max(1, round(phrase['end']*plan['fps']) - round(phrase['start']*plan['fps']))
+    count = max(1, round((phrase['end'] - phrase['start']) * plan['fps']))
     nodes = ['BG = Background { Inputs = { Width = Input { Value = %d }, Height = Input { Value = %d }, TopLeftAlpha = Input { Value = 0 } } }' % (plan['width'], plan['height'])]
     previous = 'BG'
-    def curve(name, samples, value):
-        keys = ', '.join('[%d] = { %.8f, Flags = { Linear = true } }' % (k['frame'], value(k)) for k in samples)
-        nodes.append(f'{name} = BezierSpline {{ KeyFrames = {{ {keys} }} }}')
-        return 'Input { SourceOp = "' + name + '", Source = "Value" }'
     for i, w in enumerate(phrase['words']):
         ident = f'Word{i + 1}'
         c = plan['style']['accent'] if w.get('emphasis') else plan['style']['base']
         rgb = [int(c.lstrip('#')[j:j+2], 16) / 255 for j in (0, 2, 4)]
         family = 'DejaVu Serif' if w.get('family') == 'serif' else 'DejaVu Sans'
-        size = f"Input {{ Value = {w['size']/plan['height']:.8f} }}"
-        center = f"Input {{ Value = {{ {w['x']/plan['width']:.8f}, {1-w['y']/plan['height']:.8f} }} }}"
-        blend = 'Input { Value = 1 }'
-        blur = 'Input { Value = 0 }'
-        if w.get('keyframes'):
-            samples = w['keyframes']
-            size = curve(ident+'Size', samples, lambda k:w['size']/plan['height']*k['scale'])
-            xx = curve(ident+'X', samples, lambda k:(w['x']+k['dx'])/plan['width'])
-            yy = curve(ident+'Y', samples, lambda k:1-(w['y']+k['dy'])/plan['height'])
-            nodes.append(f'{ident}Path = XYPath {{ Inputs = {{ X = {xx}, Y = {yy} }} }}')
-            center = f'Input {{ SourceOp = "{ident}Path", Source = "Value" }}'
-            blend = curve(ident+'Opacity', samples, lambda k:k['opacity'])
-            blur = curve(ident+'Softness', samples, lambda k:k['blur']/min(plan['width'],plan['height'])*100)
-        style = 'Book' if w.get('family') == 'regular' else 'Bold'
-        if w.get('italic'):
-            style = 'Oblique' if style == 'Book' else 'Bold Oblique'
         nodes.append(f'''{ident} = TextPlus {{ Inputs = {{
             GlobalIn = Input {{ Value = 0 }}, GlobalOut = Input {{ Value = {count - 1} }},
             Width = Input {{ Value = {plan['width']} }}, Height = Input {{ Value = {plan['height']} }},
             UseFrameFormatSettings = Input {{ Value = 1 }},
             StyledText = Input {{ Value = {lua_string(w['text'])} }}, Font = Input {{ Value = {lua_string(family)} }},
-            Style = Input {{ Value = {lua_string(style)} }}, Size = {size},
-            Center = {center},
+            Style = Input {{ Value = "Bold" }}, Size = Input {{ Value = {w['size'] / plan['height']:.8f} }},
+            Center = Input {{ Value = {{ {w['x'] / plan['width']:.8f}, {1 - w['y'] / plan['height']:.8f} }} }},
             Red1 = Input {{ Value = {rgb[0]} }}, Green1 = Input {{ Value = {rgb[1]} }}, Blue1 = Input {{ Value = {rgb[2]} }},
             ShadingMappingLevel1 = Input {{ Value = 0 }} }} }}''')
-        foreground = ident
-        if w.get('keyframes') and any(k['blur'] for k in w['keyframes']):
-            foreground = ident+'Blur'
-            nodes.append(f'{foreground} = Blur {{ Inputs = {{ Filter = Input {{ Value = FuID {{ "Gaussian" }} }}, XBlurSize = {blur}, YBlurSize = {blur}, Input = Input {{ SourceOp = "{ident}", Source = "Output" }} }} }}')
         merge = f'Merge{i + 1}'
-        nodes.append(f'{merge} = Merge {{ Inputs = {{ Blend = {blend}, Background = Input {{ SourceOp = "{previous}", Source = "Output" }}, Foreground = Input {{ SourceOp = "{foreground}", Source = "Output" }} }} }}')
+        nodes.append(f'{merge} = Merge {{ Inputs = {{ Background = Input {{ SourceOp = "{previous}", Source = "Output" }}, Foreground = Input {{ SourceOp = "{ident}", Source = "Output" }} }} }}')
         previous = merge
     nodes.append(f'MediaOut1 = MediaOut {{ Inputs = {{ Input = Input {{ SourceOp = "{previous}", Source = "Output" }}, Index = Input {{ Value = "0" }} }} }}')
     Path(path).write_text('{ Tools = ordered() {\n' + ',\n'.join(nodes) + '\n}, ActiveTool = "Word1" }\n', encoding='utf-8')
@@ -249,11 +223,7 @@ def capcut_export(items, root):
             script.add_segment(segment, 'Video')
         for kind, path in p['audio']['stems'].items():
             script.add_track(cc.TrackType.audio, kind)
-            material = cc.AudioMaterial(path)
-            difference = us(p['duration'])-material.duration
-            if difference > 2000:
-                raise ValueError(f'Track {kind} kurang {difference/1e6:.3f} detik dari timeline. Render ulang clip sebelum ekspor.')
-            script.add_segment(cc.AudioSegment(material, trange(0, min(us(p['duration']), material.duration))), kind)
+            script.add_segment(cc.AudioSegment(path, trange(0, us(p['duration']))), kind)
         maxwords = max((len(ph['words']) for ph in p['captions']['phrases']), default=0)
         for k in range(maxwords):
             script.add_track(cc.TrackType.text, f'Kata {k+1}', relative_index=k)
@@ -261,26 +231,11 @@ def capcut_export(items, root):
             if end - start < .015:
                 return
             rgb = tuple(int(paint.lstrip('#')[j:j+2],16)/255 for j in (0,2,4))
-            samples = w.get('keyframes', [])
-            # Text opacity/blur keyframes are not supported by pycapcut's native
-            # text mapping. Start at the reveal; preserve move and scale curves.
-            reveal = next((k['t'] for k in samples if k['opacity'] > 0), 0.)
-            duration = end-start-reveal
-            if duration < .015:
-                return
-            seg = cc.TextSegment(w['text'], trange(us(start+reveal), us(duration)),
-                style=cc.TextStyle(size=w['size'] * 120 / min(W,H), bold=w.get('family')!='regular', italic=bool(w.get('italic')), color=rgb, align=1),
+            seg = cc.TextSegment(w['text'], trange(us(start), us(end-start)),
+                style=cc.TextStyle(size=w['size'] * 120 / min(W,H), bold=True, color=rgb, align=1),
                 clip_settings=cc.ClipSettings(transform_x=2*w['x']/W-1, transform_y=1-2*w['y']/H),
-                border=cc.TextBorder(width=0 if samples else 8, alpha=.65))
-            timed = {min(us(duration), max(0, us(k['t']-reveal))): k for k in samples if k['t'] >= reveal}
-            for when, key in sorted(timed.items()):
-                if key['t'] < reveal:
-                    continue
-                for prop, value in ((cc.KeyframeProperty.scale_x,key['scale']), (cc.KeyframeProperty.scale_y,key['scale']),
-                    (cc.KeyframeProperty.position_x,2*(w['x']+key['dx'])/W-1),
-                    (cc.KeyframeProperty.position_y,1-2*(w['y']+key['dy'])/H)):
-                    seg.add_keyframe(prop, when, value)
-            fontmap[seg.material_id] = {'regular':'DejaVuSans.ttf','serif':'DejaVuSerif-Bold.ttf'}.get(w.get('family'),'DejaVuSans-Bold.ttf')
+                border=cc.TextBorder(width=8, alpha=.65))
+            fontmap[seg.material_id] = 'DejaVuSerif-Bold.ttf' if w.get('family') == 'serif' else 'DejaVuSans-Bold.ttf'
             script.add_segment(seg, track)
         for phrase in p['captions']['phrases']:
             for k, w in enumerate(phrase['words']):
@@ -370,37 +325,6 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
             raise ValueError('Rencana edit tidak sesuai render terakhir.')
         if not Path(p['source']['path']).is_file():
             raise ValueError('Sumber dipindahkan. Pulihkan path sumber sebelum ekspor.')
-        from . import render, qc
-        original = copy.deepcopy(p)
-        clean_cfg = replace(cfg, target_w=p['width'], target_h=p['height'], output_fps=p['fps'],
-                            **p.get('render_config', {}))
-        clean = Path(result['plan_path']).parent / 'video-clean.mp4'
-        cache = clean.with_suffix('.cache.json')
-        fingerprint = {k:p.get(k) for k in ('shots','source','width','height','fps','duration','render_config')}
-        fingerprint['media_mtime'] = Path(p['source']['path']).stat().st_mtime_ns
-        fingerprint['mix_mtime'] = Path(p['audio']['mix']).stat().st_mtime_ns
-        key = hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
-        if not clean.exists() or read_json(cache,{}).get('key') != key:
-            progress(round(5+30*i/max(1,len(results))), f'Menyiapkan video tanpa teks {i+1}/{len(results)}')
-            render.video(p['source']['path'], p, clean_cfg, None, clean, p['audio']['mix'],
-                lambda fraction: progress(round(5+30*(i+fraction)/max(1,len(results))),
-                    f'Video tanpa teks {i+1}/{len(results)}'))
-        qc.inspect(clean, clean_cfg, p['duration'])
-        write_json(cache, {'key':key})
-        packed_clean = root / 'Media' / f'{i+1:02}-video-clean.mp4'
-        shutil.copy2(clean, packed_clean)
-        subtitle = Path(p.get('subtitle_path', Path(result['plan_path']).parent / 'captions.ass'))
-        if subtitle.is_file():
-            shutil.copy2(subtitle, root / 'Media' / f'{i+1:02}-captions.ass')
-        write_srt(p, root / 'Media' / f'{i+1:02}-captions.srt')
-        write_json(root / f'original-edit-plan-{i+1:02}.json', original)
-        # Framing and zoom are baked into V1; typography and audio remain separate.
-        # This preserves the material/speaker split exactly in both editors.
-        p['source'] = {**p['source'], 'path': str(packed_clean.resolve()), 'fps': p['fps'],
-                       'width': p['width'], 'height': p['height'], 'duration': p['duration']}
-        p['shots'] = [{**s, 'source_start': s['start'], 'source_end': s['end'],
-                       'rect': [0,0,p['width'],p['height']], 'mode': 'fill',
-                       'face_rect': None, 'zoom_at': None} for s in p['shots']]
         for kind, source in list(p['audio']['stems'].items()):
             target = root / 'Media' / f'{i+1:02}-{kind}.wav'
             shutil.copy2(source, target)
@@ -415,13 +339,13 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
         capcut_export(items, root)
     except Exception as exc:
         capcut_error = str(exc)
-    manifest = {'version': 3, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
+    manifest = {'version': 2, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
         'source_files': sorted({p['plan']['source']['path'] for p in items}),
         'capcut_status': 'experimental-generated' if capcut_error is None else 'failed', 'capcut_error': capcut_error,
         'resolve_status': 'generated-unverified-in-editor', 'limitations': [
-            'Video tanpa teks, WAV, font, ASS master dan SRT ada di paket. Framing/zoom sudah menyatu di video.',
-            'DaVinci: Fusion Text+ dengan kurva posisi, ukuran, opacity dan blur; perlu verifikasi tampilan di editor.',
-            'CapCut: teks editable dengan gerak posisi/ukuran. Blur dan fade native belum dipetakan; MP4/ASS memuat efek lengkap.',
+            'Sumber video asli direferensikan; jangan dipindah. WAV dan font ada di paket.',
+            'DaVinci: Fusion teks tetap editable; animasi penekanan dan zoom dapat berbeda dari MP4.',
+            'Mode materi+pembicara saat ini diekspor ke editor sebagai gambar utuh; susun ulang split bila diperlukan.',
             'CapCut multi-timeline memakai format draft tidak resmi; perlu uji 9.5. Fallback draft per clip disediakan.']}
     write_json(root / 'manifest.json', manifest)
     shutil.copy2(Path(__file__).parent / 'project_install.py', root / 'PASANG_PROYEK.py')
@@ -430,16 +354,12 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
     guide = '''PAKET PROYEK CLIPPER STUDIO
 
 MP4 final berada di folder clips aplikasi dan dapat diunduh dari UI.
-Ekstrak paket ke folder permanen. Video tanpa teks, suara, musik, efek, dan teks terpisah.
-Komposisi materi/pembicara serta zoom menyatu dalam video agar hasilnya konsisten.
-original-edit-plan menyimpan keputusan terhadap sumber asli untuk referensi.
-Media/XX-captions.ass adalah master animasi penuh; ASS tidak otomatis menjadi
-layer editable native. Paket mengubah tipografi menjadi Text+ / track teks editor.
-Media/XX-captions.srt merupakan fallback teks biasa tanpa animasi.
+Sumber video asli tetap dipakai. Jangan pindahkan/hapus sumber tersebut.
+Ekstrak paket ke folder permanen. Track suara, musik, efek, dan teks terpisah.
 
 DAVINCI RESOLVE FREE
 1. Jalankan SIAPKAN_DAVINCI.cmd agar path aset sesuai lokasi ekstrak.
-2. Instal semua font TTF dalam Fonts bila belum ada (klik kanan > Install).
+2. Instal dua font TTF dalam Fonts bila belum ada (klik kanan > Install).
 3. Buka Resolve > Workspace > Console. Pilih Lua.
 4. Jalankan dofile([[C:/path/paket/DaVinci/IMPORT_RESOLVE.lua]]) dengan path Anda.
 Script membuat satu proyek baru dengan satu timeline per clip; tidak menimpa proyek lama.
@@ -447,7 +367,7 @@ Alternatif: import setiap DaVinci/clip-XX/timeline.xml ke satu proyek secara man
 lalu impor captions.srt. Tipografi Fusion memerlukan script atau Import Fusion Composition
 pada clip TEXT_... menggunakan file text-XXX.comp yang sesuai.
 Teks bisa diedit pada Fusion > Word1, Word2, dst. Zoom dasar di Inspector.
-Gerak posisi, ukuran, opacity dan blur teks memiliki kurva animasi di Fusion.
+Marker kuning menunjukkan penekanan zoom yang dapat ditambahkan keyframe.
 Tata letak/animasi native perlu diperiksa; MP4 merupakan rujukan hasil render.
 
 CAPCUT 9.5 — EKSPERIMENTAL
@@ -463,11 +383,8 @@ Jangan hapus folder paket setelah impor karena aset direferensikan dari sini.
 BATAS VERIFIKASI
 File proyek telah dibuat secara terstruktur; impor di Resolve Free 21.0.4 / CapCut 9.5
 belum dijalankan dalam lingkungan pengembangan. Periksa satu clip dahulu.
-Perbedaan yang diketahui: blur dan fade teks CapCut belum dipetakan; ukuran font dan
-baseline kedua editor dapat berbeda. Semua efek penuh ada pada MP4 dan master ASS.
-Komposisi kamera sudah menyatu di video tanpa teks. Ubah framing di aplikasi lalu
-ekspor ulang jika ingin menggantinya. Pembuatan paket menambah satu render tanpa teks
-per clip, yang disimpan untuk dipakai kembali selama revisi tidak berubah.
+Perbedaan yang diketahui: penekanan teks Fusion statis, zoom halus Resolve berupa marker,
+dan split materi+pembicara pada editor perlu disusun ulang. MP4 memakai semua efek renderer.
 '''
     if capcut_error:
         guide += '\nEKSPOR CAPCUT GAGAL: ' + capcut_error + '\nInstal requirements-pro.txt lalu ekspor ulang.\n'

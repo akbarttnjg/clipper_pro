@@ -15,7 +15,7 @@ def test_validate_overrides():
 
 def test_config_has_caption_style():
     from clipper.config import Config
-    assert Config().caption_style == "narrative"
+    assert Config().caption_style == "editorial"
 
 
 def test_validate_overrides_length():

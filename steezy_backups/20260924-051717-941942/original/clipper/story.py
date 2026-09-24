@@ -5,11 +5,10 @@ are not silently stretched to manufacture a complete discussion.
 """
 import json
 import re
-import time
 from pathlib import Path
 import requests
 from . import editorial
-from .boundaries import segments_from_words, annotate
+from .score import segments_from_words
 from .typography import token, STOP
 from .storage import read_json, write_json
 
@@ -37,7 +36,7 @@ def windows(segments, cfg):
         i = max(i + 1, next((k for k in range(i + 1, j) if segments[k]['start'] >= next_time), j))
 
 
-def request(block, cfg, candidate=None):
+def request(block, cfg):
     fields = {k: {'type': 'string'} for k in ('title', 'reason', 'hook_quote', 'ending_evidence')}
     fields.update({k: {'type': 'integer'} for k in ('start_segment', 'end_segment', 'value', 'opening', 'closure')})
     fields['complete'] = {'type': 'boolean'}
@@ -51,26 +50,15 @@ def request(block, cfg, candidate=None):
         'Gunakan ID start_segment dan end_segment inklusif. Jangan potong kata atau mulai di tengah jawaban yang butuh konteks. '
         'Sertakan caveat/risiko ketika keuangan. Jangan mengarang, menyusun ulang isi utama, atau memilih iklan dan pengulangan. '
         'Jika awal/akhir topik berada di luar jendela, jangan pilih. complete true hanya jika topik selesai. '
-        'Kalimat seperti "Nah dari uang ini", "yang keempat uang orang", atau "setelah itu gue ngerti" '
-        'BUKAN kesimpulan. Jangan berhenti sebelum jawaban, alasan, unsur daftar, atau kata setelah "dari". '
-        'Sebuah janji seperti "ada 4 cara" harus diikuti keempat cara lengkap dalam clip. '
-        'Jangan mengembangkan singkatan yang tidak dijelaskan pembicara. '
         'Nilai value (daging/contoh konkret), opening (alasan menonton), closure (jawaban tuntas) masing-masing 0-5. '
         'ending_evidence wajib kutipan PERSIS dari kalimat terakhir yang membuktikan kesimpulan. '
         'hook_quote opsional: kutipan PERSIS 3-8 kata yang diucapkan di dalam clip, kuat dan tidak menyesatkan tanpa konteks; kosong bila tidak ada. '
-        'Judul Indonesia <=8 kata. reason <=35 kata. keywords kata bermakna PERSIS dari transkrip, bukan kata sambung. Kembalikan JSON.')
-    if candidate is not None:
-        system += (' Ini pemeriksaan KEDUA. Tinjau konteks SEBELUM dan SESUDAH kandidat, abaikan skor awal. '
-            'Kembalikan maksimal satu clip yang mempertahankan inti kandidat dengan awal dan akhir utuh. '
-            'Boleh menggeser batas atau membuang pengantar yang tidak menjawab judul. '
-            'Jika topik tidak bisa utuh dalam durasi yang diizinkan, kembalikan clips kosong. '
-            'Jangan memilih topik lain hanya agar ada hasil. Kandidat DATA: ' +
-            json.dumps({k: candidate.get(k) for k in ('start', 'end', 'title')}, ensure_ascii=False))
+        'Judul Indonesia <=8 kata. keywords kata bermakna PERSIS dari transkrip, bukan kata sambung. Kembalikan JSON.')
     prompt = '\n'.join(f"[{s['id']}] {s['start']:.2f}-{s['end']:.2f} {s['text']}" for s in block)
     r = requests.post(editorial.local_url(cfg) + '/api/generate', json={
         'model': cfg.model, 'system': system, 'prompt': prompt, 'stream': False, 'think': False,
         'format': schema, 'keep_alive': '5m', 'options': {'temperature': .1, 'num_ctx': cfg.ollama_num_ctx,
-        'num_predict': 1100 if candidate is None else 700, 'num_gpu': cfg.ollama_num_gpu}}, timeout=cfg.ollama_timeout)
+        'num_predict': 1500, 'num_gpu': cfg.ollama_num_gpu}}, timeout=cfg.ollama_timeout)
     r.raise_for_status()
     data = r.json()
     if data.get('done_reason') == 'length':
@@ -98,12 +86,7 @@ def ground(raw, block, words, cfg, duration):
     for item in raw if isinstance(raw, list) else []:
         try:
             a, b = by_id[int(item['start_segment'])], by_id[int(item['end_segment'])]
-            if a['id'] > b['id']:
-                continue
-            previous = max((w['end'] for w in words if w['end'] <= a['start']), default=0.)
-            following = min((w['start'] for w in words if w['start'] >= b['end']), default=duration)
-            start = min(a['start'], max(0., a['start'] - .12, previous))
-            end = max(b['end'], min(duration, b['end'] + .18, following))
+            start, end = max(0., a['start'] - .12), min(duration, b['end'] + .18)
             if not cfg.min_clip_s <= end - start <= cfg.max_clip_s + cfg.topic_grace_s:
                 continue
             if item.get('complete') is not True:
@@ -121,12 +104,12 @@ def ground(raw, block, words, cfg, duration):
             warnings = ['Batas topik dinilai AI; dengarkan pembuka dan penutup sebelum menyetujui.']
             if end - start > cfg.max_clip_s:
                 warnings.append('Sedikit lebih panjang untuk menuntaskan topik.')
-            result.append(annotate({'start': start, 'end': end, 'title': str(item['title'])[:120],
+            result.append({'start': start, 'end': end, 'title': str(item['title'])[:120],
                 'reason': str(item['reason'])[:600], 'keywords': keywords, 'rubric': rubric,
                 'hook': str(item.get('hook_quote', ''))[:140],
                 'cold_open_span': quote_span(item.get('hook_quote', ''), words, start, end),
                 'ending_evidence': str(item['ending_evidence'])[:250], 'warnings': warnings,
-                'selection_source': 'local-topic-review', 'approved': False, 'revision': 0}, words, cfg.max_clip_s))
+                'selection_source': 'local-topic-review', 'approved': False, 'revision': 0})
         except (KeyError, TypeError, ValueError, OverflowError):
             continue
     return result
@@ -159,19 +142,17 @@ def distinct(candidates, words, cfg):
 def select(transcript, cfg, progress=lambda p, m: None):
     segments = segments_from_words(transcript['words'])
     blocks = list(windows(segments, cfg))
-    candidates, failures, timings = [], [], []
+    candidates, failures = [], []
     journal = Path(cfg.work_dir) / 'topic-windows'
     try:
         for i, block in enumerate(blocks):
-            progress(32 + round(45 * i / max(1, len(blocks))), f'Memeriksa topik {i + 1}/{len(blocks)}')
+            progress(32 + round(60 * i / max(1, len(blocks))), f'Memeriksa topik {i + 1}/{len(blocks)}')
             # Key includes the words/model/settings; editing a transcript invalidates the selection cache.
             import hashlib
             key = hashlib.sha256(json.dumps([block, cfg.model, cfg.min_clip_s, cfg.max_clip_s,
-                cfg.topic_grace_s, 'topic-v3']).encode()).hexdigest()[:24]
+                cfg.topic_grace_s, 'topic-v2']).encode()).hexdigest()[:24]
             path = journal / (key + '.json')
             raw = read_json(path)
-            started = time.monotonic()
-            cached = raw is not None
             if raw is None:
                 try:
                     raw = request(block, cfg)
@@ -182,18 +163,11 @@ def select(transcript, cfg, progress=lambda p, m: None):
                         break  # unavailable model should not repeat long timeouts for 2 hours of video
                     continue
             candidates.extend(ground(raw, block, transcript['words'], cfg, transcript['duration']))
-            timings.append({'window': i + 1, 'cached': cached, 'seconds': round(time.monotonic() - started, 2)})
-        result = distinct(candidates, transcript['words'], cfg)
-        if cfg.topic_review:
-            for i, c in enumerate(result):
-                progress(78 + round(19 * i / max(1, len(result))), f'Memeriksa awal dan akhir kandidat {i+1}/{len(result)}')
-                result[i] = review_candidate(c, transcript, cfg)
     finally:
         editorial.release(cfg)
-    result = distinct(result, transcript['words'], cfg)
-    write_json(Path(cfg.work_dir) / 'selection-report.json', {'windows': len(blocks), 'processed_windows': len(timings), 'errors': failures,
-        'accepted': len(result), 'needs_review': sum(c.get('boundary_review', {}).get('status') == 'needs_review' for c in result),
-        'timings': timings, 'rubric': '0–5 editorial; bukan probabilitas FYP'})
+    result = distinct(candidates, transcript['words'], cfg)
+    write_json(Path(cfg.work_dir) / 'selection-report.json', {'windows': len(blocks), 'errors': failures,
+        'accepted': len(result), 'rubric': '0–5 editorial; bukan probabilitas FYP'})
     if not result:
         # A manual starting point, never disguised as a high-scoring AI selection.
         end_limit = min(cfg.max_clip_s, transcript['duration'])
@@ -207,43 +181,3 @@ def select(transcript, cfg, progress=lambda p, m: None):
         for c in result:
             c['warnings'].append('Analisis sumber belum seluruhnya berhasil; lihat selection-report.json.')
     return result
-
-
-def review_candidate(candidate, transcript, cfg):
-    """Use the saved transcript. No Whisper or whole-video rescan is needed."""
-    import hashlib
-    from dataclasses import replace
-    words = transcript['words']
-    # A strict maximum during repair avoids extending every candidate indefinitely.
-    strict = replace(cfg, topic_grace_s=0)
-    block = [s for s in segments_from_words(words)
-             if s['end'] > candidate['start'] - 45 and s['start'] < candidate['end'] + 60]
-    key = hashlib.sha256(json.dumps([block, candidate['start'], candidate['end'], candidate['title'],
-        cfg.model, cfg.min_clip_s, cfg.max_clip_s, 'boundary-v1'], ensure_ascii=False).encode()).hexdigest()[:24]
-    path = Path(cfg.work_dir) / 'boundary-reviews' / (key + '.json')
-    c = annotate(candidate, words, cfg.max_clip_s)
-    try:
-        raw = read_json(path)
-        if raw is None:
-            raw = request(block, strict, candidate)
-            write_json(path, raw)
-        options = ground(raw, block, words, strict, transcript['duration'])
-        # Re-review must overlap the original thought, not silently switch topics.
-        options = [x for x in options if
-            max(0., min(x['end'], c['end']) - max(x['start'], c['start'])) >=
-            .4 * min(x['end'] - x['start'], c['end'] - c['start'])
-            and not x['boundary_review']['issues']]
-        if not options:
-            c['boundary_review']['status'] = 'needs_review'
-            c['boundary_review']['issues'] = list(dict.fromkeys(c['boundary_review']['issues'] +
-                ['Pemeriksaan konteks belum menemukan batas utuh. Dengarkan pembuka dan penutup, lalu sesuaikan.']))
-            return c
-        new = annotate(options[0], words, cfg.max_clip_s, verified=True)
-        new['previous_boundary'] = {'start': c['start'], 'end': c['end'], 'title': c['title']}
-        new['revision'] = c.get('revision', 0) + 1
-        new['selection_source'] = 'context-reviewed'
-        return new
-    except (requests.RequestException, ValueError, KeyError) as exc:
-        c['boundary_review']['status'] = 'needs_review'
-        c['boundary_review']['issues'].append('Pemeriksaan AI belum selesai: ' + str(exc)[:180])
-        return c

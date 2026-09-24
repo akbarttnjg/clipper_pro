@@ -5,18 +5,12 @@ from .ffmpeg_util import ass_filter, encoder_args, encode, filter_file_args
 
 
 def run_audio(args, target, log):
-    target = Path(target)
-    pending = target.with_name(target.stem + '.rendering.wav')
-    try:
-        r = subprocess.run(['ffmpeg', '-nostdin', '-hide_banner', '-v', 'error', '-y', *map(str, args),
-                            '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', str(pending)], capture_output=True)
-        if r.returncode:
-            message = r.stderr.decode('utf-8', 'replace')[-2400:]
-            Path(log).write_text(message, encoding='utf-8')
-            raise RuntimeError('Audio FFmpeg gagal: ' + message)
-        pending.replace(target)
-    finally:
-        pending.unlink(missing_ok=True)
+    r = subprocess.run(['ffmpeg', '-hide_banner', '-v', 'error', '-y', *map(str, args),
+                        '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', str(target)], capture_output=True)
+    if r.returncode:
+        message = r.stderr.decode('utf-8', 'replace')[-2400:]
+        Path(log).write_text(message, encoding='utf-8')
+        raise RuntimeError('Audio FFmpeg gagal: ' + message)
 
 
 def audio_stems(source, plan, cfg, folder):
@@ -86,8 +80,7 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
         if shot['mode'] == 'stream' and H > W and shot.get('face_rect'):
             top = round(H * shot.get('material_share', .62)) // 2 * 2
             fx, fy, fw, fh = shot['face_rect']
-            vertical = '0' if shot.get('caption_panel') else '(oh-ih)/2'
-            graph.append(prefix + f",scale={W}:{top}:force_original_aspect_ratio=decrease,pad={W}:{top}:(ow-iw)/2:{vertical}:color=0x11151b[mat{i}]")
+            graph.append(prefix + f",scale={W}:{top}:force_original_aspect_ratio=decrease,pad={W}:{top}:(ow-iw)/2:(oh-ih)/2:color=0x11151b[mat{i}]")
             graph.append(f"[0:v]trim=start={shot['source_start'] - seek:.8f}:end={shot['source_end'] - seek:.8f},setpts=PTS-STARTPTS,fps={fps},crop={fw}:{fh}:{fx}:{fy},scale={W}:{H-top}:force_original_aspect_ratio=increase,crop={W}:{H-top}[face{i}]")
             graph.append(f'[mat{i}][face{i}]vstack=inputs=2' + suffix)
         else:
@@ -100,8 +93,7 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
                 envelope = f'max(0,min(1,min((on-{zf})/8,({zf + 3 * fps}-on)/12)))'
                 prefix += f",zoompan=z='1+{cfg.zoom_amount}*{envelope}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s={W}x{H}:fps={fps}"
             graph.append(prefix + suffix)
-    subtitle = ',' + ass_filter(ass, cfg) if ass else ''
-    graph.append(''.join(f'[v{i}]' for i in range(len(plan['shots']))) + f"concat=n={len(plan['shots'])}:v=1:a=0{subtitle}[out]")
+    graph.append(''.join(f'[v{i}]' for i in range(len(plan['shots']))) + f"concat=n={len(plan['shots'])}:v=1:a=0,{ass_filter(ass, cfg)}[out]")
     target = Path(target)
     pending = target.with_name(target.stem + '.rendering.mp4')
     script = target.with_suffix('.filter.txt')

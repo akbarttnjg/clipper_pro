@@ -43,21 +43,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if end - start < .02:
                 continue
             paint = color(cfg.accent_hex if w["emphasis"] else cfg.base_hex)
-            if w.get('keyframes'):
-                family = 'DejaVu Sans'
-                bold = 0 if w.get('family') == 'regular' else 1
-                for a,b in zip(w['keyframes'], w['keyframes'][1:]):
-                    left,right = start+a['t'],min(end,start+b['t'])
-                    if right<=left or a['opacity']<=0:
-                        continue
-                    alpha = round((1-a['opacity'])*255)
-                    scale = a['scale']*100
-                    tags = (f"\\an5\\pos({w['x']+a['dx']:.3f},{w['y']+a['dy']:.3f})"
-                        f"\\fn{family}\\fs{w['ass_size']}\\b{bold}\\i{int(w.get('italic',False))}"
-                        f"\\c{paint}\\alpha&H{alpha:02X}&\\fscx{scale:.3f}\\fscy{scale:.3f}"
-                        f"\\bord0\\shad{min(cfg.target_w,cfg.target_h)/1080*2:.2f}\\blur{a['blur']:.3f}")
-                    events.append(f"Dialogue: 0,{ts(left)},{ts(right)},Editorial,,0,0,0,,{{{tags}}}{safe(w['text'])}")
-                continue
             dur_ms = max(1, int((end - start) * 1000))
             enter = min(120, max(1, dur_ms // 3))
             fade = min(65, dur_ms // 4)
@@ -75,22 +60,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         from .typography import font
         label = safe(hook.strip())[:100]
         size = round(min(cfg.target_w, cfg.target_h) * .044)
-        def title_rows(text, fs):
-            rows=['']
-            for word in text.split():
-                line=(rows[-1]+' '+word).strip()
-                if rows[-1] and font(cfg.fonts_dir,fs).getlength(line)>cfg.target_w*.78:
-                    rows.append(word)
-                else: rows[-1]=line
-            return rows
-        rows=title_rows(label,size)
-        while size>14 and (len(rows)>2 or any(font(cfg.fonts_dir,size).getlength(r)>cfg.target_w*.78 for r in rows)):
-            size-=1;rows=title_rows(label,size)
+        while size > 14 and font(cfg.fonts_dir, size).getlength(label) > cfg.target_w * .78:
+            size -= 1
         end = min(3., max((p['end'] for p in plan['phrases']), default=3.))
         tags = f"\\an8\\pos({cfg.target_w * .47},{cfg.target_h * .105})\\fs{size}\\c{color(cfg.base_hex)}\\bord2\\shad2\\fad(120,180)"
-        shown='\\N'.join(rows)
-        events.append(f"Dialogue: 1,{ts(0)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{shown}")
-        plan['title'] = {'text': '\n'.join(rows), 'start': 0, 'end': end, 'size': size,
+        events.append(f"Dialogue: 1,{ts(0)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{label}")
+        plan['title'] = {'text': label, 'start': 0, 'end': end, 'size': size,
                          'x': cfg.target_w * .47, 'y': cfg.target_h * .105}
     dst = Path(path)
     dst.parent.mkdir(parents=True, exist_ok=True)

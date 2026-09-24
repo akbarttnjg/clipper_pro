@@ -34,7 +34,6 @@ def relink(root):
                     temp = p.with_name(p.name + '.relink-tmp')
                     temp.write_text(replaced, encoding='utf-8')
                     os.replace(temp, p)
-        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
         manifest['created_root'] = new
         atomic_json(manifest_path, manifest)
     missing = [p for p in manifest['source_files'] if not Path(p).is_file()]

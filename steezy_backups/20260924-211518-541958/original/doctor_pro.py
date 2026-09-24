@@ -33,7 +33,6 @@ try:
         print('Unduh gratis dengan: ollama pull ' + cfg.model)
 except Exception:
     print('Ollama belum berjalan. Buka aplikasi Ollama; mode video utuh tidak membutuhkan Ollama.')
-print('Font:', 'OK' if all((Path(cfg.fonts_dir) / n).is_file() for n in ('DejaVuSans.ttf','DejaVuSans-Bold.ttf','DejaVuSans-BoldOblique.ttf','DejaVuSerif-Bold.ttf')) else 'BELUM LENGKAP')
-print('Galeri tipografi:', 'OK' if all((Path(__file__).parent / 'static/templates' / (n+'.mp4')).is_file() for n in ('narrative','pop','slide','blur','impact')) else 'BELUM LENGKAP')
-print('Studio 2.2: analisis -> pilih tipografi -> preview -> render -> proyek editable')
+print('Font:', 'OK' if (Path(cfg.fonts_dir) / 'DejaVuSans-Bold.ttf').exists() else 'TIDAK DITEMUKAN')
+print('Studio 2.1: analisis -> review batas -> render -> proyek editable')
 print('Native CapCut/Resolve: periksa satu proyek percobaan pada editor Anda.')

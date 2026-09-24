@@ -97,7 +97,7 @@ def _events(words: list[dict], cfg: Config) -> list[str]:
 
 
 def write_ass(words: list[dict], path: str, cfg: Config, hook: str = "", keywords=(), position="bottom", anchors=None) -> str:
-    if cfg.caption_style in ("editorial", "clean", "narrative", "pop", "slide", "blur", "impact"):
+    if cfg.caption_style in ("editorial", "clean"):
         from .captions_pro import write_ass as write_pro
         return write_pro(words, path, cfg, hook, keywords, position, anchors)
     base = _ass_color(cfg.base_hex)

@@ -74,8 +74,7 @@ class Config:
     caption_gap_s: float = _env_float("CAPTION_GAP_S", 0.6)    # break line on pauses
     font_name: str = os.environ.get("FONT_NAME", "Arial")
     font_size: int = _env_int("FONT_SIZE", 120)
-    caption_style: str = os.environ.get("CAPTION_STYLE", "narrative")
-    motion_intensity: str = "balanced"
+    caption_style: str = os.environ.get("CAPTION_STYLE", "editorial")
 
     # --- Encoding ---
     use_nvenc: bool = os.environ.get("USE_NVENC", "1") == "1"
@@ -131,7 +130,7 @@ ASPECTS: dict[str, tuple[int, int]] = {
     "1:1": (1080, 1080),
     "16:9": (1920, 1080),
 }
-CAPTION_STYLES: tuple[str, ...] = ("narrative", "pop", "slide", "blur", "impact", "editorial", "clean", "karaoke", "boxed", "bold")
+CAPTION_STYLES: tuple[str, ...] = ("editorial", "clean", "karaoke", "boxed", "bold")
 LAYOUTS: tuple[str, ...] = ("auto", "fill", "fit", "stream", "split")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
@@ -150,8 +149,6 @@ def validate_overrides(form: dict) -> dict:
         out["target_w"], out["target_h"] = ASPECTS[form["aspect"]]
     if form.get("caption_style") in CAPTION_STYLES:
         out["caption_style"] = form["caption_style"]
-    if form.get('motion_intensity') in ('calm','balanced','dynamic'):
-        out['motion_intensity'] = form['motion_intensity']
     if form.get("layout") in LAYOUTS:
         out["layout"] = form["layout"]
     if form.get("processing_mode") in ("auto", "full"):

@@ -24,7 +24,7 @@ BRAND_FILE = ROOT / 'brand.json'
 base_cfg = replace(Config(), **validate_brand(read_json(BRAND_FILE, {})))
 base_cfg = replace(base_cfg, work_dir=str((ROOT / base_cfg.work_dir).resolve()),
                    out_dir=str((ROOT / base_cfg.out_dir).resolve()))
-app = FastAPI(title='Clipper Studio Local', version='2.2.0')
+app = FastAPI(title='Clipper Studio Local', version='2.1.0')
 STATIC = ROOT / 'static'
 UPLOADS = ROOT / 'uploads'
 UPLOADS.mkdir(exist_ok=True)
@@ -119,7 +119,7 @@ def worker(job_id, action, indices=None):
                 for n, idx in enumerate(indices):
                     c = st['scored'][idx]
                     prior = next((r for r in job['clips'] if r.get('index') == idx and
-                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == '2.2.0'
+                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == '2.1.0'
                         and (Path(st['cfg'].out_dir) / r.get('file', '')).is_file()), None)
                     if prior:
                         completed += 1
@@ -207,23 +207,6 @@ def static_asset(name: str):
 def jobs():
     return [{'id': j, 'name': v.get('name', j), 'status': v['status'], 'created': v.get('created', 0)}
             for j, v in sorted(JOBS.items(), key=lambda row: row[1].get('created', 0), reverse=True)]
-
-
-@app.get('/api/templates')
-def typography_templates():
-    from clipper.motion import TEMPLATES
-    return [{**t, 'preview': '/api/template-preview/' + t['id']} for t in TEMPLATES]
-
-
-@app.get('/api/template-preview/{template_id}')
-def template_preview(template_id: str):
-    from clipper.motion import IDS
-    if template_id not in IDS:
-        raise HTTPException(404, 'Template tidak ditemukan.')
-    path = STATIC / 'templates' / (template_id + '.mp4')
-    if not path.is_file():
-        raise HTTPException(404, 'Preview template belum terpasang. Pasang paket upgrade lengkap.')
-    return FileResponse(path, media_type='video/mp4')
 
 
 @app.post('/api/upload')
@@ -410,31 +393,6 @@ def selected_indices(data, st):
     return sorted(set(raw))
 
 
-@app.post('/api/apply-template/{job_id}')
-def apply_template(job_id: str, data: dict = Body(...)):
-    from clipper.motion import IDS
-    st, job = state(job_id)
-    if job['status'] in ACTIVE:
-        raise HTTPException(409, 'Tunggu proses selesai sebelum mengganti template.')
-    indices = selected_indices(data, st)
-    settings = data.get('settings', {})
-    if not isinstance(settings, dict) or settings.get('caption_style') not in (*IDS, 'editorial', 'clean'):
-        raise HTTPException(400, 'Pilih template yang tersedia.')
-    try:
-        allowed = {'caption_style', 'motion_intensity', 'caption_scale', 'accent_hex', 'accent_font'}
-        overrides = validate_overrides({k: v for k, v in settings.items() if k in allowed})
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-    for i in indices:
-        st.setdefault('clip_settings', {})[str(i)] = {**st.get('clip_settings', {}).get(str(i), {}), **overrides}
-        st['scored'][i]['revision'] = st['scored'][i].get('revision', 0) + 1
-    job.pop('export', None)
-    if job.get('preview', {}).get('index') in indices:
-        job.pop('preview', None)
-    persist(job_id)
-    return {'ok': True, 'count': len(indices)}
-
-
 @app.post('/api/render/{job_id}')
 def render_selected(job_id: str, data: dict = Body(...)):
     st, _ = state(job_id)
@@ -532,7 +490,7 @@ def regenerate(job_id: str, idx: int, aspect: str = Form('9:16'), caption_style:
 def health():
     from clipper.ffmpeg_util import nvenc_diagnostic, render_diagnostic
     return {'nvenc': nvenc_diagnostic(), 'render': render_diagnostic(), 'model': base_cfg.model, 'whisper': base_cfg.whisper_model,
-            'version': '2.2.0', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
+            'version': '2.1.0', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
 
 
 @app.get('/api/brand')
@@ -552,13 +510,11 @@ def set_brand(accent_hex: str = Form(...), caption_style: str = Form(...), font_
 @app.get('/clips/{name}')
 def clip(name: str):
     p = Path(base_cfg.out_dir) / Path(name).name
-    if not p.is_file() or p.suffix not in ('.mp4', '.ass', '.srt'):
+    if not p.is_file() or p.suffix != '.mp4':
         raise HTTPException(404, 'Clip tidak ditemukan.')
-    if p.suffix == '.mp4':
-        return FileResponse(p, media_type='video/mp4')
-    return FileResponse(p, media_type='text/plain; charset=utf-8', filename=p.name)
+    return FileResponse(p, media_type='video/mp4')
 
 
 if __name__ == '__main__':
-    print('Clipper Studio Local 2.2 -> http://localhost:8765')
+    print('Clipper Studio Local 2.1 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

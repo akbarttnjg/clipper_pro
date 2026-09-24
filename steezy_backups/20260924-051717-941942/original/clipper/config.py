@@ -74,8 +74,7 @@ class Config:
     caption_gap_s: float = _env_float("CAPTION_GAP_S", 0.6)    # break line on pauses
     font_name: str = os.environ.get("FONT_NAME", "Arial")
     font_size: int = _env_int("FONT_SIZE", 120)
-    caption_style: str = os.environ.get("CAPTION_STYLE", "narrative")
-    motion_intensity: str = "balanced"
+    caption_style: str = os.environ.get("CAPTION_STYLE", "editorial")
 
     # --- Encoding ---
     use_nvenc: bool = os.environ.get("USE_NVENC", "1") == "1"
@@ -114,11 +113,6 @@ class Config:
     analysis_overlap_s: float = 130.0
     selection_floor: int = 3
     preview_seconds: float = 0.0
-    topic_review: bool = True
-    # Optional normalized source regions, editable without cropping the source file.
-    material_rect: str = ""
-    speaker_rect: str = ""
-    material_share: float = .62
 
     @property
     def video_codec(self) -> str:
@@ -131,7 +125,7 @@ ASPECTS: dict[str, tuple[int, int]] = {
     "1:1": (1080, 1080),
     "16:9": (1920, 1080),
 }
-CAPTION_STYLES: tuple[str, ...] = ("narrative", "pop", "slide", "blur", "impact", "editorial", "clean", "karaoke", "boxed", "bold")
+CAPTION_STYLES: tuple[str, ...] = ("editorial", "clean", "karaoke", "boxed", "bold")
 LAYOUTS: tuple[str, ...] = ("auto", "fill", "fit", "stream", "split")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
@@ -150,8 +144,6 @@ def validate_overrides(form: dict) -> dict:
         out["target_w"], out["target_h"] = ASPECTS[form["aspect"]]
     if form.get("caption_style") in CAPTION_STYLES:
         out["caption_style"] = form["caption_style"]
-    if form.get('motion_intensity') in ('calm','balanced','dynamic'):
-        out['motion_intensity'] = form['motion_intensity']
     if form.get("layout") in LAYOUTS:
         out["layout"] = form["layout"]
     if form.get("processing_mode") in ("auto", "full"):
@@ -176,7 +168,7 @@ def validate_overrides(form: dict) -> dict:
         if key in form:
             out[key] = str(form[key]).lower() in ("1", "true")
     for key, lo, hi in (("music_db", -40, -10), ("sfx_db", -40, -12),
-                        ("caption_scale", .7, 1.3), ("framing_x", -1, 1), ("material_share", .5, .72)):
+                        ("caption_scale", .7, 1.3), ("framing_x", -1, 1)):
         if key in form:
             try:
                 value = float(form[key])
@@ -186,19 +178,6 @@ def validate_overrides(form: dict) -> dict:
                 pass
     if form.get("accent_hex") and _HEX.match(str(form["accent_hex"])):
         out["accent_hex"] = form["accent_hex"]
-    for key in ('material_rect', 'speaker_rect'):
-        if key in form:
-            value = str(form[key]).strip()
-            if value:
-                try:
-                    x, y, w, h = map(float, value.split(','))
-                    if not all(__import__('math').isfinite(v) for v in (x,y,w,h)) or not (
-                        0 <= x <= 95 and 0 <= y <= 95 and 5 <= w <= 100 and 5 <= h <= 100
-                        and x+w <= 100.01 and y+h <= 100.01):
-                        raise ValueError()
-                except (ValueError, TypeError):
-                    raise ValueError('Area gambar harus x,y,lebar,tinggi dalam persen, seluruhnya di dalam frame.')
-            out[key] = value
     return out
 
 
