@@ -96,12 +96,19 @@ def speaker_panel(area, material, face, aspect):
 
 
 def analyze(media, plan, cfg, info):
+    automatic_placement = cfg.caption_position == 'auto' and cfg.safe_placement
     cap = cv2.VideoCapture(str(media))
     W, H = info['width'], info['height']
     ratio = min(1., 640 / W)
     sw, sh = round(W * ratio), round(H * ratio)
     detector = crop._try_yunet(sw, sh)
-    haar = None if detector is not None else cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    # Some OpenCV 5 wheels omit the old cascade API. Preserve the frame if
+    # neither detector is available; explicit source regions still work.
+    haar = None
+    if detector is None and hasattr(cv2, 'CascadeClassifier'):
+        haar = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    if detector is None and haar is None:
+        plan['warnings'].append('Detektor wajah tidak tersedia; gunakan komposisi utuh atau tandai area pembicara.')
     def sample(t):
         cap.set(cv2.CAP_PROP_POS_MSEC, max(0, t) * 1000)
         ok, frame = cap.read()
@@ -112,9 +119,11 @@ def analyze(media, plan, cfg, info):
             detector.setInputSize((sw, sh))
             _, found = detector.detect(small)
             faces = [] if found is None else [list(map(float, f[:4] / ratio)) for f in found if f[-1] >= .82]
-        else:
+        elif haar is not None:
             found = haar.detectMultiScale(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), 1.15, 5, minSize=(22, 22))
             faces = [list(map(float, np.array(f) / ratio)) for f in found]
+        else:
+            faces = []
         faces.sort(key=lambda f: f[2] * f[3], reverse=True)
         hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
         hist = cv2.calcHist([hsv], [0, 1], None, [24, 24], [0, 180, 0, 256])
@@ -174,7 +183,7 @@ def analyze(media, plan, cfg, info):
                 small_face = face is not None and face[2] * face[3] / (area[2] * area[3]) < .012
                 mode = cfg.layout
                 if mode == 'auto':
-                    mode = 'stream' if cfg.target_h > cfg.target_w and (separated or side_panel or material and explicit_face) else (
+                    mode = 'stream' if (separated or side_panel or material and explicit_face) else (
                         'fit' if material is not None or multiple or small_face or face is None else 'fill')
                 if mode == 'split':
                     mode = 'fit'
@@ -183,16 +192,24 @@ def analyze(media, plan, cfg, info):
                 rect = rectangle(area, face, cfg.target_w / cfg.target_h, cfg.framing_x) if mode == 'fill' else area
                 face_rect = explicit_face or (speaker_panel(area, material, face, cfg.target_w/(cfg.target_h*(1-cfg.material_share)))
                     if material else rectangle(area, face, cfg.target_w/(cfg.target_h*(1-cfg.material_share))) if face else None)
-                if mode == 'stream' and cfg.target_h > cfg.target_w:
-                    rect = material or area
+                if mode == 'stream' and material:
+                    rect = material
+                    if cfg.target_w > cfg.target_h:
+                        face_rect = explicit_face or speaker_panel(area, material, face, cfg.target_w*.30/(cfg.target_h*.82))
                 start = (span['start_frame'] + left) / plan['fps']
                 end = (span['start_frame'] + right) / plan['fps']
                 pos = 'bottom'
                 caption_panel = None
+                image_height = None
+                material_image_height = None
                 if mode == 'stream' and cfg.target_h > cfg.target_w:
                     top = round(cfg.target_h*cfg.material_share)//2*2
                     shown_h = min(top, rect[3]*cfg.target_w/rect[2])
                     gap = top-shown_h
+                    if automatic_placement and gap <= cfg.target_h*.17:
+                        material_image_height = even(top-cfg.target_h*.19)
+                        shown_h = min(material_image_height, rect[3]*cfg.target_w/rect[2])
+                        gap = top-shown_h
                     if gap > cfg.target_h*.17:
                         margin = cfg.target_h*.012
                         caption_panel = [cfg.target_w*.085, shown_h+margin, cfg.target_w*.78, gap-margin*2]
@@ -202,6 +219,16 @@ def analyze(media, plan, cfg, info):
                         pos = 'right'
                     elif relx > .65:
                         pos = 'left'
+                if automatic_placement and cfg.target_w > cfg.target_h:
+                    if material is not None and mode != 'fill':
+                        # Reserve a caption strip instead of covering a face or a diagram.
+                        image_height = even(cfg.target_h * .82)
+                        caption_panel = [cfg.target_w*.08, cfg.target_h*.835,
+                                         cfg.target_w*.84, cfg.target_h*.145]
+                        pos = 'bottom'
+                    elif face is not None:
+                        from .typography import panel
+                        caption_panel = list(panel(cfg, pos))
                 keywords = {token(k) for k in plan['keywords']}
                 emph = [w['start'] - start for w in plan['words'] if start + 2 <= w['start'] < end - 3 and token(w['word']) in keywords]
                 zoom = emph[0] if cfg.punch_zoom and mode == 'fill' and end - start >= cfg.zoom_gap and emph else None
@@ -209,7 +236,8 @@ def analyze(media, plan, cfg, info):
                     'start': start, 'end': end, 'start_frame': span['start_frame'] + left,
                     'duration_frames': right - left, 'rect': rect, 'mode': mode, 'position': pos,
                     'face': face, 'zoom_at': zoom, 'zoom_amount': cfg.zoom_amount,
-                    'face_rect': face_rect, 'material_share': cfg.material_share, 'caption_panel': caption_panel})
+                    'face_rect': face_rect, 'material_share': cfg.material_share, 'caption_panel': caption_panel,
+                    'image_height': image_height, 'material_image_height': material_image_height, 'has_material': material is not None})
                 if mode == 'fit' and cfg.target_h > cfg.target_w:
                     plan['warnings'].append('Materi/tamu dipertahankan utuh. Periksa keterbacaan dalam format vertikal atau pilih 16:9.')
     finally:

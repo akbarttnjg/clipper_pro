@@ -17,14 +17,17 @@ ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
 load_dotenv(ROOT / '.env.pro', override=True)
 from clipper.config import Config, validate_overrides, validate_brand
-from clipper import pipeline, boundaries, story, editorial
+from clipper import pipeline, boundaries, story, editorial, stock, illustrations
 from clipper.storage import read_json, write_json
+from clipper.looks import LOOKS, VISUAL_FIELDS
+from clipper.font_catalog import FONTS
 
 BRAND_FILE = ROOT / 'brand.json'
+PRESETS_FILE = ROOT / 'style-presets.json'
 base_cfg = replace(Config(), **validate_brand(read_json(BRAND_FILE, {})))
 base_cfg = replace(base_cfg, work_dir=str((ROOT / base_cfg.work_dir).resolve()),
                    out_dir=str((ROOT / base_cfg.out_dir).resolve()))
-app = FastAPI(title='Clipper Studio Local', version='2.2.0')
+app = FastAPI(title='Clipper Studio Local', version='2.4')
 STATIC = ROOT / 'static'
 UPLOADS = ROOT / 'uploads'
 UPLOADS.mkdir(exist_ok=True)
@@ -33,14 +36,14 @@ STATES.mkdir(parents=True, exist_ok=True)
 JOBS, JOB_STATE = {}, {}
 PROCESS_LOCK = threading.Lock()
 STATE_LOCK = threading.RLock()
-ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting'}
+ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating'}
 
 
 def persist(job_id):
     with STATE_LOCK:
         st = JOB_STATE[job_id]
         write_json(STATES / f'{job_id}.json', {'job': JOBS[job_id], 'state': {
-            **st, 'cfg': asdict(st['cfg']), 'edits': {str(k): v for k, v in st.get('edits', {}).items()}}})
+            **st, 'cfg': {k:v for k,v in asdict(st['cfg']).items() if k != 'pexels_key'}, 'edits': {str(k): v for k, v in st.get('edits', {}).items()}}})
 
 
 def restore():
@@ -51,6 +54,9 @@ def restore():
         try:
             st, job = data['state'], data['job']
             st['cfg'] = Config(**{k: v for k, v in st['cfg'].items() if k in {f.name for f in fields(Config)}})
+            st['cfg'] = replace(st['cfg'], title_card=False)
+            for settings in st.get('clip_settings', {}).values():
+                settings['title_card'] = False
             st['edits'] = {int(k): v for k, v in st.get('edits', {}).items()}
             st['scored'] = [boundaries.annotate(c, st.get('edits', {}).get(i, st.get('transcript', {}).get('words', [])),
                                               st['cfg'].max_clip_s) for i, c in enumerate(st.get('scored', []))]
@@ -106,12 +112,23 @@ def worker(job_id, action, indices=None):
                     for n, idx in enumerate(indices):
                         progress(round(100 * n / len(indices)), f'Periksa batas {n+1}/{len(indices)} — transkrip tersimpan')
                         transcript = {**st['transcript'], 'words': st.get('edits', {}).get(idx, st['transcript']['words'])}
-                        st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, st['cfg'])
+                        st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {})))
                         persist(job_id)
                 finally:
                     editorial.release(st['cfg'])
                 job.pop('export', None)
                 job.update(status='review', percent=100, message='Pemeriksaan batas selesai. Kandidat bermasalah ditandai untuk review.')
+            elif action == 'illustrating':
+                for n,idx in enumerate(indices):
+                    cfg=replace(st['cfg'], **st.get('clip_settings',{}).get(str(idx),{}))
+                    recipe=illustrations.prepare(st.get('edits',{}).get(idx,st['transcript']['words']),
+                        st['scored'][idx],cfg,lambda p,m:progress(round((100*n+p)/len(indices)),m),refresh=True)
+                    st['scored'][idx]['revision']=st['scored'][idx].get('revision',0)+1
+                    job.setdefault('illustration_status',{})[str(idx)]={'count':len(recipe['scenes']),'notes':recipe['notes'],
+                        'recipe':illustrations.recipe_path(st.get('edits',{}).get(idx,st['transcript']['words']),st['scored'][idx],cfg).name}
+                    persist(job_id)
+                job.pop('export',None)
+                job.update(status='review',percent=100,message='Ilustrasi disiapkan. Tinjau hasil pada tab Visual sebelum render.')
             elif action == 'rendering':
                 pipeline.ffmpeg_util.filter_file_args('preflight')
                 job['failures'] = []
@@ -119,7 +136,7 @@ def worker(job_id, action, indices=None):
                 for n, idx in enumerate(indices):
                     c = st['scored'][idx]
                     prior = next((r for r in job['clips'] if r.get('index') == idx and
-                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == '2.2.0'
+                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == '2.4'
                         and (Path(st['cfg'].out_dir) / r.get('file', '')).is_file()), None)
                     if prior:
                         completed += 1
@@ -146,12 +163,19 @@ def worker(job_id, action, indices=None):
                 idx = indices[0]
                 c = dict(st['scored'][idx])
                 cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
+                if cfg.broll_mode != 'off':
+                    c['_broll_recipe'] = illustrations.prepare(st.get('edits', {}).get(idx, st['transcript']['words']), c, cfg, progress)
+                cursor = job.pop('preview_source_start', c['start'])
+                if cursor > c['start'] + .05:
+                    c['start'] = cursor
+                    c['cold_open_span'] = None
+                    cfg = replace(cfg, cold_open=False, title_card=False)
                 cfg = replace(cfg, preview_seconds=12, target_w=640 if cfg.target_w > cfg.target_h else 360,
                               target_h=360 if cfg.target_w > cfg.target_h else 640)
                 result = pipeline.render_clip(st['media'], st.get('edits', {}).get(idx, st['transcript']['words']),
-                                              c, 'preview-' + str(idx), cfg, progress)
-                job.update(status='review', percent=100, message='Preview 12 detik siap. Pilih tab Preview.',
-                           preview={**result, 'index': idx})
+                                              c, 'preview-' + str(idx) + '-' + uuid.uuid4().hex[:6], cfg, progress)
+                job.update(status='review', percent=100, message=f"Preview {result['length']:.1f} detik siap. Pilih tab Preview.",
+                           preview={**result, 'index': idx, 'source_start': cursor})
             elif action == 'exporting':
                 from clipper.projects import export_bundle
                 selected = [r for r in job['clips'] if r.get('index') in indices]
@@ -191,6 +215,65 @@ def new_job(path, options, music='', sfx='', original_name=None):
     return {'job': job_id}
 
 
+@app.get('/api/stock-settings')
+def get_stock_settings():
+    return stock.public_settings()
+
+
+@app.post('/api/stock-settings')
+def set_stock_settings(data: dict = Body(...)):
+    try:
+        return stock.save_settings(data)
+    except (TypeError,ValueError,OSError) as exc:
+        raise HTTPException(400,str(exc)) from exc
+
+
+def clip_recipe(job_id,idx):
+    st,job=state(job_id,idx)
+    cfg=replace(st['cfg'],**st.get('clip_settings',{}).get(str(idx),{}))
+    words=st.get('edits',{}).get(idx,st['transcript']['words'])
+    path=illustrations.recipe_path(words,st['scored'][idx],cfg)
+    last=job.get('illustration_status',{}).get(str(idx),{})
+    notes=last['notes'] if last.get('recipe')==path.name else ['Tekan Siapkan ilustrasi, atau langsung render untuk menyiapkannya otomatis.']
+    return st,job,cfg,path,read_json(path,{'scenes':[],'notes':notes})
+
+
+@app.get('/api/illustrations/{job_id}/{idx}')
+def get_illustrations(job_id: str,idx: int):
+    st,job,cfg,path,recipe=clip_recipe(job_id,idx)
+    return {**recipe,'scenes':[{**e,'asset':{k:v for k,v in e['asset'].items() if k not in ('path','url')},
+        'preview':f'/api/illustration-media/{job_id}/{idx}/{e["id"]}'} for e in recipe['scenes']]}
+
+
+@app.post('/api/illustrations/{job_id}/{idx}')
+def edit_illustration(job_id: str,idx: int,data: dict=Body(...)):
+    st,job,cfg,path,recipe=clip_recipe(job_id,idx)
+    if job['status'] in ACTIVE: raise HTTPException(409,'Tunggu proses selesai.')
+    item=next((e for e in recipe['scenes'] if e['id']==data.get('id')),None)
+    if item is None: raise HTTPException(404,'Ilustrasi tidak ditemukan.')
+    if type(data.get('enabled')) is not bool: raise HTTPException(400,'Pilihan aktif tidak valid.')
+    item['enabled']=data['enabled'];write_json(path,recipe)
+    st['scored'][idx]['revision']=st['scored'][idx].get('revision',0)+1
+    job.pop('export',None);persist(job_id)
+    return {'ok':True}
+
+
+@app.get('/api/illustration-media/{job_id}/{idx}/{scene_id}')
+def illustration_media(job_id: str,idx: int,scene_id: str):
+    *_,recipe=clip_recipe(job_id,idx)
+    item=next((e for e in recipe['scenes'] if e['id']==scene_id),None)
+    if item is None or not Path(item['asset']['path']).is_file(): raise HTTPException(404,'Aset tidak ditemukan.')
+    return FileResponse(item['asset']['path'])
+
+
+@app.post('/api/prepare-illustrations/{job_id}')
+def prepare_illustrations(job_id: str,data: dict=Body(...)):
+    st,_=state(job_id)
+    indices=selected_indices(data,st)
+    enqueue(job_id,'illustrating',indices)
+    return {'ok':True}
+
+
 @app.get('/', response_class=HTMLResponse)
 def index():
     return (STATIC / 'index.html').read_text(encoding='utf-8')
@@ -211,19 +294,76 @@ def jobs():
 
 @app.get('/api/templates')
 def typography_templates():
-    from clipper.motion import TEMPLATES
-    return [{**t, 'preview': '/api/template-preview/' + t['id']} for t in TEMPLATES]
+    return [{**t, 'preview': '/api/template-preview/' + t['id'],
+             'poster': '/api/template-poster/' + t['id']} for t in LOOKS]
+
+
+@app.get('/api/template-poster/{template_id}')
+def template_poster(template_id: str):
+    if template_id not in {t['id'] for t in LOOKS}:
+        raise HTTPException(404, 'Template tidak ditemukan.')
+    path = STATIC / 'templates' / (template_id + '.jpg')
+    if not path.is_file():
+        raise HTTPException(404, 'Gambar contoh belum terpasang.')
+    return FileResponse(path, media_type='image/jpeg')
 
 
 @app.get('/api/template-preview/{template_id}')
 def template_preview(template_id: str):
     from clipper.motion import IDS
-    if template_id not in IDS:
+    if template_id not in (*IDS, *(t['id'] for t in LOOKS)):
         raise HTTPException(404, 'Template tidak ditemukan.')
     path = STATIC / 'templates' / (template_id + '.mp4')
     if not path.is_file():
         raise HTTPException(404, 'Preview template belum terpasang. Pasang paket upgrade lengkap.')
     return FileResponse(path, media_type='video/mp4')
+
+
+@app.get('/api/fonts')
+def fonts():
+    return [{'id': k, **v, 'url': '/api/font/' + k} for k, v in FONTS.items()]
+
+
+@app.get('/api/font/{font_id}')
+def font_file(font_id: str):
+    if font_id not in FONTS:
+        raise HTTPException(404, 'Font tidak tersedia.')
+    return FileResponse(Path(base_cfg.fonts_dir) / FONTS[font_id]['file'], media_type='font/ttf')
+
+
+@app.get('/api/style-presets')
+def style_presets():
+    return [{**p, 'settings': {k:v for k,v in p.get('settings', {}).items() if k in VISUAL_FIELDS}}
+            for p in read_json(PRESETS_FILE, [])]
+
+
+@app.post('/api/style-presets')
+def save_style_preset(data: dict = Body(...)):
+    name = str(data.get('name', '')).strip()[:60]
+    values = data.get('settings')
+    if not name or not isinstance(values, dict):
+        raise HTTPException(400, 'Isi nama dan pengaturan preset.')
+    try:
+        settings = validate_overrides({k:v for k,v in values.items() if k in VISUAL_FIELDS})
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not {'caption_style', 'font_main', 'font_accent'} <= settings.keys():
+        raise HTTPException(400, 'Pilih gaya dan pasangan font yang tersedia.')
+    with STATE_LOCK:
+        presets = read_json(PRESETS_FILE, [])
+        if len(presets) >= 30:
+            raise HTTPException(400, 'Maksimal 30 preset; hapus preset lama dahulu.')
+        saved = {'id': uuid.uuid4().hex[:12], 'name': name, 'settings': settings}
+        write_json(PRESETS_FILE, [*presets, saved])
+    return saved
+
+
+@app.delete('/api/style-presets/{preset_id}')
+def delete_style_preset(preset_id: str):
+    with STATE_LOCK:
+        presets = read_json(PRESETS_FILE, [])
+        write_json(PRESETS_FILE, [p for p in presets if p.get('id') != preset_id])
+    return {'ok': True}
 
 
 @app.post('/api/upload')
@@ -379,7 +519,9 @@ def editor_save(job_id: str, idx: int, data: dict = Body(...)):
         st.setdefault('clip_settings', {})[str(idx)] = overrides
         job.pop('export', None)
         persist(job_id)
-        return {'ok': True, 'revision': c['revision'], 'clip': c}
+        canonical = asdict(replace(st['cfg'], **overrides))
+        canonical.pop('pexels_key', None)
+        return {'ok': True, 'revision': c['revision'], 'clip': c, 'settings': canonical}
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -421,7 +563,7 @@ def apply_template(job_id: str, data: dict = Body(...)):
     if not isinstance(settings, dict) or settings.get('caption_style') not in (*IDS, 'editorial', 'clean'):
         raise HTTPException(400, 'Pilih template yang tersedia.')
     try:
-        allowed = {'caption_style', 'motion_intensity', 'caption_scale', 'accent_hex', 'accent_font'}
+        allowed = VISUAL_FIELDS
         overrides = validate_overrides({k: v for k, v in settings.items() if k in allowed})
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -479,9 +621,31 @@ async def update_audio(job_id: str, request: Request):
     return {'ok': True}
 
 
+@app.get('/api/subtitle-review/{job_id}/{idx}')
+def subtitle_review(job_id: str, idx: int):
+    from clipper.subtitle_edit import clean
+    st, _ = state(job_id, idx)
+    c = st['scored'][idx]
+    cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
+    words = st.get('edits', {}).get(idx, st['transcript']['words'])
+    words = [w for w in words if w['start'] < c['end'] and w['end'] > c['start']]
+    display, changes, warnings = clean(words, cfg.caption_cleanup)
+    return {'original': words, 'display': display, 'changes': changes, 'warnings': warnings}
+
+
 @app.post('/api/preview/{job_id}/{idx}')
-def preview(job_id: str, idx: int):
-    state(job_id, idx)
+def preview(job_id: str, idx: int, data: dict = Body(default={})):
+    st, job = state(job_id, idx)
+    if job['status'] in ACTIVE:
+        raise HTTPException(409, 'Tunggu proses selesai.')
+    c = st['scored'][idx]
+    try:
+        cursor = float(data.get('source_start', c['start']))
+        if not math.isfinite(cursor) or not c['start'] <= cursor < c['end']:
+            raise ValueError('Posisi preview harus di dalam clip.')
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    job['preview_source_start'] = cursor
     enqueue(job_id, 'previewing', [idx])
     return {'ok': True}
 
@@ -491,7 +655,7 @@ def export_selected(job_id: str, data: dict = Body(...)):
     st, job = state(job_id)
     indices = selected_indices(data, st)
     for i in indices:
-        if not any(r.get('index') == i and r.get('revision') == st['scored'][i].get('revision', 0) for r in job['clips']):
+        if not any(r.get('index') == i and r.get('revision') == st['scored'][i].get('revision', 0) and r.get('render_version') == '2.4' for r in job['clips']):
             raise HTTPException(409, 'Render ulang clip yang berubah sebelum membuat paket proyek.')
     enqueue(job_id, 'exporting', indices)
     return {'ok': True}
@@ -532,7 +696,7 @@ def regenerate(job_id: str, idx: int, aspect: str = Form('9:16'), caption_style:
 def health():
     from clipper.ffmpeg_util import nvenc_diagnostic, render_diagnostic
     return {'nvenc': nvenc_diagnostic(), 'render': render_diagnostic(), 'model': base_cfg.model, 'whisper': base_cfg.whisper_model,
-            'version': '2.2.0', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
+            'version': '2.4', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
 
 
 @app.get('/api/brand')
@@ -552,7 +716,7 @@ def set_brand(accent_hex: str = Form(...), caption_style: str = Form(...), font_
 @app.get('/clips/{name}')
 def clip(name: str):
     p = Path(base_cfg.out_dir) / Path(name).name
-    if not p.is_file() or p.suffix not in ('.mp4', '.ass', '.srt'):
+    if not p.is_file() or (p.suffix not in ('.mp4', '.ass', '.srt') and not p.name.endswith('.credits.txt')):
         raise HTTPException(404, 'Clip tidak ditemukan.')
     if p.suffix == '.mp4':
         return FileResponse(p, media_type='video/mp4')
@@ -560,5 +724,5 @@ def clip(name: str):
 
 
 if __name__ == '__main__':
-    print('Clipper Studio Local 2.2 -> http://localhost:8765')
+    print('Clipper Studio Local 2.4 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

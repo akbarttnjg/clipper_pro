@@ -59,6 +59,15 @@ def request(block, cfg, candidate=None):
         'ending_evidence wajib kutipan PERSIS dari kalimat terakhir yang membuktikan kesimpulan. '
         'hook_quote opsional: kutipan PERSIS 3-8 kata yang diucapkan di dalam clip, kuat dan tidak menyesatkan tanpa konteks; kosong bila tidak ada. '
         'Judul Indonesia <=8 kata. reason <=35 kata. keywords kata bermakna PERSIS dari transkrip, bukan kata sambung. Kembalikan JSON.')
+    audience = {'general': 'penonton umum: ide jelas tanpa pengetahuan awal',
+        'creators': 'kreator/editor: keterampilan, proses, nilai kerja dan contoh praktis',
+        'business': 'pemilik usaha: pelanggan, operasional, biaya dan keputusan',
+        'finance': 'edukasi keuangan: angka beserta asumsi dan risiko, tanpa janji hasil',
+        'students': 'pelajar: penjelasan runtut, analogi dan langkah belajar'}[cfg.audience]
+    system += (' Sasaran utama: ' + audience + '. reason menjelaskan manfaat konkret bagi mereka. '
+        'Utamakan contoh, konflik gagasan, atau jawaban yang memenuhi janji pembuka. '
+        'Jangan pilih salam penutup live, ajakan komentar, atau pertanyaan baru yang belum dijawab sebagai payoff. '
+        'Jangan menebak nominal/singkatan meragukan untuk dijadikan klaim judul. Tidak ada jaminan FYP.')
     if candidate is not None:
         system += (' Ini pemeriksaan KEDUA. Tinjau konteks SEBELUM dan SESUDAH kandidat, abaikan skor awal. '
             'Kembalikan maksimal satu clip yang mempertahankan inti kandidat dengan awal dan akhir utuh. '
@@ -167,7 +176,7 @@ def select(transcript, cfg, progress=lambda p, m: None):
             # Key includes the words/model/settings; editing a transcript invalidates the selection cache.
             import hashlib
             key = hashlib.sha256(json.dumps([block, cfg.model, cfg.min_clip_s, cfg.max_clip_s,
-                cfg.topic_grace_s, 'topic-v3']).encode()).hexdigest()[:24]
+                cfg.topic_grace_s, cfg.audience, 'topic-v4']).encode()).hexdigest()[:24]
             path = journal / (key + '.json')
             raw = read_json(path)
             started = time.monotonic()
@@ -219,7 +228,7 @@ def review_candidate(candidate, transcript, cfg):
     block = [s for s in segments_from_words(words)
              if s['end'] > candidate['start'] - 45 and s['start'] < candidate['end'] + 60]
     key = hashlib.sha256(json.dumps([block, candidate['start'], candidate['end'], candidate['title'],
-        cfg.model, cfg.min_clip_s, cfg.max_clip_s, 'boundary-v1'], ensure_ascii=False).encode()).hexdigest()[:24]
+        cfg.model, cfg.min_clip_s, cfg.max_clip_s, cfg.audience, 'boundary-v2'], ensure_ascii=False).encode()).hexdigest()[:24]
     path = Path(cfg.work_dir) / 'boundary-reviews' / (key + '.json')
     c = annotate(candidate, words, cfg.max_clip_s)
     try:

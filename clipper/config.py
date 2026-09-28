@@ -45,6 +45,11 @@ class Config:
     broll_max: int = _env_int("BROLL_MAX", 3)          # max cutaways per clip
     broll_dur: float = _env_float("BROLL_DUR", 2.5)    # seconds per cutaway
     broll_gap: float = _env_float("BROLL_GAP", 5.0)    # min seconds between cutaways
+    broll_mode: str = 'off'
+    broll_provider: str = 'auto'
+    source_kind: str = 'auto'
+    audience: str = 'general'
+    preserve_material_pauses: bool = True
 
     # --- Silence trimming ---
     trim_silence: bool = os.environ.get("TRIM_SILENCE", "1") == "1"
@@ -76,6 +81,11 @@ class Config:
     font_size: int = _env_int("FONT_SIZE", 120)
     caption_style: str = os.environ.get("CAPTION_STYLE", "narrative")
     motion_intensity: str = "balanced"
+    font_main: str = 'dm_sans'
+    font_accent: str = 'dm_serif_italic'
+    caption_cleanup: str = 'safe'
+    caption_backdrop: bool = True
+    safe_placement: bool = True
 
     # --- Encoding ---
     use_nvenc: bool = os.environ.get("USE_NVENC", "1") == "1"
@@ -89,6 +99,7 @@ class Config:
     processing_mode: str = "auto"
     job_id: str = ""
     caption_position: str = os.environ.get("CAPTION_POSITION", "auto")
+    caption_align: str = 'auto'
     caption_scale: float = _env_float("CAPTION_SCALE", 1.0)
     audio_normalize: bool = os.environ.get("AUDIO_NORMALIZE", "1") == "1"
     ollama_num_gpu: int = _env_int("OLLAMA_NUM_GPU", 16)
@@ -106,8 +117,8 @@ class Config:
     music_db: float = -24.0
     sfx_path: str = ""
     sfx_db: float = -25.0
-    cold_open: bool = True
-    title_card: bool = True
+    cold_open: bool = False
+    title_card: bool = False  # Legacy field; clip titles are metadata only.
     accent_font: bool = True
     framing_x: float = -1.0  # -1 = detected; otherwise normalized horizontal focus
     analysis_window_s: float = 240.0
@@ -146,6 +157,17 @@ LENGTHS: dict[str, tuple[float, float]] = {
 def validate_overrides(form: dict) -> dict:
     """Whitelist + clamp UI form fields into Config overrides. Bad values are dropped."""
     out: dict = {}
+    for key, values in {'source_kind': ('auto','speaker','board','podcast'),
+                        'audience': ('general','creators','business','finance','students'),
+                        'broll_mode': ('off','local','auto'),
+                        'broll_provider': ('auto','pexels','pixabay','coverr')}.items():
+        if form.get(key) in values:
+            out[key] = form[key]
+    if 'broll_max' in form:
+        try:
+            out['broll_max'] = max(1, min(5, int(form['broll_max'])))
+        except (TypeError, ValueError):
+            pass
     if form.get("aspect") in ASPECTS:
         out["target_w"], out["target_h"] = ASPECTS[form["aspect"]]
     if form.get("caption_style") in CAPTION_STYLES:
@@ -158,6 +180,8 @@ def validate_overrides(form: dict) -> dict:
         out["processing_mode"] = form["processing_mode"]
     if form.get("caption_position") in ("auto", "left", "right", "bottom"):
         out["caption_position"] = form["caption_position"]
+    if form.get('caption_align') in ('auto', 'left', 'center', 'right'):
+        out['caption_align'] = form['caption_align']
     if form.get("language") in ("id", "en", "auto"):
         out["language"] = form["language"]
     if form.get("length") in LENGTHS:
@@ -172,7 +196,13 @@ def validate_overrides(form: dict) -> dict:
             out["num_clips"] = max(1, min(10, int(n)))
         except (TypeError, ValueError):
             pass
-    for key in ("punch_zoom", "cold_open", "title_card", "accent_font", "adaptive_clips"):
+    from .font_catalog import FONTS
+    for key in ('font_main', 'font_accent'):
+        if form.get(key) in FONTS:
+            out[key] = form[key]
+    if form.get('caption_cleanup') in ('safe', 'verbatim'):
+        out['caption_cleanup'] = form['caption_cleanup']
+    for key in ("punch_zoom", "cold_open", "accent_font", "adaptive_clips", 'caption_backdrop', 'safe_placement', 'preserve_material_pauses'):
         if key in form:
             out[key] = str(form[key]).lower() in ("1", "true")
     for key, lo, hi in (("music_db", -40, -10), ("sfx_db", -40, -12),

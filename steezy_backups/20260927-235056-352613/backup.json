@@ -1,0 +1,271 @@
+{
+  "version": "2.3.0",
+  "target": "C:\\AI\\clipper",
+  "status": "installed",
+  "files": [
+    {
+      "path": "CEK_PRO.cmd",
+      "sha256": "083bccba5d917d3225c29cbb9f5658ba4c1860ae21cd665a0b63dd136f69a186",
+      "existed": true,
+      "original_sha256": "22669a31bfacd03355265eed377685ca0a3d5bdf1920e5caf66ed89660778752"
+    },
+    {
+      "path": "CHANGELOG_STUDIO_2_3.md",
+      "sha256": "2a5193a836516819b3b69e955b07e6ab681aed06e7cdfb0f14cfd31cbee3123c",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "JALANKAN_PRO.cmd",
+      "sha256": "c9adb79b10e729df439500cd2e074317667f41b360fad13f3fe02aeff93dc21f",
+      "existed": true,
+      "original_sha256": "d1b705683e47e42e9a8e32359d4cc7225b1fc8e3bafa474c5740d92cc8599ac5"
+    },
+    {
+      "path": "PANDUAN_STUDIO_2_3.md",
+      "sha256": "67b6584116bf7435a0d65827d43478e347129c624f58ac9a0ebf5f5ef9bbc44e",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "PULIHKAN_PRO.cmd",
+      "sha256": "1fa3d44330530a9dfd06312c6f24600bf3e684a364a46c322fc0b7b9446cb329",
+      "existed": true,
+      "original_sha256": "ebcc2125143cc2a3398aa1144ba53d66d00c24443d437b36f1c4d7ad0af048e5"
+    },
+    {
+      "path": "TEST_REPORT_STUDIO_2_3.md",
+      "sha256": "1fbab7b6f6529dec614cb9852295a0c8a6d771f707ae0850ffddee1da03abf91",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "app.py",
+      "sha256": "a4c693f1b89807330acbd85a987c561154fd27a6bce78459d09a81f4f09912a6",
+      "existed": true,
+      "original_sha256": "8d7bad2dac9cb104661ec815f08327e84b218fbfea07d6b93c67bf90f401abdc"
+    },
+    {
+      "path": "clipper/captions_pro.py",
+      "sha256": "779137d859a75c45901b79f978cc568bd5f2571916493faa4e3ba372606844eb",
+      "existed": true,
+      "original_sha256": "35580ffbcbff6f21efa0fc3ab175c37051ae2706a90196fe5a0f29394e01d1bb"
+    },
+    {
+      "path": "clipper/composition.py",
+      "sha256": "252bd80a48994b4f13d3fa246d5a0eda803ed03a73ff0ec78479156f20c30f9f",
+      "existed": true,
+      "original_sha256": "82a4d9fef555998c3728e95bea4b9aa16d12d213a61515951f4cd7de17fea26c"
+    },
+    {
+      "path": "clipper/config.py",
+      "sha256": "cf4e3afa8f270fc656f38baa9f47955136a06fcf1f4550b2c48505365f789f10",
+      "existed": true,
+      "original_sha256": "3990d4ed33b39910832479a6711e2b107555f5f7dba79af8e9a854d50f5ca5d0"
+    },
+    {
+      "path": "clipper/font-licenses/SOURCES.md",
+      "sha256": "5acb484a1116fc6285485da2e1e437a069b791993e27095188fbc484a355eaa4",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/font-licenses/bebasneue-OFL.txt",
+      "sha256": "72082f6cb4d04be2ecf7cc7d9e1e7d73787f0af8a5a278a47cade70c16b78341",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/font-licenses/dmsans-OFL.txt",
+      "sha256": "9af36190332437f5ecd09974de43c1f7c77a310a996cdd8ceb25628b458840e1",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/font-licenses/dmserifdisplay-OFL.txt",
+      "sha256": "a3e5cdd67d4571dd0a24fcc968de0efde7ae97ef752daf0906e4767619dd7231",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/font-licenses/montserrat-OFL.txt",
+      "sha256": "8b7141c03fa4f8d44e6345d5d4931709290f0f67875e452e95ac1fd3a027802e",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/font_catalog.py",
+      "sha256": "642d14e8cae95f16610127a1647e477b55a7701fe8794870704d643f82a96c6f",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/BebasNeue-Regular.ttf",
+      "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/DMSans-SemiBold.ttf",
+      "sha256": "8ad459c2b4f894cb403faa4926f471e24fcdc06abb54ea51afe39f8f1ade84f2",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/DMSerifDisplay-Italic.ttf",
+      "sha256": "df74c0ac387baeaeb0fe4f2324e1668e6a3ed8c09cd9796fe162c71753e19e45",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/DMSerifDisplay-Regular.ttf",
+      "sha256": "8cc3643535edf039aa5d95440a8542735e9197e4f4b8d9303e980fefbf5ab616",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/fonts/Montserrat-Bold.ttf",
+      "sha256": "79a5479535943e1200b8e3135fd2fb13a1f101758b4714d0e9bab9d0714643bb",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/looks.py",
+      "sha256": "0a652a67303f268865523c6e847761018d1ea49e92016fb0b361ea9e5a28178b",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/pipeline.py",
+      "sha256": "f74f1782b8208ad5413aff52faa4b12993583de2d640e0d750aca2d3429ce630",
+      "existed": true,
+      "original_sha256": "04e83db244b7ea3b108bb546de1c480854036d0597f6b2ff930757be98e94412"
+    },
+    {
+      "path": "clipper/projects.py",
+      "sha256": "1e3b401e48a6c26973cd8847d8204fadd274b6d6a18fb24d8c8d7f727d64003e",
+      "existed": true,
+      "original_sha256": "1ab39d80ef0f2932db33d2e71ffb04b046678eaeaf2b5b54372b58d36031b92b"
+    },
+    {
+      "path": "clipper/render.py",
+      "sha256": "c494b6ad178e2ec6ee7960c13603fe41e7e7c5993660ebb7ca87bf4131699cbc",
+      "existed": true,
+      "original_sha256": "8508731226bb46d5f1b8a7faa8da8cc337b1700f05d2c81b6da879f4e5904700"
+    },
+    {
+      "path": "clipper/subtitle_edit.py",
+      "sha256": "a7ef89c21abcfe5ab7ad6f1eb6f66ad31246c343d6840edae5461d3321dc1523",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/tests/test_recovery.py",
+      "sha256": "d207c29d3454ef9e6e73a51957693831024bc187532913e82823921b0b5f3c15",
+      "existed": true,
+      "original_sha256": "a60e0b2e62d21c1206cd5f4f400cef53e3a795f9d74e85b73722ef24acf9a4b4"
+    },
+    {
+      "path": "clipper/tests/test_studio23.py",
+      "sha256": "1206aaf5cd056df0dc1d1675a461796371dc1575e91dd46f90882e4491490b13",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/typography.py",
+      "sha256": "d6af35992703689a0621dc233800e837235870a5d95c386dcc9f136f6c11e2d4",
+      "existed": true,
+      "original_sha256": "f2e1a90f8cd2facde47097e501785cae9437808d3d3b0012b6bde8700763829f"
+    },
+    {
+      "path": "doctor_pro.py",
+      "sha256": "48acbee7d79a848b24bd676fde272ef4814750719cc27ae2ad329ebdc5a93ed5",
+      "existed": true,
+      "original_sha256": "a3e13c697013d6cd4232a371ffe843ee567e8797cceb3e54ae50f302b7c4ed08"
+    },
+    {
+      "path": "static/index.html",
+      "sha256": "d7056e088b67aaca55f8598f25a62a69b7e4c44cce11257e29a6d416fe696ee9",
+      "existed": true,
+      "original_sha256": "39837857a3fef4698544c6ff3dd58e98ac64a2268c2fad59e116b6015b1439f1"
+    },
+    {
+      "path": "static/studio.css",
+      "sha256": "9936794e123f82bd7961a779f2648cc7e69caef6776d8dc7d7e3769cf7d10ffe",
+      "existed": true,
+      "original_sha256": "e015da5a275b1ae0d1ce63a687d7819045c64561ec9ad64b364b0803b40ad3a3"
+    },
+    {
+      "path": "static/studio.js",
+      "sha256": "20c6b1c3318535bb184620ca4dd627ebd95802eed1407d0ebf5114850ccd4daa",
+      "existed": true,
+      "original_sha256": "4c88d5e1a156397ab07b58610ca4cf64cf631660421a2051c2e611e696df0e70"
+    },
+    {
+      "path": "static/templates/elegan.jpg",
+      "sha256": "7da6cbdeab9e0f2ca9fdfcae131ca390049b63fd4fe6c17cf985b2a4b30df20f",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/elegan.mp4",
+      "sha256": "8a9cd314bcdc131fb98a9845e29161832ac513439b2424858a26e77c92436d03",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/energi.jpg",
+      "sha256": "b255d3a9ff35ae74aea89e84dfdf12088f5a8563b4f41a02f230ed7831ec8da1",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/energi.mp4",
+      "sha256": "fe48f8acdd22e4483e6433dd915b54ef4d1908fda816343345616e88a6fa0e70",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/fokus.jpg",
+      "sha256": "52a9e5a34b28b845868923cc046c19065b0de9347fdd7d9c7364b64291fe8b99",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/fokus.mp4",
+      "sha256": "12fe5cce4478fd6d93f86ab432808183fa66432d13bae9b7a80d5e1a1afb4ecf",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/kelas.jpg",
+      "sha256": "145a3de068c61719811ee3a16fb0d2432565948be767f2d0a0bd6af0db2b4204",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/kelas.mp4",
+      "sha256": "7fc2bd46311644d28a9a7f9644e8e496e781241fbd9b60372c22b45039f384a1",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/tegas.jpg",
+      "sha256": "f8952ac00f8c282e4cd7c969416a06139c324f584f1f0fb01b49d8c9aa71788c",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/templates/tegas.mp4",
+      "sha256": "f841d3b110a4e4749cae57865ae3d9848ffe9a4cf2d2c8392ae58ae799339c9b",
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "tools/build_template_previews.py",
+      "sha256": "cabacef14434d5020545daefd55282c10e03f9e29691b4a8a1328dd85039e41a",
+      "existed": true,
+      "original_sha256": "7dc27294d076277212077c0c7db3c927e2bfa569c198c00faff1300cfdc19187"
+    }
+  ]
+}

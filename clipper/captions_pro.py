@@ -44,8 +44,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 continue
             paint = color(cfg.accent_hex if w["emphasis"] else cfg.base_hex)
             if w.get('keyframes'):
-                family = 'DejaVu Sans'
-                bold = 0 if w.get('family') == 'regular' else 1
+                family = w['family']
+                bold = int(w.get('bold', False))
                 for a,b in zip(w['keyframes'], w['keyframes'][1:]):
                     left,right = start+a['t'],min(end,start+b['t'])
                     if right<=left or a['opacity']<=0:
@@ -55,7 +55,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     tags = (f"\\an5\\pos({w['x']+a['dx']:.3f},{w['y']+a['dy']:.3f})"
                         f"\\fn{family}\\fs{w['ass_size']}\\b{bold}\\i{int(w.get('italic',False))}"
                         f"\\c{paint}\\alpha&H{alpha:02X}&\\fscx{scale:.3f}\\fscy{scale:.3f}"
-                        f"\\bord0\\shad{min(cfg.target_w,cfg.target_h)/1080*2:.2f}\\blur{a['blur']:.3f}")
+                        f"\\3c&H15110D&\\4c&H000000&\\bord{min(cfg.target_w,cfg.target_h)/1080*1.8 if cfg.caption_backdrop else 0:.2f}"
+                        f"\\shad{min(cfg.target_w,cfg.target_h)/1080*3 if cfg.caption_backdrop else 0:.2f}\\blur{a['blur']:.3f}")
                     events.append(f"Dialogue: 0,{ts(left)},{ts(right)},Editorial,,0,0,0,,{{{tags}}}{safe(w['text'])}")
                 continue
             dur_ms = max(1, int((end - start) * 1000))
@@ -66,32 +67,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             # Entire phrase is readable from the beginning; emphasis changes at spoken time.
             anim = (f"\\fscx100\\fscy100\\t({active},{active + enter},\\c{paint})"
                     if cfg.caption_style == "editorial" else "")
-            family = 'DejaVu Serif' if w.get('family') == 'serif' else 'DejaVu Sans'
+            family = w['family']
             initial = color(cfg.base_hex) if cfg.caption_style == 'editorial' else paint
-            tags = f"\\an5\\pos({w['x']},{w['y']})\\fn{family}\\fs{w['ass_size']}\\c{initial}\\fad({fade},{fade}){anim}"
+            tags = f"\\an5\\pos({w['x']},{w['y']})\\fn{family}\\b{int(w.get('bold',False))}\\i{int(w.get('italic',False))}\\fs{w['ass_size']}\\c{initial}\\fad({fade},{fade}){anim}"
             events.append(f"Dialogue: 0,{ts(start)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{safe(w['text'])}")
-    if hook and cfg.title_card:
-        # A restrained top title for the first three seconds; no synthetic spoken claim.
-        from .typography import font
-        label = safe(hook.strip())[:100]
-        size = round(min(cfg.target_w, cfg.target_h) * .044)
-        def title_rows(text, fs):
-            rows=['']
-            for word in text.split():
-                line=(rows[-1]+' '+word).strip()
-                if rows[-1] and font(cfg.fonts_dir,fs).getlength(line)>cfg.target_w*.78:
-                    rows.append(word)
-                else: rows[-1]=line
-            return rows
-        rows=title_rows(label,size)
-        while size>14 and (len(rows)>2 or any(font(cfg.fonts_dir,size).getlength(r)>cfg.target_w*.78 for r in rows)):
-            size-=1;rows=title_rows(label,size)
-        end = min(3., max((p['end'] for p in plan['phrases']), default=3.))
-        tags = f"\\an8\\pos({cfg.target_w * .47},{cfg.target_h * .105})\\fs{size}\\c{color(cfg.base_hex)}\\bord2\\shad2\\fad(120,180)"
-        shown='\\N'.join(rows)
-        events.append(f"Dialogue: 1,{ts(0)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{shown}")
-        plan['title'] = {'text': '\n'.join(rows), 'start': 0, 'end': end, 'size': size,
-                         'x': cfg.target_w * .47, 'y': cfg.target_h * .105}
+    # Ignore legacy title_card/hook settings: titles remain clip metadata.
     dst = Path(path)
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(header + "\n".join(events) + "\n", encoding="utf-8")

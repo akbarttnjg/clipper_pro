@@ -6,7 +6,7 @@ completeness. Re-review supplies surrounding context and remains reviewable.
 import re
 from .typography import token
 
-VERSION = 1
+VERSION = 2
 
 
 def segments_from_words(words):
@@ -44,6 +44,8 @@ def audit(clip, words, max_duration=120):
         issues.append('Penutup masih berada pada rincian daftar atau janji pembahasan.')
     if re.match(r'^(biar|supaya|karena|ketika|atau|yang)\b', text.lower()):
         issues.append('Pembuka mungkin membutuhkan kalimat sebelumnya.')
+    if re.search(r'(?:(?:gue|gua|saya|aku) (?:pengen|ingin|mau) (?:tahu|tau)|pertanyaannya|gimana menurut (?:kalian|kamu))[^.!?]{0,45}[,.?]?$', tail):
+        issues.append('Penutup membuka pertanyaan baru; akhiri pada kesimpulan sebelumnya atau sertakan jawabannya.')
     if clip['end'] - clip['start'] > max_duration + .05:
         issues.append(f'Durasi melewati batas pilihan {max_duration:g} detik.')
     source_tokens = {token(w['word']) for w in words}

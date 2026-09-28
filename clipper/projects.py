@@ -48,7 +48,7 @@ def fusion_comp(phrase, plan, path):
         ident = f'Word{i + 1}'
         c = plan['style']['accent'] if w.get('emphasis') else plan['style']['base']
         rgb = [int(c.lstrip('#')[j:j+2], 16) / 255 for j in (0, 2, 4)]
-        family = 'DejaVu Serif' if w.get('family') == 'serif' else 'DejaVu Sans'
+        family = w['family'] if w.get('font_id') else ('DejaVu Serif' if w.get('family') == 'serif' else 'DejaVu Sans')
         size = f"Input {{ Value = {w['size']/plan['height']:.8f} }}"
         center = f"Input {{ Value = {{ {w['x']/plan['width']:.8f}, {1-w['y']/plan['height']:.8f} }} }}"
         blend = 'Input { Value = 1 }'
@@ -65,6 +65,8 @@ def fusion_comp(phrase, plan, path):
         style = 'Book' if w.get('family') == 'regular' else 'Bold'
         if w.get('italic'):
             style = 'Oblique' if style == 'Book' else 'Bold Oblique'
+        if w.get('font_id'):
+            style = w['style']
         nodes.append(f'''{ident} = TextPlus {{ Inputs = {{
             GlobalIn = Input {{ Value = 0 }}, GlobalOut = Input {{ Value = {count - 1} }},
             Width = Input {{ Value = {plan['width']} }}, Height = Input {{ Value = {plan['height']} }},
@@ -134,6 +136,12 @@ def xml_timeline(plan, name, path, transparent):
     for i, s in enumerate(plan['shots']):
         clipitem(track, f'SHOT_{i+1:03}', source['path'], s['start_frame'], s['duration_frames'],
                  s['source_start'], source['fps'], True, source['width'], source['height'], source['duration'])
+    if plan.get('broll'):
+        broll_track = node(video, 'track')
+        for i, event in enumerate(plan['broll']):
+            a, b = round(event['start']*fps), round(event['end']*fps)
+            clipitem(broll_track, f'BROLL_{i+1:03}', event['path'], a, b-a, 0, fps,
+                     True, plan['width'], plan['height'], event['duration'])
     text_track = node(video, 'track')
     for i, p in enumerate(plan['captions']['phrases']):
         a, b = round(p['start'] * fps), round(p['end'] * fps)
@@ -199,7 +207,7 @@ def resolve_export(items, root):
             if shot['zoom_at'] is not None:
                 frame = round((shot['start'] + shot['zoom_at']) * plan['fps'])
                 commands.append(f'tl:AddMarker({frame}, "Yellow", "Zoom accent", "MP4 memiliki zoom halus. Atur keyframe Inspector bila ingin menyamai geraknya.", 1)')
-        commands += ['local texts = tl:GetItemListInTrack("video", 2) or {}',
+        commands += [f'local texts = tl:GetItemListInTrack("video", {3 if plan.get("broll") else 2}) or {{}}',
             'for i,item in ipairs(texts) do',
             f' local ok = item:ImportFusionComp(here .. {lua_string(prefix)} .. string.format("text-%03d.comp",i))',
             ' if not ok then note("Fusion teks belum terpasang: " .. tostring(i)) end', 'end']
@@ -247,6 +255,13 @@ def capcut_export(items, root):
                     for prop in (cc.KeyframeProperty.scale_x, cc.KeyframeProperty.scale_y):
                         segment.add_keyframe(prop, us(t), value)
             script.add_segment(segment, 'Video')
+        if p.get('broll'):
+            script.add_track(cc.TrackType.video, 'Ilustrasi B-roll', relative_index=1)
+            for event in p['broll']:
+                material=cc.VideoMaterial(event['path'])
+                duration=min(us(event['duration']),material.duration)
+                script.add_segment(cc.VideoSegment(material,trange(us(event['start']),duration),
+                    source_timerange=trange(0,duration),volume=0),'Ilustrasi B-roll')
         for kind, path in p['audio']['stems'].items():
             script.add_track(cc.TrackType.audio, kind)
             material = cc.AudioMaterial(path)
@@ -269,7 +284,7 @@ def capcut_export(items, root):
             if duration < .015:
                 return
             seg = cc.TextSegment(w['text'], trange(us(start+reveal), us(duration)),
-                style=cc.TextStyle(size=w['size'] * 120 / min(W,H), bold=w.get('family')!='regular', italic=bool(w.get('italic')), color=rgb, align=1),
+                style=cc.TextStyle(size=w['size'] * 120 / min(W,H), bold=w.get('bold',w.get('family')!='regular'), italic=bool(w.get('italic')), color=rgb, align=1),
                 clip_settings=cc.ClipSettings(transform_x=2*w['x']/W-1, transform_y=1-2*w['y']/H),
                 border=cc.TextBorder(width=0 if samples else 8, alpha=.65))
             timed = {min(us(duration), max(0, us(k['t']-reveal))): k for k in samples if k['t'] >= reveal}
@@ -280,7 +295,7 @@ def capcut_export(items, root):
                     (cc.KeyframeProperty.position_x,2*(w['x']+key['dx'])/W-1),
                     (cc.KeyframeProperty.position_y,1-2*(w['y']+key['dy'])/H)):
                     seg.add_keyframe(prop, when, value)
-            fontmap[seg.material_id] = {'regular':'DejaVuSans.ttf','serif':'DejaVuSerif-Bold.ttf'}.get(w.get('family'),'DejaVuSans-Bold.ttf')
+            fontmap[seg.material_id] = w.get('file') or {'regular':'DejaVuSans.ttf','serif':'DejaVuSerif-Bold.ttf'}.get(w.get('family'),'DejaVuSans-Bold.ttf')
             script.add_segment(seg, track)
         for phrase in p['captions']['phrases']:
             for k, w in enumerate(phrase['words']):
@@ -363,6 +378,9 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
     root.mkdir(parents=True, exist_ok=False)
     (root / 'Media').mkdir()
     shutil.copytree(cfg.fonts_dir, root / 'Fonts')
+    licenses = Path(__file__).parent / 'font-licenses'
+    if licenses.is_dir():
+        shutil.copytree(licenses, root / 'Font-Licenses')
     items = []
     for i, result in enumerate(results):
         p = read_json(result['plan_path'])
@@ -377,18 +395,27 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
         clean = Path(result['plan_path']).parent / 'video-clean.mp4'
         cache = clean.with_suffix('.cache.json')
         fingerprint = {k:p.get(k) for k in ('shots','source','width','height','fps','duration','render_config')}
+        fingerprint['version'] = '2.4-source-only'
         fingerprint['media_mtime'] = Path(p['source']['path']).stat().st_mtime_ns
         fingerprint['mix_mtime'] = Path(p['audio']['mix']).stat().st_mtime_ns
         key = hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
         if not clean.exists() or read_json(cache,{}).get('key') != key:
             progress(round(5+30*i/max(1,len(results))), f'Menyiapkan video tanpa teks {i+1}/{len(results)}')
-            render.video(p['source']['path'], p, clean_cfg, None, clean, p['audio']['mix'],
+            render.video(p['source']['path'], {**p, 'broll': []}, clean_cfg, None, clean, p['audio']['mix'],
                 lambda fraction: progress(round(5+30*(i+fraction)/max(1,len(results))),
                     f'Video tanpa teks {i+1}/{len(results)}'))
         qc.inspect(clean, clean_cfg, p['duration'])
         write_json(cache, {'key':key})
         packed_clean = root / 'Media' / f'{i+1:02}-video-clean.mp4'
         shutil.copy2(clean, packed_clean)
+        from .illustrations import credits
+        credit_rows=credits(p)
+        write_json(root/'Media'/f'{i+1:02}-credits.json',credit_rows)
+        (root/'Media'/f'{i+1:02}-credits.txt').write_text('\n'.join(c['credit'] for c in credit_rows),encoding='utf-8')
+        for j,event in enumerate(p.get('broll',[])):
+            packed=root/'Media'/f'{i+1:02}-broll-{j+1:02}.mp4'
+            shutil.copy2(event['path'],packed)
+            event['path']=str(packed.resolve());event['asset']['path']=str(packed.resolve())
         subtitle = Path(p.get('subtitle_path', Path(result['plan_path']).parent / 'captions.ass'))
         if subtitle.is_file():
             shutil.copy2(subtitle, root / 'Media' / f'{i+1:02}-captions.ass')
@@ -418,7 +445,8 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
     manifest = {'version': 3, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
         'source_files': sorted({p['plan']['source']['path'] for p in items}),
         'capcut_status': 'experimental-generated' if capcut_error is None else 'failed', 'capcut_error': capcut_error,
-        'resolve_status': 'generated-unverified-in-editor', 'limitations': [
+        'resolve_status': 'generated-unverified-in-editor', 'broll_layer': 'separate silent video track', 'limitations': [
+            'B-roll ada pada track terpisah; credits.txt berisi sumber untuk deskripsi publikasi.',
             'Video tanpa teks, WAV, font, ASS master dan SRT ada di paket. Framing/zoom sudah menyatu di video.',
             'DaVinci: Fusion Text+ dengan kurva posisi, ukuran, opacity dan blur; perlu verifikasi tampilan di editor.',
             'CapCut: teks editable dengan gerak posisi/ukuran. Blur dan fade native belum dipetakan; MP4/ASS memuat efek lengkap.',
@@ -431,6 +459,7 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
 
 MP4 final berada di folder clips aplikasi dan dapat diunduh dari UI.
 Ekstrak paket ke folder permanen. Video tanpa teks, suara, musik, efek, dan teks terpisah.
+B-roll adalah layer video terpisah tanpa audio stok. Kredit ada di Media/XX-credits.txt.
 Komposisi materi/pembicara serta zoom menyatu dalam video agar hasilnya konsisten.
 original-edit-plan menyimpan keputusan terhadap sumber asli untuk referensi.
 Media/XX-captions.ass adalah master animasi penuh; ASS tidak otomatis menjadi

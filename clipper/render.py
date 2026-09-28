@@ -83,16 +83,27 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
         prefix = (f"[0:v]trim=start={shot['source_start'] - seek:.8f}:end={shot['source_end'] - seek:.8f},"
                   f"setpts=PTS-STARTPTS,fps={fps},crop={w}:{h}:{x}:{y}")
         suffix = f",setsar=1,format=yuv420p,trim=end_frame={shot['duration_frames']},setpts=N/({fps}*TB)[v{i}]"
-        if shot['mode'] == 'stream' and H > W and shot.get('face_rect'):
+        if shot['mode'] == 'stream' and W > H and shot.get('face_rect'):
+            image_h=shot.get('image_height') or H
+            side=round(W*.30)//2*2; gap=max(2,round(W*.008)//2*2); mat_w=W-side-gap
+            fx,fy,fw,fh=shot['face_rect']
+            graph.append(prefix+f',scale={mat_w}:{image_h}:force_original_aspect_ratio=decrease,pad={mat_w}:{image_h}:(ow-iw)/2:(oh-ih)/2:color=0x11151b[mat{i}]')
+            graph.append(f"[0:v]trim=start={shot['source_start']-seek:.8f}:end={shot['source_end']-seek:.8f},setpts=PTS-STARTPTS,fps={fps},crop={fw}:{fh}:{fx}:{fy},scale={side}:{image_h}:force_original_aspect_ratio=decrease,pad={side+gap}:{image_h}:(ow-iw)/2:(oh-ih)/2:color=0x11151b[face{i}]")
+            graph.append(f'[face{i}][mat{i}]hstack=inputs=2,pad={W}:{H}:0:0:color=0x11151b'+suffix)
+        elif shot['mode'] == 'stream' and H > W and shot.get('face_rect'):
             top = round(H * shot.get('material_share', .62)) // 2 * 2
             fx, fy, fw, fh = shot['face_rect']
             vertical = '0' if shot.get('caption_panel') else '(oh-ih)/2'
-            graph.append(prefix + f",scale={W}:{top}:force_original_aspect_ratio=decrease,pad={W}:{top}:(ow-iw)/2:{vertical}:color=0x11151b[mat{i}]")
+            image_h = shot.get('material_image_height') or top
+            graph.append(prefix + f",scale={W}:{image_h}:force_original_aspect_ratio=decrease,pad={W}:{top}:(ow-iw)/2:{vertical}:color=0x11151b[mat{i}]")
             graph.append(f"[0:v]trim=start={shot['source_start'] - seek:.8f}:end={shot['source_end'] - seek:.8f},setpts=PTS-STARTPTS,fps={fps},crop={fw}:{fh}:{fx}:{fy},scale={W}:{H-top}:force_original_aspect_ratio=increase,crop={W}:{H-top}[face{i}]")
             graph.append(f'[mat{i}][face{i}]vstack=inputs=2' + suffix)
         else:
             if shot['mode'] == 'fill':
                 prefix += f',scale={W}:{H}:flags=bicubic'
+            elif shot.get('image_height'):
+                top = shot['image_height']
+                prefix += f',scale={W}:{top}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:({top}-ih)/2:color=0x11151b'
             else:
                 prefix += f',scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x11151b'
             if shot['zoom_at'] is not None:
@@ -100,15 +111,21 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
                 envelope = f'max(0,min(1,min((on-{zf})/8,({zf + 3 * fps}-on)/12)))'
                 prefix += f",zoompan=z='1+{cfg.zoom_amount}*{envelope}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s={W}x{H}:fps={fps}"
             graph.append(prefix + suffix)
-    subtitle = ',' + ass_filter(ass, cfg) if ass else ''
-    graph.append(''.join(f'[v{i}]' for i in range(len(plan['shots']))) + f"concat=n={len(plan['shots'])}:v=1:a=0{subtitle}[out]")
+    graph.append(''.join(f'[v{i}]' for i in range(len(plan['shots']))) + f"concat=n={len(plan['shots'])}:v=1:a=0[base]")
+    extra_inputs=[]; previous='base'
+    for i,event in enumerate(plan.get('broll',[])):
+        extra_inputs.extend(['-i',event['path']])
+        graph.append(f"[{i+2}:v]trim=duration={event['duration']:.8f},setpts=PTS-STARTPTS+{event['start']:.8f}/TB,fps={fps},scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1[br{i}]")
+        graph.append(f"[{previous}][br{i}]overlay=0:0:eof_action=pass:repeatlast=0:enable='gte(t,{event['start']:.8f})*lt(t,{event['end']:.8f})'[layer{i}]")
+        previous=f'layer{i}'
+    graph.append(f'[{previous}]'+(ass_filter(ass,cfg) if ass else 'null')+'[out]')
     target = Path(target)
     pending = target.with_name(target.stem + '.rendering.mp4')
     script = target.with_suffix('.filter.txt')
     script.write_text(';\n'.join(graph), encoding='utf-8')
     codec = cfg.video_codec
     command = ['ffmpeg', '-hide_banner', '-v', 'warning', '-y', '-ss', str(seek), '-t', str(end - seek), '-i', str(source),
-        '-i', str(mix), '-filter_complex_threads', '2', *filter_file_args(script),
+        '-i', str(mix), *extra_inputs, '-filter_complex_threads', '2', *filter_file_args(script),
         '-map', '[out]', '-map', '1:a', '-t', str(plan['duration']), '-r', str(fps),
         '-c:v', codec, *encoder_args(codec), '-pix_fmt', 'yuv420p', '-threads', '6',
         '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', str(pending)]
@@ -120,3 +137,30 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
     plan['encoder'] = actual
     plan['warnings'].extend(warnings)
     return str(target)
+
+
+def broll_plates(plan,cfg,folder):
+    """Short silent canvas-sized plates retain framing in both native editors."""
+    import hashlib
+    W,H,fps=plan['width'],plan['height'],plan['fps']
+    kept=[]
+    for event in plan.get('broll',[]):
+        original=Path(event['asset']['path'])
+        try:
+            key=hashlib.sha256(str([str(original),original.stat().st_mtime_ns,W,H,fps,event['duration']]).encode()).hexdigest()[:20]
+            target=Path(folder)/('broll-'+key+'.mp4')
+            if not target.exists():
+                pending=target.with_suffix('.rendering.mp4')
+                cmd=['ffmpeg','-hide_banner','-v','error','-y','-i',str(original),'-an','-t',str(event['duration']),
+                    '-vf',f'fps={fps},scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1',
+                    '-c:v','libx264','-preset','veryfast','-crf','18','-pix_fmt','yuv420p','-threads','4','-movflags','+faststart',str(pending)]
+                try:
+                    r=subprocess.run(cmd,capture_output=True,timeout=120)
+                    if r.returncode: raise ValueError('Aset B-roll tidak dapat dikonversi.')
+                    pending.replace(target)
+                finally:
+                    pending.unlink(missing_ok=True)
+            event['path']=str(target.resolve());kept.append(event)
+        except (ValueError,OSError,subprocess.TimeoutExpired):
+            plan['warnings'].append('Aset B-roll gagal disiapkan; bagian itu memakai sumber asli.')
+    plan['broll']=kept

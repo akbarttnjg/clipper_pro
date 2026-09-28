@@ -4,6 +4,39 @@ import subprocess
 from pathlib import Path
 
 
+def inspect_caption_plan(plan, cfg):
+    """Check settled positions and line edges against the requested placement."""
+    issues = []
+    if plan.get('title'):
+        issues.append('Judul pembuka seharusnya tidak dirender.')
+    for phrase in plan.get('phrases', []):
+        if cfg.caption_position != 'auto' and phrase['position'] != cfg.caption_position:
+            issues.append('Posisi subtitle berbeda dari pilihan manual.')
+        align = cfg.caption_align
+        if align == 'auto':
+            align = phrase['position'] if phrase['position'] in ('left', 'right') else 'center'
+        if phrase.get('alignment') != align:
+            issues.append('Perataan subtitle berbeda dari pengaturan.')
+        x, y, width, height = phrase['panel']
+        lines = {}
+        for word in phrase['words']:
+            lines.setdefault(word['baseline'], []).append(word)
+            if not (0 <= word['x']-word['width']/2 < word['x']+word['width']/2 <= cfg.target_w):
+                issues.append('Subtitle keluar dari lebar gambar.')
+        for row in lines.values():
+            left = min(w['x']-w['width']/2 for w in row)
+            right = max(w['x']+w['width']/2 for w in row)
+            observed = left if align == 'left' else right if align == 'right' else (left+right)/2
+            expected = x if align == 'left' else x+width if align == 'right' else x+width/2
+            if abs(observed-expected) > 1:
+                issues.append('Tepi baris subtitle belum sejajar.')
+    if issues:
+        raise ValueError('Pemeriksaan posisi subtitle gagal: ' + ' '.join(dict.fromkeys(issues)))
+    return {'passed': True, 'phrases': len(plan.get('phrases', [])),
+            'requested_position': cfg.caption_position, 'requested_alignment': cfg.caption_align,
+            'checks': ['manual_position', 'line_alignment', 'horizontal_bounds', 'no_title_overlay']}
+
+
 def inspect(path, cfg, expected_duration):
     r = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
                        capture_output=True, text=True, check=True)

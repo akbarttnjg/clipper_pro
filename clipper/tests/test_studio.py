@@ -39,7 +39,7 @@ def test_cold_open_exact_quote_and_timeline_word_mapping():
     ws=words('Satu dua tiga empat lima enam risiko kehilangan uang itu nyata sekarang selesai.',.5)
     assert story.quote_span('risiko keuntungan pasti',ws,0,6.5) is None
     c={'start':0,'end':6.5,'title':'Uji','keywords':['risiko'],'cold_open_span':[4,5.5]}
-    p=editplan.build(ws,c,Config(trim_silence=False))
+    p=editplan.build(ws,c,Config(trim_silence=False,cold_open=True))
     assert p['spans'][0]['kind']=='cold_open'
     assert p['duration_frames']==240
     assert p['spans'][1]['source_start']==0

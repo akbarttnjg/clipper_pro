@@ -12,7 +12,7 @@ TEMPLATES = (
 IDS = tuple(t['id'] for t in TEMPLATES)
 
 
-def frames(style, duration, reveal, index, emphasis, cfg):
+def frames(style, duration, reveal, index, emphasis, cfg, position='bottom'):
     """Times are relative to a phrase. Intermediate samples preserve easing in ASS.
 
     Each exporter consumes the same position/scale/alpha samples. Blur in CapCut
@@ -22,8 +22,9 @@ def frames(style, duration, reveal, index, emphasis, cfg):
     last = max(1, math.ceil(duration * fps))
     first = min(last - 1, max(0, round(reveal * fps)))
     strength = {'calm': .65, 'balanced': 1., 'dynamic': 1.35}.get(cfg.motion_intensity, 1.)
-    kind = {'narrative': ('blur', 'up', 'pop', 'left', 'down', 'right')[index % 6],
-            'pop': 'pop', 'slide': ('left','right','up','down')[index % 4],
+    direction = position if position in ('left','right') else 'up'
+    kind = {'narrative': 'pop' if emphasis else 'blur',
+            'pop': 'pop', 'slide': direction,
             'blur': 'blur', 'impact': 'pop'}.get(style, 'up')
     enter = min(max(2, round(.28 * fps)), max(1, (last-first)//2))
     leave = min(round(.1*fps), max(1, (last-first)//4))

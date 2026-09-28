@@ -2,6 +2,7 @@
 import re
 import shutil
 import time
+from dataclasses import replace
 from pathlib import Path
 from .config import Config
 from . import ffmpeg_util, transcribe, score, story, editorial, editplan, composition, render, captions_pro, qc
@@ -54,7 +55,7 @@ def clip_name(clip, i):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
-    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}-v22"
+    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}-v24"
     work, out = Path(cfg.work_dir) / name, Path(cfg.out_dir)
     work.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
@@ -66,17 +67,39 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         raise ValueError('Sumber tidak mempunyai track audio.')
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
-    plan = editplan.build(words, clip, cfg)
+    edit_cfg = replace(cfg, trim_silence=False) if cfg.source_kind == 'board' and cfg.preserve_material_pauses else cfg
+    plan = editplan.build(words, clip, edit_cfg)
     composition.analyze(media_path, plan, cfg, info)
+    if cfg.source_kind == 'auto' and cfg.trim_silence and cfg.preserve_material_pauses and any(s.get('has_material') for s in plan['shots']):
+        plan = editplan.build(words, clip, replace(cfg, trim_silence=False))
+        composition.analyze(media_path, plan, cfg, info)
+        plan['warnings'].append('Jeda materi dipertahankan; waktu menulis tidak dipangkas otomatis.')
     if not plan['shots']:
         raise ValueError('Tidak ada frame yang dapat dirender. Periksa batas clip.')
-    ass = captions_pro.write_ass(plan['words'], work / 'captions.ass', cfg,
-        hook=clip['title'] if cfg.title_card else '', keywords=clip.get('keywords', []),
+    from . import illustrations
+    if cfg.broll_mode != 'off':
+        recipe = clip.get('_broll_recipe') or illustrations.prepare(words, clip, cfg, lambda p,m: on_progress(7+p//8,m))
+        illustrations.attach(plan, recipe, cfg)
+        render.broll_plates(plan, cfg, work)
+    write_json(out / (name + '.credits.json'), illustrations.credits(plan))
+    (out / (name + '.credits.txt')).write_text('\n'.join(c['credit'] for c in illustrations.credits(plan)), encoding='utf-8')
+    from .subtitle_edit import clean
+    display, changes, notices = clean(plan['words'], cfg.caption_cleanup)
+    plan['display_words'] = display
+    plan['subtitle_cleanup'] = {'mode': cfg.caption_cleanup, 'changes': changes, 'review': notices}
+    if notices:
+        plan['warnings'].append('Ada angka atau waktu kata yang perlu didengarkan kembali; lihat laporan subtitle.')
+    write_json(out / (name + '.subtitle-review.json'), plan['subtitle_cleanup'])
+    ass = captions_pro.write_ass(display, work / 'captions.ass', cfg,
+        keywords=clip.get('keywords', []),
         anchors=[{'time': (s['start'] + s['end']) / 2, 'start': s['start'], 'end': s['end'],
                   'position': s['position'], 'panel': s.get('caption_panel')} for s in plan['shots']])
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
+    plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg)
     plan['style'] = {'accent': cfg.accent_hex, 'base': cfg.base_hex, 'caption_style': cfg.caption_style,
-                     'motion_intensity': cfg.motion_intensity}
+                     'motion_intensity': cfg.motion_intensity, 'font_main': cfg.font_main,
+                     'font_accent': cfg.font_accent, 'contrast': cfg.caption_backdrop, 'caption_position': cfg.caption_position,
+                     'caption_align': cfg.caption_align, 'safe_placement': cfg.safe_placement}
     plan['subtitle_path'] = str(Path(ass).resolve())
     plan['render_config'] = {'zoom_amount': cfg.zoom_amount}
     plan_path = work / 'edit-plan.json'
@@ -94,6 +117,11 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
             lambda p: on_progress(40 + round(p * 54), 'Encoding video'))
         on_progress(96, 'Memeriksa durasi, gambar, dan suara')
         checked = qc.inspect(final, cfg, plan['duration'])
+        checked['caption_layout'] = plan['caption_checks']
+        checked['editorial'] = {'status': 'needs_review' if notices or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',
+            'subtitle_flags': len(notices), 'boundary': clip.get('boundary_review', {}),
+            'note': 'QC teknis bukan penilaian kelengkapan cerita atau prediksi retensi.'}
+        write_json(Path(final).with_suffix('.qc.json'), checked)
     except Exception as exc:
         plan.update(status='error', error=str(exc))
         write_json(plan_path, plan)
@@ -106,7 +134,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         'start': clip['start'], 'end': clip['end'], 'length': round(checked['duration'], 2),
         'width': cfg.target_w, 'height': cfg.target_h, 'fps': cfg.output_fps, 'encoder': plan['encoder'],
         'revision': clip.get('revision', 0), 'plan_path': str(plan_path.resolve()),
-        'render_version': '2.2.0',
+        'render_version': '2.4', 'broll_count': len(plan.get('broll', [])), 'subtitle_flags': len(notices),
         'render_seconds': plan['render_seconds'], 'selection_source': clip.get('selection_source'),
         'warnings': list(dict.fromkeys(clip.get('warnings', []) + plan['warnings'])), 'qc': checked}
 
