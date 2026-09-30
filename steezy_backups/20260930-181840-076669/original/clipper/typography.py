@@ -61,12 +61,6 @@ def groups(words, cfg):
                 penalty = (count-4.5)**2*.3 + (9 if count==1 else 0)
                 if b<n and token(run[b-1]['word']) in weak:
                     penalty += 8
-                # Source-grounded phrases from the editorial review must stay
-                # together when they fit; a long phrase can still wrap safely.
-                if b<n and run[b-1].get('meaning_group') is not None and run[b-1].get('meaning_group') == run[b].get('meaning_group'):
-                    penalty += 24
-                if b<n and token(run[b]['word']) in {'jadi','tapi','namun','karena','kalau'}:
-                    penalty -= 2
                 if a>0 and token(run[a]['word']) in {'nya','lah','pun'}:
                     penalty += 6
                 if re.search(r'[,;.!?]$',run[b-1]['word']) and not re.search(r'\d[,.]$',run[b-1]['word']):
@@ -102,10 +96,6 @@ def balanced_rows(phrase, measures, space, width, max_rows, emphasis):
 
 
 def emphasis_indices(words, keywords=()):
-    semantic = {i for i, w in enumerate(words) if w.get('meaning_emphasis')}
-    if semantic:
-        # Keep a short meaningful phrase, including its negation, emphasized.
-        return semantic
     keys = {token(k) for phrase in keywords for k in str(phrase).split()}
     scores = []
     for i, w in enumerate(words):

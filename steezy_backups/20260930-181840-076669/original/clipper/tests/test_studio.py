@@ -40,12 +40,11 @@ def test_cold_open_exact_quote_and_timeline_word_mapping():
     assert story.quote_span('risiko keuntungan pasti',ws,0,6.5) is None
     c={'start':0,'end':6.5,'title':'Uji','keywords':['risiko'],'cold_open_span':[4,5.5]}
     p=editplan.build(ws,c,Config(trim_silence=False,cold_open=True))
-    # Legacy word-fragment hooks are no longer inserted/replayed.
-    assert p['spans'][0]['kind']=='body'
-    assert p['duration_frames']==195
-    assert p['spans'][0]['source_start']==0
+    assert p['spans'][0]['kind']=='cold_open'
+    assert p['duration_frames']==240
+    assert p['spans'][1]['source_start']==0
     repeated=[w for w in p['words'] if w['word']=='uang']
-    assert len(repeated)==1
+    assert len(repeated)==2 and repeated[1]['start']>repeated[0]['start']
     assert all(0<=w['start']<w['end']<=p['duration']+.001 for w in p['words'])
 
 

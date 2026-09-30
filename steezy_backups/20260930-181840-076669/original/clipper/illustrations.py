@@ -11,8 +11,7 @@ from .storage import read_json, write_json
 def recipe_path(words,clip,cfg):
     selected=[w for w in words if clip['start']<=w['start']<clip['end']]
     key=hashlib.sha256(json.dumps([selected,clip['start'],clip['end'],cfg.audience,cfg.source_kind,
-        cfg.broll_mode,cfg.broll_provider,cfg.broll_max,cfg.target_h>cfg.target_w,cfg.model,
-        clip.get('intelligence',{}), 'broll-3.1'],
+        cfg.broll_mode,cfg.broll_provider,cfg.broll_max,cfg.target_h>cfg.target_w,cfg.model,'broll-2.4'],
         sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:24]
     return Path(cfg.work_dir)/'broll-plans'/(key+'.json')
 
@@ -42,14 +41,8 @@ def propose(words,cfg):
 def prepare(words,clip,cfg,progress=lambda p,m:None,refresh=False):
     path=recipe_path(words,clip,cfg); existing=read_json(path)
     if existing is not None and not refresh: return existing
-    recipe={'version':'3.1','scenes':[],'notes':[],'audience':cfg.audience,'status':'off' if cfg.broll_mode=='off' else 'ready'}
+    recipe={'version':'2.4','scenes':[],'notes':[],'audience':cfg.audience,'status':'off' if cfg.broll_mode=='off' else 'ready'}
     if cfg.broll_mode=='off': return recipe
-    from .intelligence import signature
-    decision=clip.get('intelligence',{})
-    if (decision.get('signature')==signature(clip,words,cfg.audience)
-            and decision.get('broll')=='preserve_speaker'):
-        recipe.update(status='skipped',notes=['Pembicara dipertahankan: '+decision.get('broll_reason','')])
-        write_json(path,recipe);return recipe
     if cfg.source_kind=='board':
         recipe['notes']=['Mode papan tulis: materi dipertahankan. Ilustrasi tidak menutup penjelasan.']
         write_json(path,recipe); return recipe
@@ -77,8 +70,7 @@ def prepare(words,clip,cfg,progress=lambda p,m:None,refresh=False):
             if not 2<=len(query.split())<=8: continue
             progress(20+len(recipe['scenes'])*15,'Mencari stok: '+query)
             asset,notes=stock.find(query,str(row.get('local_query','')),cfg.broll_provider,
-                online=cfg.broll_mode=='auto',portrait=cfg.target_h>cfg.target_w,excluded=used,
-                cfg=cfg,context=' '.join(w['word'] for w in selected[max(0,i-16):i+24]))
+                online=cfg.broll_mode=='auto',portrait=cfg.target_h>cfg.target_w,excluded=used)
             if not asset:
                 recipe['notes'].extend(notes);continue
             from .ffmpeg_util import probe

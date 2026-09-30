@@ -7,9 +7,6 @@ from pathlib import Path
 from .config import Config
 from . import ffmpeg_util, transcribe, score, story, editorial, editplan, composition, render, captions_pro, qc
 from .storage import source_key, read_json, write_json
-from . import intelligence
-
-RENDER_VERSION = '3.1'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -58,7 +55,7 @@ def clip_name(clip, i):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
-    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}-v31"
+    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}-v24"
     work, out = Path(cfg.work_dir) / name, Path(cfg.out_dir)
     work.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
@@ -70,7 +67,6 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         raise ValueError('Sumber tidak mempunyai track audio.')
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
-    words = intelligence.annotate_words(words, clip, cfg)
     edit_cfg = replace(cfg, trim_silence=False) if cfg.source_kind == 'board' and cfg.preserve_material_pauses else cfg
     plan = editplan.build(words, clip, edit_cfg)
     composition.analyze(media_path, plan, cfg, info)
@@ -124,7 +120,6 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         checked['caption_layout'] = plan['caption_checks']
         checked['editorial'] = {'status': 'needs_review' if notices or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',
             'subtitle_flags': len(notices), 'boundary': clip.get('boundary_review', {}),
-            'intelligence': clip.get('intelligence', {}),
             'note': 'QC teknis bukan penilaian kelengkapan cerita atau prediksi retensi.'}
         write_json(Path(final).with_suffix('.qc.json'), checked)
     except Exception as exc:
@@ -139,7 +134,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         'start': clip['start'], 'end': clip['end'], 'length': round(checked['duration'], 2),
         'width': cfg.target_w, 'height': cfg.target_h, 'fps': cfg.output_fps, 'encoder': plan['encoder'],
         'revision': clip.get('revision', 0), 'plan_path': str(plan_path.resolve()),
-        'render_version': RENDER_VERSION, 'broll_count': len(plan.get('broll', [])), 'subtitle_flags': len(notices),
+        'render_version': '2.4', 'broll_count': len(plan.get('broll', [])), 'subtitle_flags': len(notices),
         'render_seconds': plan['render_seconds'], 'selection_source': clip.get('selection_source'),
         'warnings': list(dict.fromkeys(clip.get('warnings', []) + plan['warnings'])), 'qc': checked}
 

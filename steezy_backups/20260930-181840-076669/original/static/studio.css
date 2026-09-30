@@ -40,6 +40,3 @@
 .stock-key{padding:12px;border:1px solid #303842;border-radius:10px}
 #cleanupWarnings{display:flex;flex-direction:column;gap:6px}#cleanupWarnings button{text-align:left}
 @media(max-width:1100px){#hardware{display:none}}
-
-.decision-panel{border:1px solid var(--line,#34404d);border-radius:12px;padding:14px;background:rgba(255,255,255,.025)}
-.decision-panel h3{margin:0 0 10px;font-size:15px}.decision-panel ul{font-size:12px;padding-left:18px}.evidence-quote{font-size:13px;line-height:1.6;margin:5px 0 12px;padding-left:10px;border-left:2px solid #e7c46b}

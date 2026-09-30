@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const state = {job:null,index:null,data:null,editor:null,dirty:false,mode:'source',selected:new Set(),poll:null,draw:null,drag:null,loadedRevision:null,seen:new Set(),selectionToken:0,drawOld:''};
 const optionIds = ['aspect','caption_style','motion_intensity','layout','caption_position','caption_align','caption_scale','accent_hex','punch_zoom','accent_font','cold_open','trim','music_db','sfx_db','framing_x','material_rect','speaker_rect','material_share','font_main','font_accent','caption_cleanup','caption_backdrop','safe_placement','source_kind','audience','broll_mode','broll_provider','broll_max','preserve_material_pauses'];
-const active = new Set(['queued','analyzing','reviewing','rendering','previewing','exporting','illustrating','automatic']);
+const active = new Set(['queued','analyzing','reviewing','rendering','previewing','exporting','illustrating']);
 const busy = () => active.has(state.data?.status);
 function toast(text){$('toast').textContent=text;$('toast').classList.remove('hidden');clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),6000)}
 function tc(t, precision=false){t=Math.max(0,Number(t)||0);const seconds=Math.floor(t);return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(x=>String(x).padStart(2,'0')).join(':')+(precision?'.'+String(Math.floor((t-seconds)*100+.001)).padStart(2,'0'):'')}
@@ -18,46 +18,31 @@ function updatePlacementHint(){const manual=$('caption_position').value!=='auto'
 function updateFontSample(){for(const [role,id] of [['main','fontSampleMain'],['accent','fontSampleAccent']]){const fontId=$('font_'+(role==='accent'&&!$('accent_font').checked?'main':role)).value;$(id).style.fontFamily='preview_'+fontId;$(id).style.fontStyle='normal';$(id).style.fontWeight='normal'}$('fontSampleAccent').style.color=$('accent_hex').value;$('sizeLabel').textContent=$('caption_scale').value+'%';$('font_accent').disabled=!$('accent_font').checked||busy()}
 
 async function history(){const jobs=await api('/api/jobs');$('history').replaceChildren();for(const j of jobs){const b=el('button',j.name);b.title=j.name;b.onclick=()=>loadJob(j.id);$('history').append(b)}}
-function issues(c){return [...new Set([...(c.boundary_review?.issues||[]),...(c.intelligence?.issues||[])])]}
-function paintIntelligence(c){
- const box=$('intelligenceReview');box.replaceChildren();const d=c.intelligence;
- box.append(el('h3','Alasan cerita ini dipilih'));
- if(!d){box.append(el('p','Sesi ini belum mempunyai pemeriksaan cerita 3.1. Klik Periksa AI; transkripsi lama tetap dipakai.','tiny'));return}
- const label={ready:'Lolos pemeriksaan AI',needs_review:'Perlu review',stale:'Keputusan perlu diperbarui'}[d.status]||'Belum diperiksa';
- box.append(el('strong',label),el('p',d.summary||'Pembuka dan jawaban belum diverifikasi.','tiny'));
- for(const [key,name] of [['opening','Pembuka'],['development','Isi'],['payoff','Jawaban / penutup']]){
-  const e=d.evidence?.[key];if(!e)continue;const b=el('button',name+' · '+tc(e.source_start),'quiet small');
-  b.onclick=()=>playAt(e.source_start);box.append(b,el('p','“'+e.quote+'”','evidence-quote'));
- }
- box.append(el('p','B-roll: '+(d.broll==='contextual'?'Ilustrasi bila relevan. ':'Pertahankan pembicara. ')+(d.broll_reason||''),'tiny'));
- box.append(el('p',d.hook?'Kutipan pembuka: '+d.hook.quote:'Hook memakai pembukaan asli.','tiny'));
- if(d.issues?.length){const list=el('ul');for(const issue of d.issues)list.append(el('li',issue));box.append(list)}
- box.append(el('p','Pemeriksaan AI membantu seleksi; hasil ini bukan prediksi FYP.','tiny'));
-}
+function issues(c){return c.boundary_review?.issues||[]}
 function paintCandidates(){
  const parent=$('candidates');const scroll=parent.scrollTop;parent.replaceChildren();const candidates=state.data?.candidates||[];$('count').textContent=candidates.length;
  for(const [i,c] of candidates.entries()){
   const card=el('div',undefined,'card'+(i===state.index?' active':''));card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-pressed',String(i===state.index));card.onclick=()=>selectClip(i);card.onkeydown=e=>{if(e.key==='Enter')selectClip(i)};
   const check=document.createElement('input');check.type='checkbox';check.checked=state.selected.has(i);check.setAttribute('aria-label','Pilih '+c.title);check.onclick=e=>e.stopPropagation();check.onchange=()=>{check.checked?state.selected.add(i):state.selected.delete(i);updateControls()};
   card.append(check,el('div',String(i+1).padStart(2,'0')+' · '+Math.round(c.end-c.start)+' dtk','meta'),el('h3',c.title),el('div',tc(c.start)+' → '+tc(c.end),'meta'),el('p',c.reason,'reason'));
-  const warning=issues(c).length||c.boundary_review?.status==='needs_review';const result=state.data.clips?.find(r=>r.index===i&&r.revision===c.revision&&r.render_version==='3.1');
-  card.append(el('div',result?'✓ Render tersimpan':warning?'Periksa batas pembahasan':c.intelligence?.status==='ready'?'Cerita lolos pemeriksaan AI':c.boundary_review?.status==='checked'?'Konteks diperiksa · dengarkan hasilnya':'Kandidat · belum diperiksa','rubric'+(warning?' warn':'')));parent.append(card);
+  const warning=issues(c).length||c.boundary_review?.status==='needs_review';const result=state.data.clips?.find(r=>r.index===i&&r.revision===c.revision&&r.render_version==='2.4');
+  card.append(el('div',result?'✓ Render tersimpan':warning?'Periksa batas pembahasan':c.boundary_review?.status==='checked'?'Konteks diperiksa · dengarkan hasilnya':'Kandidat · belum diperiksa','rubric'+(warning?' warn':'')));parent.append(card);
  }
  parent.scrollTop=scroll;
 }
 function updateControls(){
  const chosen=state.index!==null,selected=state.selected.size>0;document.body.classList.toggle('busy',!!busy());
  for(const id of ['saveEdit','preview','markIn','markOut','playBeginning','playEnding','playClip','context','reviewBoundary','drawMaterial','drawSpeaker','openTemplates','savePreset','reviewCleanup','usePreset','prepareBroll'])$(id).disabled=!chosen||!!busy();
- $('applyLook').disabled=!chosen||!selected||!!busy();$('render').disabled=!selected||!!busy();$('autoRun').disabled=!selected||!!busy();$('reviewAll').disabled=!state.data?.candidates?.length||!!busy();$('addClip').disabled=!state.data?.candidates?.length||!!busy();$('saveEdit').textContent=state.dirty?'Simpan koreksi •':'Simpan koreksi';$('render').textContent='Render '+(state.selected.size||'')+' pilihan';
+ $('applyLook').disabled=!chosen||!selected||!!busy();$('render').disabled=!selected||!!busy();$('reviewAll').disabled=!state.data?.candidates?.length||!!busy();$('addClip').disabled=!state.data?.candidates?.length||!!busy();$('saveEdit').textContent=state.dirty?'Simpan koreksi •':'Simpan koreksi';$('render').textContent='Render '+(state.selected.size||'')+' pilihan';
  for(const id of optionIds)$(id).disabled=!chosen||!!busy();if(chosen)updateFontSample();updatePlacementHint();
  const result=state.data?.clips?.find(r=>r.index===state.index);$('resultTab').disabled=!result;$('download').classList.toggle('hidden',!result);
- $('resultTab').textContent=result&&(state.dirty||result.revision!==state.editor?.clip.revision||result.render_version!=='3.1')?'Hasil sebelumnya':'Hasil';
+ $('resultTab').textContent=result&&(state.dirty||result.revision!==state.editor?.clip.revision||result.render_version!=='2.4')?'Hasil sebelumnya':'Hasil';
  $('downloadCredits').classList.toggle('hidden',!result?.broll_count);if(result?.broll_count)$('downloadCredits').href='/clips/'+encodeURIComponent(result.file.replace(/\.mp4$/,'.credits.txt'));
- $('downloadAss').classList.toggle('hidden',!result||result.render_version!=='3.1');
+ $('downloadAss').classList.toggle('hidden',!result||result.render_version!=='2.4');
  if(result){$('downloadAss').href='/clips/'+encodeURIComponent(result.file.replace(/\.mp4$/,'.ass'));$('downloadAss').download=result.file.replace(/\.mp4$/,'.ass');$('download').href='/clips/'+encodeURIComponent(result.file);$('download').download=result.file}
- const exportReady=!state.dirty&&selected&&[...state.selected].every(i=>state.data?.clips?.some(r=>r.index===i&&r.revision===(state.data.candidates[i].revision||0)&&r.render_version==='3.1'));
+ const exportReady=!state.dirty&&selected&&[...state.selected].every(i=>state.data?.clips?.some(r=>r.index===i&&r.revision===(state.data.candidates[i].revision||0)&&r.render_version==='2.4'));
  $('export').disabled=!exportReady||!!busy();$('downloadBundle').classList.toggle('hidden',!state.data?.export);if(state.data?.export)$('downloadBundle').href='/api/download/'+state.job;
- const preview=state.data?.preview;$('previewTab').classList.toggle('hidden',!preview||preview.index!==state.index||preview.revision!==state.editor?.clip.revision||preview.render_version!=='3.1');$('previewTab').textContent=state.dirty?'Preview sebelumnya':'Preview';
+ const preview=state.data?.preview;$('previewTab').classList.toggle('hidden',!preview||preview.index!==state.index||preview.revision!==state.editor?.clip.revision||preview.render_version!=='2.4');$('previewTab').textContent=state.dirty?'Preview sebelumnya':'Preview';
  if(result&&state.editor&&result.revision!==state.editor.clip.revision&&!state.dirty)$('saveState').textContent='Koreksi tersimpan · render perlu diperbarui';
 }
 async function loadJob(id){
@@ -70,7 +55,7 @@ async function refresh(){
   const oldStatus=state.data?.status,oldPreview=state.data?.preview?.file,oldResult=state.data?.clips?.find(r=>r.index===state.index)?.file;const data=await api('/api/status/'+job);if(job!==state.job)return;state.data=data;
   $('projectName').textContent=data.name||'Proyek lokal';$('message').textContent=data.message;$('progress').value=data.percent||0;$('elapsed').textContent=tc(data.elapsed);
   $('error').textContent=data.error||'';$('errorDetails').classList.toggle('hidden',!data.error);$('resume').classList.toggle('hidden',!['interrupted','error'].includes(data.status));
-  $('timings').textContent=Object.entries(data.timings||{}).map(([k,v])=>({analyzing:'Analisis',reviewing:'Review AI',rendering:'Render',previewing:'Preview',exporting:'Ekspor',illustrating:'Ilustrasi',automatic:'Otomatis'}[k]||k)+': '+tc(v)).join(' · ');
+  $('timings').textContent=Object.entries(data.timings||{}).map(([k,v])=>({analyzing:'Analisis',reviewing:'Review AI',rendering:'Render',previewing:'Preview',exporting:'Ekspor',illustrating:'Ilustrasi'}[k]||k)+': '+tc(v)).join(' · ');
   for(const [i,c] of data.candidates.entries())if(!state.seen.has(i)){state.seen.add(i);if(!issues(c).length&&c.boundary_review?.status!=='needs_review'&&c.selection_source!=='manual-required')state.selected.add(i)}
   if(!busy()){
    if(oldStatus==='reviewing')for(const i of state.selected)if(issues(data.candidates[i]||{}).length)state.selected.delete(i);
@@ -94,7 +79,7 @@ async function selectClip(i,quiet=false){
   $('audioInfo').textContent=(s.music_path?'Musik tersedia. ':'Belum ada musik. ')+(s.sfx_path?'Efek suara tersedia.':'Belum ada efek suara.');
   $('hookInfo').textContent=c.cold_open_span?'Kutipan pembuka sudah memiliki waktu sumber.':'Belum ada kutipan pembuka yang terverifikasi; video dimulai dari awal clip.';
   $('warnings').textContent=[...issues(c),...(c.warnings||[]).filter(x=>!x.startsWith('Batas topik dinilai'))].join(' ');
-  paintIntelligence(c);showSource(c.start);paintWords();paintCandidates();updateControls();updateRange();loadIllustrations();
+  showSource(c.start);paintWords();paintCandidates();updateControls();updateRange();loadIllustrations();
  }catch(e){toast(e.message)}
 }
 function updateRange(){try{const b=bounds();$('clipScrub').min=b.start;$('clipScrub').max=Math.max(b.start+.01,b.end);$('clipDuration').textContent=Math.max(0,b.end-b.start).toFixed(1)+' dtk';$('sourceNote').textContent=state.mode==='source'?'Sumber asli · hasil '+$('aspect').value+' · gunakan Preview untuk melihat komposisi.':'Hasil '+$('aspect').value+' · '+(state.mode==='preview'?'preview '+Number(state.data?.preview?.length||0).toFixed(1)+' detik':'render tersimpan');drawRegions()}catch{}}
@@ -122,11 +107,10 @@ async function save(){
  $('start').value=tc(state.editor.clip.start,true);$('end').value=tc(state.editor.clip.end,true);$('warnings').textContent=issues(state.editor.clip).join(' ');updateRange();$('saveState').textContent='Koreksi tersimpan';await refresh();return result;
 }
 async function review(indices){try{if(state.dirty)await save();await post('/api/review-boundaries/'+state.job,{indices});await refresh()}catch(e){toast(e.message)}}
-$('autoRun').onclick=async()=>{try{if(state.dirty)await save();await post('/api/automatic/'+state.job,{indices:[...state.selected]});await refresh()}catch(e){toast(e.message)}};
 $('reviewBoundary').onclick=()=>review([state.index]);$('reviewAll').onclick=()=>review(state.data.candidates.map((_,i)=>i));
 $('newProject').onclick=()=>$('newDialog').showModal();$('startProject').onclick=()=>$('newProject').click();$('closeDialog').onclick=()=>$('newDialog').close();$('toggleInspector').onclick=()=>document.body.classList.toggle('inspector-open');
 $('selectAll').onclick=()=>{state.data?.candidates.forEach((_,i)=>state.selected.add(i));paintCandidates();updateControls()};$('selectNone').onclick=()=>{state.selected.clear();paintCandidates();updateControls()};
-$('uploadForm').onsubmit=async e=>{e.preventDefault();$('uploadError').textContent='';$('analyze').disabled=true;$('analyze').textContent='Menyiapkan sumber…';try{const form=new FormData(e.target);form.set('trim','1');form.set('cold_open','1');let result;if($('localPath').value.trim()){const data=Object.fromEntries([...form].filter(([,v])=>typeof v==='string'));if(form.get('music')?.size||form.get('sfx')?.size)throw Error('Untuk mode path video, isi path musik/efek juga.');result=await post('/api/local',data)}else{if(!$('sourceFile').files.length)throw Error('Pilih video atau isi path lokal.');result=await api('/api/upload',{method:'POST',body:form})}$('newDialog').close();await loadJob(result.job)}catch(err){$('uploadError').textContent=err.message}finally{$('analyze').disabled=false;$('analyze').textContent='Mulai proses'}};
+$('uploadForm').onsubmit=async e=>{e.preventDefault();$('uploadError').textContent='';$('analyze').disabled=true;$('analyze').textContent='Menyiapkan sumber…';try{const form=new FormData(e.target);form.set('trim','1');form.set('caption_style','narrative');form.set('font_accent','bebas');form.set('cold_open','0');let result;if($('localPath').value.trim()){const data=Object.fromEntries([...form].filter(([,v])=>typeof v==='string'));if(form.get('music')?.size||form.get('sfx')?.size)throw Error('Untuk mode path video, isi path musik/efek juga.');result=await post('/api/local',data)}else{if(!$('sourceFile').files.length)throw Error('Pilih video atau isi path lokal.');result=await api('/api/upload',{method:'POST',body:form})}$('newDialog').close();await loadJob(result.job)}catch(err){$('uploadError').textContent=err.message}finally{$('analyze').disabled=false;$('analyze').textContent='Analisis video'}};
 $('audioForm').onsubmit=async e=>{e.preventDefault();try{if(!state.job)throw Error('Buka sesi dahulu.');if(state.dirty)await save();await api('/api/audio/'+state.job,{method:'POST',body:new FormData(e.target)});e.target.reset();await refresh();if(state.index!==null)await selectClip(state.index,true);toast('Audio sesi diperbarui. Render ulang clip yang ingin menggunakan audio baru.')}catch(err){toast(err.message)}};
 $('saveEdit').onclick=()=>save().then(()=>toast('Koreksi disimpan.')).catch(e=>toast(e.message));
 for(const id of ['title','start','end','keywords','hookStart','hookEnd',...optionIds])$(id).addEventListener('input',()=>{markDirty();updateControls();updateRange();updateFontSample()});

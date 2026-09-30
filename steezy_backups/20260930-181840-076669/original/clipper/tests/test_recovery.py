@@ -156,7 +156,7 @@ def test_render_batch_keeps_good_results_and_retries_only_failed(tmp_path,monkey
         if clip['title']=='1' and calls.count('1')==1:raise RuntimeError('contoh gagal per clip')
         f=tmp_path/(clip['title']+'.mp4');f.write_bytes(b'complete')
         on_progress(50,'Encoding')
-        return {'file':f.name,'revision':0,'render_version':app.pipeline.RENDER_VERSION}
+        return {'file':f.name,'revision':0,'render_version':'2.4'}
     monkeypatch.setattr(app.pipeline,'render_clip',render)
     app.worker('resume-test','rendering',[0,1,2])
     assert app.JOBS['resume-test']['status']=='error'

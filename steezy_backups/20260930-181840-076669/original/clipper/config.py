@@ -97,8 +97,6 @@ class Config:
     # Pro Local: stable typography and a sequential 4 GB VRAM profile.
     language: str = os.environ.get("TRANSCRIPT_LANGUAGE", "id")
     processing_mode: str = "auto"
-    workflow: str = 'review'  # Saved sessions keep their previous review workflow.
-    auto_export: bool = True
     job_id: str = ""
     caption_position: str = os.environ.get("CAPTION_POSITION", "auto")
     caption_align: str = 'auto'
@@ -160,7 +158,6 @@ def validate_overrides(form: dict) -> dict:
     """Whitelist + clamp UI form fields into Config overrides. Bad values are dropped."""
     out: dict = {}
     for key, values in {'source_kind': ('auto','speaker','board','podcast'),
-                        'workflow': ('review','automatic'),
                         'audience': ('general','creators','business','finance','students'),
                         'broll_mode': ('off','local','auto'),
                         'broll_provider': ('auto','pexels','pixabay','coverr')}.items():
@@ -205,7 +202,7 @@ def validate_overrides(form: dict) -> dict:
             out[key] = form[key]
     if form.get('caption_cleanup') in ('safe', 'verbatim'):
         out['caption_cleanup'] = form['caption_cleanup']
-    for key in ("punch_zoom", "cold_open", "accent_font", "adaptive_clips", 'caption_backdrop', 'safe_placement', 'preserve_material_pauses', 'auto_export'):
+    for key in ("punch_zoom", "cold_open", "accent_font", "adaptive_clips", 'caption_backdrop', 'safe_placement', 'preserve_material_pauses'):
         if key in form:
             out[key] = str(form[key]).lower() in ("1", "true")
     for key, lo, hi in (("music_db", -40, -10), ("sfx_db", -40, -12),

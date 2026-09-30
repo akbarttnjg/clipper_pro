@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
 load_dotenv(ROOT / '.env.pro', override=True)
 from clipper.config import Config, validate_overrides, validate_brand
-from clipper import pipeline, boundaries, story, editorial, stock, illustrations, intelligence
+from clipper import pipeline, boundaries, story, editorial, stock, illustrations
 from clipper.storage import read_json, write_json
 from clipper.looks import LOOKS, VISUAL_FIELDS
 from clipper.font_catalog import FONTS
@@ -27,7 +27,7 @@ PRESETS_FILE = ROOT / 'style-presets.json'
 base_cfg = replace(Config(), **validate_brand(read_json(BRAND_FILE, {})))
 base_cfg = replace(base_cfg, work_dir=str((ROOT / base_cfg.work_dir).resolve()),
                    out_dir=str((ROOT / base_cfg.out_dir).resolve()))
-app = FastAPI(title='Clipper Studio Local', version=pipeline.RENDER_VERSION)
+app = FastAPI(title='Clipper Studio Local', version='2.4')
 STATIC = ROOT / 'static'
 UPLOADS = ROOT / 'uploads'
 UPLOADS.mkdir(exist_ok=True)
@@ -36,7 +36,7 @@ STATES.mkdir(parents=True, exist_ok=True)
 JOBS, JOB_STATE = {}, {}
 PROCESS_LOCK = threading.Lock()
 STATE_LOCK = threading.RLock()
-ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating', 'automatic'}
+ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating'}
 
 
 def persist(job_id):
@@ -102,10 +102,6 @@ def worker(job_id, action, indices=None):
         def progress(percent, message):
             with STATE_LOCK:
                 job.update(percent=percent, message=message)
-        automatic = action == 'automatic' or (action == 'analyzing' and st['cfg'].workflow == 'automatic')
-        if action == 'automatic':
-            action = 'reviewing'
-            job['status'] = action
         try:
             if action == 'analyzing':
                 transcript, clips = pipeline.analyze(st['media'], st['cfg'], progress)
@@ -116,37 +112,13 @@ def worker(job_id, action, indices=None):
                     for n, idx in enumerate(indices):
                         progress(round(100 * n / len(indices)), f'Periksa batas {n+1}/{len(indices)} — transkrip tersimpan')
                         transcript = {**st['transcript'], 'words': st.get('edits', {}).get(idx, st['transcript']['words'])}
-                        cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
-                        if not (automatic and (intelligence.ready(st['scored'][idx], transcript['words'], cfg)
-                                or st['scored'][idx].get('selection_source') == 'full')):
-                            st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, cfg)
+                        st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {})))
                         persist(job_id)
                 finally:
                     editorial.release(st['cfg'])
                 job.pop('export', None)
                 job.update(status='review', percent=100, message='Pemeriksaan batas selesai. Kandidat bermasalah ditandai untuk review.')
-            if automatic and action in ('analyzing', 'reviewing'):
-                requested = list(range(len(st['scored']))) if indices is None else indices
-                indices, skipped = [], []
-                for idx in requested:
-                    c = st['scored'][idx]
-                    cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
-                    words = st.get('edits', {}).get(idx, st['transcript']['words'])
-                    if intelligence.ready(c, words, cfg) or c.get('selection_source') == 'full':
-                        indices.append(idx)
-                    else:
-                        skipped.append({'index': idx, 'title': c['title'],
-                            'issues': c.get('intelligence', {}).get('issues') or
-                            c.get('boundary_review', {}).get('issues') or ['Perlu pemeriksaan cerita.']})
-                job['automation'] = {'selected': indices, 'skipped': skipped}
-                if not indices:
-                    job.update(status='review', percent=100,
-                        message='Belum ada cerita lolos pemeriksaan otomatis. Kandidat tersimpan untuk diperbaiki pada tab Cerita.')
-                    return
-                action = 'rendering'
-                job.update(status=action, percent=0)
-                persist(job_id)
-            if action == 'illustrating':
+            elif action == 'illustrating':
                 for n,idx in enumerate(indices):
                     cfg=replace(st['cfg'], **st.get('clip_settings',{}).get(str(idx),{}))
                     recipe=illustrations.prepare(st.get('edits',{}).get(idx,st['transcript']['words']),
@@ -159,14 +131,12 @@ def worker(job_id, action, indices=None):
                 job.update(status='review',percent=100,message='Ilustrasi disiapkan. Tinjau hasil pada tab Visual sebelum render.')
             elif action == 'rendering':
                 pipeline.ffmpeg_util.filter_file_args('preflight')
-                job.pop('export', None)
-                job.pop('export_error', None)
                 job['failures'] = []
                 completed = 0
                 for n, idx in enumerate(indices):
                     c = st['scored'][idx]
                     prior = next((r for r in job['clips'] if r.get('index') == idx and
-                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == pipeline.RENDER_VERSION
+                        r.get('revision') == c.get('revision', 0) and r.get('render_version') == '2.4'
                         and (Path(st['cfg'].out_dir) / r.get('file', '')).is_file()), None)
                     if prior:
                         completed += 1
@@ -189,25 +159,6 @@ def worker(job_id, action, indices=None):
                 job.update(status='error' if failed else 'done', percent=100,
                     error=job['failures'][0]['error'] if failed else None,
                     message=f'{completed}/{len(indices)} clip selesai' + (f'; {failed} gagal. Render ulang hanya mengerjakan yang belum selesai.' if failed else '. Hasil tersimpan di folder clips.'))
-                if automatic:
-                    skipped_count = len(job.get('automation', {}).get('skipped', []))
-                    job['message'] += f' {skipped_count} kandidat ditahan untuk review.'
-                    completed_results = [r for r in job['clips'] if r.get('index') in indices
-                        and r.get('revision') == st['scored'][r['index']].get('revision', 0)
-                        and r.get('render_version') == pipeline.RENDER_VERSION
-                        and (Path(st['cfg'].out_dir) / r.get('file', '')).is_file()]
-                    if st['cfg'].auto_export and completed_results:
-                        from clipper.projects import export_bundle
-                        job['status'] = 'exporting'
-                        persist(job_id)
-                        summary = job['message']
-                        try:
-                            job['export'] = export_bundle(completed_results, st['cfg'], progress)
-                            summary += ' Paket editor siap.' if not job['export'].get('capcut_error') else ' Paket DaVinci siap; ekspor CapCut perlu diperiksa.'
-                        except Exception as exc:
-                            job['export_error'] = str(exc)
-                            summary += ' MP4 tersimpan; paket editor gagal, gunakan tombol ekspor untuk mencoba lagi.'
-                        job.update(status='error' if failed else 'done', percent=100, message=summary)
             elif action == 'previewing':
                 idx = indices[0]
                 c = dict(st['scored'][idx])
@@ -254,9 +205,8 @@ def new_job(path, options, music='', sfx='', original_name=None):
     if not info['has_audio']:
         raise HTTPException(400, 'File tidak mempunyai track suara.')
     job_id = uuid.uuid4().hex[:12]
-    preset = next((p['settings'] for p in LOOKS if p['id'] == options.get('style_preset')), {})
     cfg = replace(base_cfg, job_id=job_id, music_path=music, sfx_path=sfx,
-                  work_dir=str(Path(base_cfg.work_dir) / job_id), **{**preset, **validate_overrides(options)})
+                  work_dir=str(Path(base_cfg.work_dir) / job_id), **validate_overrides(options))
     JOB_STATE[job_id] = {'cfg': cfg, 'media': str(Path(path).resolve()), 'transcript': {},
                          'scored': [], 'edits': {}, 'clip_settings': {}, 'source_info': info}
     JOBS[job_id] = {'status': 'new', 'percent': 0, 'message': '', 'clips': [], 'error': None,
@@ -564,11 +514,6 @@ def editor_save(job_id: str, idx: int, data: dict = Body(...)):
             raise ValueError('Pengaturan clip harus berupa objek.')
         overrides = {**st.get('clip_settings', {}).get(str(idx), {}), **validate_overrides(settings)}
         c = boundaries.annotate(c, combined, st['cfg'].max_clip_s)
-        review_cfg = replace(st['cfg'], **overrides)
-        decision = c.get('intelligence')
-        if decision and decision.get('signature') != intelligence.signature(c, combined, review_cfg.audience):
-            c['intelligence'] = {**decision, 'status': 'stale',
-                'issues': ['Isi, sasaran atau batas clip berubah. Jalankan Periksa AI untuk memperbarui keputusan.']}
         st.setdefault('edits', {})[idx] = combined
         st['scored'][idx] = c
         st.setdefault('clip_settings', {})[str(idx)] = overrides
@@ -637,14 +582,6 @@ def render_selected(job_id: str, data: dict = Body(...)):
     st, _ = state(job_id)
     indices = selected_indices(data, st)
     enqueue(job_id, 'rendering', indices)
-    return {'ok': True}
-
-
-@app.post('/api/automatic/{job_id}')
-def automatic_selected(job_id: str, data: dict = Body(...)):
-    st, _ = state(job_id)
-    indices = selected_indices(data, st)
-    enqueue(job_id, 'automatic', indices)
     return {'ok': True}
 
 
@@ -718,7 +655,7 @@ def export_selected(job_id: str, data: dict = Body(...)):
     st, job = state(job_id)
     indices = selected_indices(data, st)
     for i in indices:
-        if not any(r.get('index') == i and r.get('revision') == st['scored'][i].get('revision', 0) and r.get('render_version') == pipeline.RENDER_VERSION for r in job['clips']):
+        if not any(r.get('index') == i and r.get('revision') == st['scored'][i].get('revision', 0) and r.get('render_version') == '2.4' for r in job['clips']):
             raise HTTPException(409, 'Render ulang clip yang berubah sebelum membuat paket proyek.')
     enqueue(job_id, 'exporting', indices)
     return {'ok': True}
@@ -759,7 +696,7 @@ def regenerate(job_id: str, idx: int, aspect: str = Form('9:16'), caption_style:
 def health():
     from clipper.ffmpeg_util import nvenc_diagnostic, render_diagnostic
     return {'nvenc': nvenc_diagnostic(), 'render': render_diagnostic(), 'model': base_cfg.model, 'whisper': base_cfg.whisper_model,
-            'version': pipeline.RENDER_VERSION, 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
+            'version': '2.4', 'exports': {'resolve': 'XML + Lua, perlu uji di Resolve', 'capcut': 'multi-timeline + draft per clip, eksperimental'}}
 
 
 @app.get('/api/brand')
@@ -787,5 +724,5 @@ def clip(name: str):
 
 
 if __name__ == '__main__':
-    print('Clipper Studio Local 3.1 -> http://localhost:8765')
+    print('Clipper Studio Local 2.4 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

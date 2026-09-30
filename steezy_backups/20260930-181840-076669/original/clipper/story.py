@@ -12,7 +12,6 @@ from . import editorial
 from .boundaries import segments_from_words, annotate
 from .typography import token, STOP
 from .storage import read_json, write_json
-from .intelligence import core as intelligence
 
 
 def windows(segments, cfg):
@@ -43,8 +42,6 @@ def request(block, cfg, candidate=None):
     fields.update({k: {'type': 'integer'} for k in ('start_segment', 'end_segment', 'value', 'opening', 'closure')})
     fields['complete'] = {'type': 'boolean'}
     fields['keywords'] = {'type': 'array', 'items': {'type': 'string'}, 'maxItems': 8}
-    if candidate is not None:
-        fields['intelligence'] = intelligence.schema()
     schema = {'type': 'object', 'properties': {'clips': {'type': 'array', 'maxItems': 3,
         'items': {'type': 'object', 'properties': fields, 'required': list(fields)}}}, 'required': ['clips']}
     system = (
@@ -72,7 +69,6 @@ def request(block, cfg, candidate=None):
         'Jangan pilih salam penutup live, ajakan komentar, atau pertanyaan baru yang belum dijawab sebagai payoff. '
         'Jangan menebak nominal/singkatan meragukan untuk dijadikan klaim judul. Tidak ada jaminan FYP.')
     if candidate is not None:
-        system += intelligence.PROMPT
         system += (' Ini pemeriksaan KEDUA. Tinjau konteks SEBELUM dan SESUDAH kandidat, abaikan skor awal. '
             'Kembalikan maksimal satu clip yang mempertahankan inti kandidat dengan awal dan akhir utuh. '
             'Boleh menggeser batas atau membuang pengantar yang tidak menjawab judul. '
@@ -83,15 +79,12 @@ def request(block, cfg, candidate=None):
     r = requests.post(editorial.local_url(cfg) + '/api/generate', json={
         'model': cfg.model, 'system': system, 'prompt': prompt, 'stream': False, 'think': False,
         'format': schema, 'keep_alive': '5m', 'options': {'temperature': .1, 'num_ctx': cfg.ollama_num_ctx,
-        'num_predict': 1100 if candidate is None else 1800, 'num_gpu': cfg.ollama_num_gpu}}, timeout=cfg.ollama_timeout)
+        'num_predict': 1100 if candidate is None else 700, 'num_gpu': cfg.ollama_num_gpu}}, timeout=cfg.ollama_timeout)
     r.raise_for_status()
     data = r.json()
     if data.get('done_reason') == 'length':
         raise ValueError('Jawaban model terpotong; kandidat jendela ini tidak dipakai.')
-    parsed = json.loads(data['response'])
-    if not isinstance(parsed, dict) or not isinstance(parsed.get('clips'), list):
-        raise ValueError('Format daftar kandidat tidak valid.')
-    return parsed['clips']
+    return json.loads(data['response']).get('clips', [])
 
 
 def quote_span(quote, words, start, end):
@@ -137,17 +130,12 @@ def ground(raw, block, words, cfg, duration):
             warnings = ['Batas topik dinilai AI; dengarkan pembuka dan penutup sebelum menyetujui.']
             if end - start > cfg.max_clip_s:
                 warnings.append('Sedikit lebih panjang untuk menuntaskan topik.')
-            clip = annotate({'start': start, 'end': end, 'title': str(item['title'])[:120],
+            result.append(annotate({'start': start, 'end': end, 'title': str(item['title'])[:120],
                 'reason': str(item['reason'])[:600], 'keywords': keywords, 'rubric': rubric,
                 'hook': str(item.get('hook_quote', ''))[:140],
                 'cold_open_span': quote_span(item.get('hook_quote', ''), words, start, end),
                 'ending_evidence': str(item['ending_evidence'])[:250], 'warnings': warnings,
-                'selection_source': 'local-topic-review', 'approved': False, 'revision': 0}, words, cfg.max_clip_s)
-            if 'intelligence' in item:
-                clip['intelligence'] = intelligence.assess(item['intelligence'], clip, block, words, cfg)
-                hook = clip['intelligence']['hook']
-                clip['cold_open_span'] = [hook['source_start'], hook['source_end']] if hook else None
-            result.append(clip)
+                'selection_source': 'local-topic-review', 'approved': False, 'revision': 0}, words, cfg.max_clip_s))
         except (KeyError, TypeError, ValueError, OverflowError):
             continue
     return result
@@ -155,8 +143,7 @@ def ground(raw, block, words, cfg, duration):
 
 def distinct(candidates, words, cfg):
     selected = []
-    ranked = sorted(candidates, key=lambda c: (c.get('intelligence', {}).get('status') == 'ready',
-                    sum(c.get('rubric', {}).values()), c['end'] - c['start']), reverse=True)
+    ranked = sorted(candidates, key=lambda c: (sum(c['rubric'].values()), c['end'] - c['start']), reverse=True)
     def vocabulary(c):
         return {token(w['word']) for w in words if c['start'] <= w['start'] < c['end'] and token(w['word']) not in STOP}
     for c in ranked:
@@ -189,7 +176,7 @@ def select(transcript, cfg, progress=lambda p, m: None):
             # Key includes the words/model/settings; editing a transcript invalidates the selection cache.
             import hashlib
             key = hashlib.sha256(json.dumps([block, cfg.model, cfg.min_clip_s, cfg.max_clip_s,
-                cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, 'topic-v5']).encode()).hexdigest()[:24]
+                cfg.topic_grace_s, cfg.audience, 'topic-v4']).encode()).hexdigest()[:24]
             path = journal / (key + '.json')
             raw = read_json(path)
             started = time.monotonic()
@@ -215,7 +202,6 @@ def select(transcript, cfg, progress=lambda p, m: None):
     result = distinct(result, transcript['words'], cfg)
     write_json(Path(cfg.work_dir) / 'selection-report.json', {'windows': len(blocks), 'processed_windows': len(timings), 'errors': failures,
         'accepted': len(result), 'needs_review': sum(c.get('boundary_review', {}).get('status') == 'needs_review' for c in result),
-        'automatic_ready': sum(intelligence.ready(c, transcript['words'], cfg) for c in result),
         'timings': timings, 'rubric': '0–5 editorial; bukan probabilitas FYP'})
     if not result:
         # A manual starting point, never disguised as a high-scoring AI selection.
@@ -242,13 +228,9 @@ def review_candidate(candidate, transcript, cfg):
     block = [s for s in segments_from_words(words)
              if s['end'] > candidate['start'] - 45 and s['start'] < candidate['end'] + 60]
     key = hashlib.sha256(json.dumps([block, candidate['start'], candidate['end'], candidate['title'],
-        cfg.model, cfg.min_clip_s, cfg.max_clip_s, cfg.audience, cfg.selection_floor,
-        cfg.ollama_num_ctx, 'boundary-v3.1'], ensure_ascii=False).encode()).hexdigest()[:24]
+        cfg.model, cfg.min_clip_s, cfg.max_clip_s, cfg.audience, 'boundary-v2'], ensure_ascii=False).encode()).hexdigest()[:24]
     path = Path(cfg.work_dir) / 'boundary-reviews' / (key + '.json')
     c = annotate(candidate, words, cfg.max_clip_s)
-    c['revision'] = candidate.get('revision', 0) + 1
-    # Never retain a previously successful decision after a failed new review.
-    c['intelligence'] = intelligence.assess(None, c, block, words, cfg)
     try:
         raw = read_json(path)
         if raw is None:
@@ -267,10 +249,8 @@ def review_candidate(candidate, transcript, cfg):
             return c
         new = annotate(options[0], words, cfg.max_clip_s, verified=True)
         new['previous_boundary'] = {'start': c['start'], 'end': c['end'], 'title': c['title']}
-        new['revision'] = candidate.get('revision', 0) + 1
+        new['revision'] = c.get('revision', 0) + 1
         new['selection_source'] = 'context-reviewed'
-        if 'intelligence' not in new:
-            new['intelligence'] = intelligence.assess(None, new, block, words, cfg)
         return new
     except (requests.RequestException, ValueError, KeyError) as exc:
         c['boundary_review']['status'] = 'needs_review'
