@@ -35,8 +35,7 @@ class Config:
     whisper_device: str = os.environ.get("WHISPER_DEVICE", "auto")  # auto|cuda|cpu
 
     # --- Clip selection ---
-    num_clips: int = _env_int("NUM_CLIPS", 0)  # 0 = all verified, distinct stories
-    search_depth: str = 'broad'
+    num_clips: int = _env_int("NUM_CLIPS", 10)
     min_clip_s: float = _env_float("MIN_CLIP_S", 30.0)
     max_clip_s: float = _env_float("MAX_CLIP_S", 120.0)
 
@@ -85,11 +84,6 @@ class Config:
     font_main: str = 'dm_sans'
     font_accent: str = 'dm_serif_italic'
     caption_cleanup: str = 'safe'
-    caption_punctuation: str = 'minimal'
-    transcript_correction: bool = True
-    glossary: str = ''
-    asr_second_pass: bool = True
-    asr_recheck_windows: int = 12
     caption_backdrop: bool = True
     safe_placement: bool = True
 
@@ -150,7 +144,7 @@ ASPECTS: dict[str, tuple[int, int]] = {
     "1:1": (1080, 1080),
     "16:9": (1920, 1080),
 }
-CAPTION_STYLES: tuple[str, ...] = ("magazine", "narrative", "pop", "slide", "blur", "impact", "editorial", "clean", "karaoke", "boxed", "bold")
+CAPTION_STYLES: tuple[str, ...] = ("narrative", "pop", "slide", "blur", "impact", "editorial", "clean", "karaoke", "boxed", "bold")
 LAYOUTS: tuple[str, ...] = ("auto", "fill", "fit", "stream", "split")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
@@ -166,7 +160,6 @@ def validate_overrides(form: dict) -> dict:
     """Whitelist + clamp UI form fields into Config overrides. Bad values are dropped."""
     out: dict = {}
     for key, values in {'source_kind': ('auto','speaker','board','podcast'),
-                        'search_depth': ('balanced','broad'),
                         'workflow': ('review','automatic'),
                         'audience': ('general','creators','business','finance','students'),
                         'broll_mode': ('off','local','auto'),
@@ -203,7 +196,7 @@ def validate_overrides(form: dict) -> dict:
     n = form.get("num_clips")
     if n is not None:
         try:
-            out["num_clips"] = max(0, min(100, int(n)))
+            out["num_clips"] = max(1, min(10, int(n)))
         except (TypeError, ValueError):
             pass
     from .font_catalog import FONTS
@@ -212,14 +205,7 @@ def validate_overrides(form: dict) -> dict:
             out[key] = form[key]
     if form.get('caption_cleanup') in ('safe', 'verbatim'):
         out['caption_cleanup'] = form['caption_cleanup']
-    if form.get('caption_punctuation') in ('minimal', 'original'):
-        out['caption_punctuation'] = form['caption_punctuation']
-    if 'glossary' in form:
-        from .transcript_correction import parse_glossary
-        value = str(form['glossary']).strip()
-        parse_glossary(value)
-        out['glossary'] = value
-    for key in ("punch_zoom", "cold_open", "accent_font", "adaptive_clips", 'caption_backdrop', 'safe_placement', 'preserve_material_pauses', 'auto_export', 'transcript_correction', 'asr_second_pass'):
+    for key in ("punch_zoom", "cold_open", "accent_font", "adaptive_clips", 'caption_backdrop', 'safe_placement', 'preserve_material_pauses', 'auto_export'):
         if key in form:
             out[key] = str(form[key]).lower() in ("1", "true")
     for key, lo, hi in (("music_db", -40, -10), ("sfx_db", -40, -12),

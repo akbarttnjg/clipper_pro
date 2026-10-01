@@ -8,9 +8,8 @@ from .config import Config
 from . import ffmpeg_util, transcribe, score, story, editorial, editplan, composition, render, captions_pro, qc
 from .storage import source_key, read_json, write_json
 from . import intelligence
-from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '3.2'
+RENDER_VERSION = '3.1'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -33,8 +32,6 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
             write_json(work / 'asr-cache.json', {'key': key, 'transcript': transcript})
     if not transcript['words']:
         raise RuntimeError('Tidak ada percakapan yang terdeteksi.')
-    transcript = transcript_correction.refine(transcript, cfg)
-    write_json(work / 'transcript-corrections.json', transcript['correction_report'])
     asr_seconds = time.monotonic() - started
     selection_started = time.monotonic()
     if cfg.processing_mode == 'full':
@@ -61,11 +58,10 @@ def clip_name(clip, i):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
-    name = name + f"-r{clip.get('revision', 0)}-v32"
-    work = Path(cfg.work_dir) / 'renders' / name
-    locations = library_paths.destinations(cfg, name)
-    video_base, text_base, report_base = locations['video'], locations['text'], locations['report']
+    name = (cfg.job_id + '-' if cfg.job_id else '') + name + f"-r{clip.get('revision', 0)}-v31"
+    work, out = Path(cfg.work_dir) / name, Path(cfg.out_dir)
     work.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     info = ffmpeg_util.probe(media_path)
     if not 0 <= clip['start'] < clip['end'] <= info['duration'] + .05:
         raise ValueError('Batas clip melebihi durasi sumber.')
@@ -88,20 +84,20 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     if cfg.broll_mode != 'off':
         recipe = clip.get('_broll_recipe') or illustrations.prepare(words, clip, cfg, lambda p,m: on_progress(7+p//8,m))
         illustrations.attach(plan, recipe, cfg)
-        placement.protect_broll(plan, cfg)
         render.broll_plates(plan, cfg, work)
-    write_json(report_base.with_suffix('.credits.json'), illustrations.credits(plan))
-    report_base.with_suffix('.credits.txt').write_text('\n'.join(c['credit'] for c in illustrations.credits(plan)), encoding='utf-8')
+    write_json(out / (name + '.credits.json'), illustrations.credits(plan))
+    (out / (name + '.credits.txt')).write_text('\n'.join(c['credit'] for c in illustrations.credits(plan)), encoding='utf-8')
     from .subtitle_edit import clean
-    display, changes, notices = clean(plan['words'], cfg.caption_cleanup, cfg.caption_punctuation, cfg)
+    display, changes, notices = clean(plan['words'], cfg.caption_cleanup)
     plan['display_words'] = display
     plan['subtitle_cleanup'] = {'mode': cfg.caption_cleanup, 'changes': changes, 'review': notices}
     if notices:
         plan['warnings'].append('Ada angka atau waktu kata yang perlu didengarkan kembali; lihat laporan subtitle.')
-    write_json(report_base.with_suffix('.subtitle-review.json'), plan['subtitle_cleanup'])
+    write_json(out / (name + '.subtitle-review.json'), plan['subtitle_cleanup'])
     ass = captions_pro.write_ass(display, work / 'captions.ass', cfg,
         keywords=clip.get('keywords', []),
-        anchors=placement.caption_anchors(plan))
+        anchors=[{'time': (s['start'] + s['end']) / 2, 'start': s['start'], 'end': s['end'],
+                  'position': s['position'], 'panel': s.get('caption_panel')} for s in plan['shots']])
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
     plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg)
     plan['style'] = {'accent': cfg.accent_hex, 'base': cfg.base_hex, 'caption_style': cfg.caption_style,
@@ -113,28 +109,24 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     plan_path = work / 'edit-plan.json'
     plan['status'] = 'preparing'
     write_json(plan_path, plan)
-    shutil.copy2(ass, text_base.with_suffix('.ass'))
+    shutil.copy2(ass, out / (name + '.ass'))
     from .projects import write_srt
-    write_srt(plan, text_base.with_suffix('.srt'))
+    write_srt(plan, out / (name + '.srt'))
     on_progress(25, 'Menyiapkan suara dan musik')
     mix = render.audio_stems(media_path, plan, cfg, work)
     plan['status'] = 'rendering'
     write_json(plan_path, plan)
     try:
-        # Logs and intermediate files remain with the editable plan.
-        rendered = render.video(media_path, plan, cfg, ass, work / (name + '.mp4'), mix,
+        final = render.video(media_path, plan, cfg, ass, out / (name + '.mp4'), mix,
             lambda p: on_progress(40 + round(p * 54), 'Encoding video'))
         on_progress(96, 'Memeriksa durasi, gambar, dan suara')
-        checked = qc.inspect(rendered, cfg, plan['duration'])
+        checked = qc.inspect(final, cfg, plan['duration'])
         checked['caption_layout'] = plan['caption_checks']
         checked['editorial'] = {'status': 'needs_review' if notices or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',
             'subtitle_flags': len(notices), 'boundary': clip.get('boundary_review', {}),
             'intelligence': clip.get('intelligence', {}),
             'note': 'QC teknis bukan penilaian kelengkapan cerita atau prediksi retensi.'}
-        write_json(report_base.with_suffix('.qc.json'), checked)
-        # Publish only a validated result; a failed retry leaves the prior MP4 intact.
-        final = video_base.with_suffix('.mp4')
-        shutil.move(rendered, final)
+        write_json(Path(final).with_suffix('.qc.json'), checked)
     except Exception as exc:
         plan.update(status='error', error=str(exc))
         write_json(plan_path, plan)
@@ -143,17 +135,12 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     plan['status'] = 'done'
     write_json(plan_path, plan)
     on_progress(100, 'Clip selesai')
-    return {'file': library_paths.relative(cfg, final), 'url': library_paths.url(library_paths.relative(cfg, final)),
-        'ass_url': library_paths.url(library_paths.relative(cfg, text_base.with_suffix('.ass'))),
-        'srt_url': library_paths.url(library_paths.relative(cfg, text_base.with_suffix('.srt'))),
-        'credits_url': library_paths.url(library_paths.relative(cfg, report_base.with_suffix('.credits.txt'))),
-        'title': clip['title'], 'reason': clip.get('reason', ''),
+    return {'file': Path(final).name, 'title': clip['title'], 'reason': clip.get('reason', ''),
         'start': clip['start'], 'end': clip['end'], 'length': round(checked['duration'], 2),
         'width': cfg.target_w, 'height': cfg.target_h, 'fps': cfg.output_fps, 'encoder': plan['encoder'],
         'revision': clip.get('revision', 0), 'plan_path': str(plan_path.resolve()),
         'render_version': RENDER_VERSION, 'broll_count': len(plan.get('broll', [])), 'subtitle_flags': len(notices),
         'render_seconds': plan['render_seconds'], 'selection_source': clip.get('selection_source'),
-        'placement': plan.get('placement_summary', {}),
         'warnings': list(dict.fromkeys(clip.get('warnings', []) + plan['warnings'])), 'qc': checked}
 
 

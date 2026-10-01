@@ -44,7 +44,6 @@ def groups(words, cfg):
     for w in display_units(words):
         if current and (w.get('part') != current[-1].get('part')
                 or w['start']-current[-1]['end'] > cfg.caption_gap_s
-                or current[-1].get('sentence_end')
                 or re.search(r'[!?;:]$|(?<!\d)\.$', current[-1]['word'])):
             runs.append(current); current = []
         current.append(w)
@@ -155,28 +154,14 @@ def row_left(x, width, row_width, align):
     return x + (width - row_width) / 2
 
 
-def scene_groups(words, cfg, anchors):
-    if not anchors or not all('start' in a and 'end' in a for a in anchors):
-        return groups(words, cfg)
-    # A phrase never straddles a composition change. Only display intervals split;
-    # speech and saved source timestamps stay unchanged.
-    result = []
-    for anchor in anchors:
-        visible = [{**w, 'start': max(w['start'], anchor['start']), 'end': min(w['end'], anchor['end'])}
-                   for w in words if w['start'] < anchor['end'] and w['end'] > anchor['start']]
-        result.extend(groups(visible, cfg))
-    return result
-
-
 def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
     from .motion import IDS
     if cfg.caption_style in IDS:
         return kinetic_plan(words, cfg, keywords, position, anchors)
-    phrases = scene_groups(words, cfg, anchors)
+    phrases = groups(words, cfg)
     plans = []
     for idx, phrase in enumerate(phrases):
         pos = position
-        anchor = None
         if anchors:
             # One placement per phrase: never chase the face mid-word.
             mid = (phrase[0]["start"] + phrase[-1]["end"]) / 2
@@ -206,8 +191,6 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
         start = phrase[0]["start"]
         next_start = phrases[idx + 1][0]["start"] if idx + 1 < len(phrases) else phrase[-1]["end"]
         end = max(start + .02, min(phrase[-1]["end"] + .16, next_start))
-        if anchor:
-            end = min(end, anchor.get('end', end))
         # Bottom-locked composition: one-line and two-line phrases share the last baseline.
         cy = y + height * .88 - total_h
         placed = []
@@ -229,8 +212,7 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
             cy += rh
         plans.append({"start": start, "end": end, "position": pos,
                       "panel": [x, y, width, height], "alignment": alignment(cfg, pos),
-                      "placement_source": 'auto' if cfg.caption_position == 'auto' else 'manual',
-                      "protected": anchor.get('protected', []) if anchor and cfg.caption_position == 'auto' else [], "words": placed})
+                      "placement_source": 'auto' if cfg.caption_position == 'auto' else 'manual', "words": placed})
     return {"version": 2, "timebase": "output_seconds", "width": cfg.target_w,
             "height": cfg.target_h, "font": "DejaVu Sans", "phrases": plans}
 
@@ -263,7 +245,7 @@ def display_units(words):
 
 def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
     from .motion import frames
-    phrases = scene_groups(words, cfg, anchors)
+    phrases = groups(words, cfg)
     W, H = cfg.target_w, cfg.target_h
     plans = []
     for idx, phrase in enumerate(phrases):
@@ -288,9 +270,8 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
         focus = next(iter(emphasis), -1)
         base = round(min(W,H)*(.073 if side else .070)*cfg.caption_scale)
         for fs in range(max(18,base), 7, -1):
-            accent_size = 1.52 if cfg.caption_style == 'magazine' else 1.45 if cfg.caption_style == 'impact' else 1.25
-            sizes = [round(fs*(accent_size if i in emphasis else
-                     .65 if cfg.caption_style == 'magazine' and token(phrase[i]['word']) in STOP else .83)) for i in range(len(phrase))]
+            accent_size = 1.45 if cfg.caption_style == 'impact' else 1.25
+            sizes = [round(fs*(accent_size if i in emphasis else .83)) for i in range(len(phrase))]
             families = [cfg.font_accent if i in emphasis and cfg.accent_font else cfg.font_main for i in range(len(phrase))]
             measures = [font(cfg.fonts_dir,sizes[i],families[i]).getlength(w['word']) for i,w in enumerate(phrase)]
             space = fs*.29
@@ -305,8 +286,6 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
         start = phrase[0]['start']
         following = phrases[idx+1][0]['start'] if idx+1<len(phrases) else phrase[-1]['end']+.12
         end = max(start+.02,min(phrase[-1]['end']+.14,following))
-        if anchor:
-            end = min(end, anchor.get('end', end))
         cy = y+(height-sum(heights))*(.5 if side or use_anchor else .8)
         placed=[]
         for row,rh in zip(rows,heights):
@@ -317,13 +296,6 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
                 w=phrase[i]; size=sizes[i]
                 word_reveal = max(reveal,min(w['start']-start-.06,end-start-.20)) if i in emphasis else reveal
                 kind,samples=frames(cfg.caption_style,end-start,max(0,word_reveal),idx,i in emphasis,cfg,position=pos)
-                wx, wy = cx+measures[i]/2, cy+rh/2
-                # Keep the entire animation inside the chosen empty-space panel.
-                for sample in samples:
-                    half_w = measures[i]*sample['scale']/2
-                    half_h = size*sample['scale']*.66
-                    sample['dx'] = round(max(x+half_w-wx, min(sample['dx'], x+width-half_w-wx)), 3)
-                    sample['dy'] = round(max(y+half_h-wy, min(sample['dy'], y+height-half_h-wy)), 3)
                 placed.append({'text':w['word'],'word_id':w.get('word_id'),'word_ids':w.get('word_ids',[]),
                     'start':w['start'],'end':w['end'],'x':round(cx+measures[i]/2,3),'y':round(cy+rh/2,3),
                     'baseline':round(cy+rh*.8,3), **font_info(families[i]), 'size':size,
@@ -333,8 +305,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
                 cx+=measures[i]+space
             cy+=rh
         plans.append({'start':start,'end':end,'position':pos,'panel':list(panel_box),'alignment':alignment(cfg,pos),
-                      'placement_source':'auto' if cfg.caption_position == 'auto' else 'manual',
-                      'protected': anchor.get('protected', []) if use_anchor else [], 'words':placed})
+                      'placement_source':'auto' if cfg.caption_position == 'auto' else 'manual','words':placed})
     return {'version':4,'timebase':'output_seconds','width':W,'height':H,'font':FONTS[cfg.font_main]['family'],
             'font_main':cfg.font_main,'font_accent':cfg.font_accent,'contrast':cfg.caption_backdrop,
             'template':cfg.caption_style,'motion_intensity':cfg.motion_intensity,'phrases':plans}

@@ -9,7 +9,6 @@ import numpy as np
 from . import crop
 from .ffmpeg_util import even
 from .typography import token
-from . import placement
 
 
 def active_area(frame):
@@ -133,8 +132,7 @@ def analyze(media, plan, cfg, info):
         area[2], area[3] = min(area[2], W - area[0]), min(area[3], H - area[1])
         panel = material_panel(small)
         panel = [round(v/ratio) for v in panel] if panel else None
-        texts = [[round(v/ratio) for v in box] for box in placement.text_regions(small)]
-        return {'t': t, 'faces': faces, 'hist': hist, 'area': area, 'panel': panel, 'texts': texts}
+        return {'t': t, 'faces': faces, 'hist': hist, 'area': area, 'panel': panel}
     shots = []
     try:
         for span in plan['spans']:
@@ -242,17 +240,9 @@ def analyze(media, plan, cfg, info):
                     'image_height': image_height, 'material_image_height': material_image_height, 'has_material': material is not None})
                 if mode == 'fit' and cfg.target_h > cfg.target_w:
                     plan['warnings'].append('Materi/tamu dipertahankan utuh. Periksa keterbacaan dalam format vertikal atau pilih 16:9.')
-                protected = [{'kind': 'face', 'box': f} for r in group for f in r['faces']]
-                protected += [{'kind': 'text', 'box': box} for r in group for box in r.get('texts', [])]
-                if material:
-                    protected.append({'kind': 'material', 'box': material})
-                if explicit_face:
-                    protected.append({'kind': 'face', 'box': explicit_face})
-                shots[-1]['protected_source'] = protected
     finally:
         cap.release()
     plan['shots'] = shots
     plan['warnings'] = list(dict.fromkeys(plan['warnings']))
     plan['source'] = {'path': str(media), **info}
-    placement.apply(plan, cfg)
     return plan

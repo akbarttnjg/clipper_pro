@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 import socket
-import ast
 from datetime import datetime
 from pathlib import Path
 
@@ -40,14 +39,6 @@ def install(target, package, dry_run=False, install_deps=True):
     if not (target / 'app.py').is_file() or not (target / 'clipper').is_dir():
         raise ValueError('Folder harus berisi app.py dan folder clipper dari instalasi Steezy.')
     manifest = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if manifest.get('requires_versions'):
-        tree = ast.parse((target / 'clipper/pipeline.py').read_text(encoding='utf-8'))
-        version = next((n.value.value for n in tree.body if isinstance(n, ast.Assign)
-                        and any(isinstance(t, ast.Name) and t.id == 'RENDER_VERSION' for t in n.targets)
-                        and isinstance(n.value, ast.Constant)), None)
-        if version not in manifest['requires_versions']:
-            raise ValueError('Paket ini untuk Clipper Studio ' + ' / '.join(manifest['requires_versions']) +
-                             '. Versi target terdeteksi: ' + str(version))
     if manifest.get('requires_studio_2') and not all((target / name).is_file() for name in ('clipper/story.py', 'clipper/editplan.py')):
         raise ValueError('Paket perbaikan ini membutuhkan Clipper Studio 2.0 yang sudah terpasang.')
     payload = package / 'payload'

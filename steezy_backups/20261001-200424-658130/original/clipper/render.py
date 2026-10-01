@@ -96,7 +96,7 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
             vertical = '0' if shot.get('caption_panel') else '(oh-ih)/2'
             image_h = shot.get('material_image_height') or top
             graph.append(prefix + f",scale={W}:{image_h}:force_original_aspect_ratio=decrease,pad={W}:{top}:(ow-iw)/2:{vertical}:color=0x11151b[mat{i}]")
-            graph.append(f"[0:v]trim=start={shot['source_start'] - seek:.8f}:end={shot['source_end'] - seek:.8f},setpts=PTS-STARTPTS,fps={fps},crop={fw}:{fh}:{fx}:{fy},scale={W}:{H-top}:force_original_aspect_ratio=decrease,pad={W}:{H-top}:(ow-iw)/2:(oh-ih)/2:color=0x11151b[face{i}]")
+            graph.append(f"[0:v]trim=start={shot['source_start'] - seek:.8f}:end={shot['source_end'] - seek:.8f},setpts=PTS-STARTPTS,fps={fps},crop={fw}:{fh}:{fx}:{fy},scale={W}:{H-top}:force_original_aspect_ratio=increase,crop={W}:{H-top}[face{i}]")
             graph.append(f'[mat{i}][face{i}]vstack=inputs=2' + suffix)
         else:
             if shot['mode'] == 'fill':
@@ -115,10 +115,7 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
     extra_inputs=[]; previous='base'
     for i,event in enumerate(plan.get('broll',[])):
         extra_inputs.extend(['-i',event['path']])
-        height = event.get('image_height') if not event.get('framed_plate') else None
-        layout = (f'scale={W}:{height}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:({height}-ih)/2:color=0x11151b'
-                  if height else f'scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}')
-        graph.append(f"[{i+2}:v]trim=duration={event['duration']:.8f},setpts=PTS-STARTPTS+{event['start']:.8f}/TB,fps={fps},{layout},setsar=1[br{i}]")
+        graph.append(f"[{i+2}:v]trim=duration={event['duration']:.8f},setpts=PTS-STARTPTS+{event['start']:.8f}/TB,fps={fps},scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1[br{i}]")
         graph.append(f"[{previous}][br{i}]overlay=0:0:eof_action=pass:repeatlast=0:enable='gte(t,{event['start']:.8f})*lt(t,{event['end']:.8f})'[layer{i}]")
         previous=f'layer{i}'
     graph.append(f'[{previous}]'+(ass_filter(ass,cfg) if ass else 'null')+'[out]')
@@ -150,15 +147,12 @@ def broll_plates(plan,cfg,folder):
     for event in plan.get('broll',[]):
         original=Path(event['asset']['path'])
         try:
-            height=event.get('image_height')
-            key=hashlib.sha256(str([str(original),original.stat().st_mtime_ns,W,H,fps,event['duration'],height,'plate-3.2']).encode()).hexdigest()[:20]
+            key=hashlib.sha256(str([str(original),original.stat().st_mtime_ns,W,H,fps,event['duration']]).encode()).hexdigest()[:20]
             target=Path(folder)/('broll-'+key+'.mp4')
             if not target.exists():
                 pending=target.with_suffix('.rendering.mp4')
-                layout=(f'scale={W}:{height}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:({height}-ih)/2:color=0x11151b'
-                        if height else f'scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}')
                 cmd=['ffmpeg','-hide_banner','-v','error','-y','-i',str(original),'-an','-t',str(event['duration']),
-                    '-vf',f'fps={fps},{layout},setsar=1',
+                    '-vf',f'fps={fps},scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1',
                     '-c:v','libx264','-preset','veryfast','-crf','18','-pix_fmt','yuv420p','-threads','4','-movflags','+faststart',str(pending)]
                 try:
                     r=subprocess.run(cmd,capture_output=True,timeout=120)
@@ -166,7 +160,7 @@ def broll_plates(plan,cfg,folder):
                     pending.replace(target)
                 finally:
                     pending.unlink(missing_ok=True)
-            event['path']=str(target.resolve());event['framed_plate']=True;kept.append(event)
+            event['path']=str(target.resolve());kept.append(event)
         except (ValueError,OSError,subprocess.TimeoutExpired):
             plan['warnings'].append('Aset B-roll gagal disiapkan; bagian itu memakai sumber asli.')
     plan['broll']=kept

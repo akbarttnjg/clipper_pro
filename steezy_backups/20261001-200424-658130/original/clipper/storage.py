@@ -33,6 +33,5 @@ def source_key(path, cfg):
             stream.seek(max(0, stat.st_size - 1024 * 1024))
             h.update(stream.read())
     h.update(json.dumps([stat.st_size, stat.st_mtime_ns, cfg.whisper_model,
-                         cfg.language, cfg.whisper_compute, cfg.glossary, cfg.audience,
-                         cfg.asr_second_pass, cfg.transcript_correction, 'asr-v3.2']).encode())
+                         cfg.language, cfg.whisper_compute, 'asr-v2']).encode())
     return h.hexdigest()

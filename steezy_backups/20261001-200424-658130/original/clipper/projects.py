@@ -374,8 +374,7 @@ def update_capcut_meta(folder, data, name, timelines):
 
 
 def export_bundle(results, cfg, progress=lambda p,m: None):
-    from .library_paths import project_root
-    root = project_root(cfg) / 'projects' / f'project-{cfg.job_id}-{time.time_ns()}'
+    root = Path(cfg.out_dir) / f'project-{cfg.job_id}-{int(time.time())}'
     root.mkdir(parents=True, exist_ok=False)
     (root / 'Media').mkdir()
     shutil.copytree(cfg.fonts_dir, root / 'Fonts')

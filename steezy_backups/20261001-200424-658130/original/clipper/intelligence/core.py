@@ -8,7 +8,7 @@ import json
 import re
 from ..typography import token, STOP
 
-VERSION = '3.2'
+VERSION = '3.1'
 
 
 def schema():
@@ -114,10 +114,7 @@ def assess(raw, clip, block, words, cfg):
     # Surface uncertain ASR, rather than letting fluent LLM text hide it.
     from ..subtitle_edit import clean
     _, _, asr_flags = clean(selected, 'safe')
-    from ..transcript_correction import PROTECTED
-    critical = [f for f in asr_flags if not f['reason'].startswith('Keyakinan') or
-                re.search(r'\d', f['text']) or token(f['text']) in PROTECTED]
-    if critical:
+    if asr_flags:
         result['issues'].append('Angka/waktu transkrip perlu diperiksa sebelum render otomatis.')
     result['transcript_flags'] = len(asr_flags)
     for row in raw.get('emphasis', []) if isinstance(raw.get('emphasis'), list) else []:

@@ -11,7 +11,6 @@ def look(ident, name, description, motion, main, accent, color, intensity='calm'
 
 
 LOOKS = (
-    look('editorial32','Editorial bertingkat','Kata penghubung kecil, serif besar untuk ide utama, susunan ringkas dengan gerak halus.','magazine','dm_sans','dm_serif_italic','#F5D98D','balanced'),
     look('shorts','Shorts dinamis','Frasa ringkas, Montserrat + Bebas Neue, penekanan pop untuk video pendek.','impact','montserrat','bebas','#FFD43B','dynamic'),
     look('studio','Studio editorial','Sans bersih + huruf padat, gerak mengikuti penekanan isi.','narrative','dm_sans','bebas','#EFCB75'),
     look('elegan','Editorial elegan','Sans yang rapi + serif miring untuk penekanan.','narrative','dm_sans','dm_serif_italic','#F6D582'),

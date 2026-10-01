@@ -35,7 +35,6 @@ def _run(media_path, cfg):
     _add_cuda_dlls()
     from faster_whisper import WhisperModel
     from .typography import valid_words
-    from .transcript_correction import prompt, recheck_ranges, merge_recheck
     device, compute = _resolve_device(cfg)
     warnings = []
     def attempt(dev, dtype):
@@ -45,7 +44,7 @@ def _run(media_path, cfg):
             segments, info = model.transcribe(media_path,
                 language=None if cfg.language == 'auto' else cfg.language,
                 task='transcribe', word_timestamps=True, vad_filter=True, beam_size=5,
-                condition_on_previous_text=False, initial_prompt=prompt(cfg) or None)
+                condition_on_previous_text=False)
             words, text, sentences = [], [], []
             for seg in segments:
                 text.append(seg.text.strip())
@@ -55,31 +54,7 @@ def _run(media_path, cfg):
                     words.append({'word_id': len(words), 'word': w.word.strip(),
                                   'start': float(w.start), 'end': float(w.end),
                                   'probability': float(w.probability)})
-            raw_words = valid_words(words)
-            heard_words, corrections = raw_words, []
-            checked, errors = 0, []
-            if cfg.asr_second_pass and cfg.transcript_correction:
-                for a, b in recheck_ranges(raw_words, float(info.duration), cfg.asr_recheck_windows):
-                    try:
-                        with tempfile.TemporaryDirectory(prefix='clipper-listen-') as tmp:
-                            audio = Path(tmp) / 'excerpt.wav'
-                            subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-ss', str(a),
-                                '-t', str(b-a), '-i', str(media_path), '-vn', '-ar', '16000', '-ac', '1', str(audio)],
-                                capture_output=True, check=True)
-                            retry, _ = model.transcribe(str(audio), language=info.language,
-                                word_timestamps=True, vad_filter=False, beam_size=8,
-                                condition_on_previous_text=False, initial_prompt=prompt(cfg) or None)
-                            heard = [{'word': w.word.strip(), 'start': float(w.start)+a, 'end': float(w.end)+a,
-                                      'probability': float(w.probability)} for seg in retry for w in seg.words or []]
-                        heard_words, accepted = merge_recheck(heard_words, heard)
-                        corrections.extend(accepted)
-                        checked += 1
-                    except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
-                        errors.append(str(exc)[:180])
-                        break
-            return {'words': heard_words, 'raw_words': raw_words, 'heard_words': heard_words,
-                    'asr_corrections': corrections, 'second_pass': {'checked': checked, 'errors': errors},
-                    'text': ' '.join(text), 'segments': sentences,
+            return {'words': valid_words(words), 'text': ' '.join(text), 'segments': sentences,
                     'duration': float(info.duration), 'language': info.language,
                     'device': dev, 'warnings': warnings}
         finally:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 TEMPLATES = (
-    {'id': 'magazine', 'name': 'Editorial bertingkat', 'description': 'Kata penghubung kecil, penekanan serif besar, susunan tiga tingkat yang stabil.', 'motion': 'mixed'},
     {'id': 'narrative', 'name': 'Narasi bertingkat', 'description': 'Putih–kuning, frasa bertingkat, blur dan gerak halus.', 'motion': 'mixed'},
     {'id': 'pop', 'name': 'Pop lembut', 'description': 'Kata utama membesar sebentar, lalu menetap.', 'motion': 'pop'},
     {'id': 'slide', 'name': 'Geser terarah', 'description': 'Masuk dari kiri, kanan, atas, dan bawah per frasa.', 'motion': 'slide'},
@@ -24,7 +23,7 @@ def frames(style, duration, reveal, index, emphasis, cfg, position='bottom'):
     first = min(last - 1, max(0, round(reveal * fps)))
     strength = {'calm': .65, 'balanced': 1., 'dynamic': 1.35}.get(cfg.motion_intensity, 1.)
     direction = position if position in ('left','right') else 'up'
-    kind = {'magazine': 'pop' if emphasis else 'up', 'narrative': 'pop' if emphasis else 'blur',
+    kind = {'narrative': 'pop' if emphasis else 'blur',
             'pop': 'pop', 'slide': direction,
             'blur': 'blur', 'impact': 'pop'}.get(style, 'up')
     enter = min(max(2, round(.28 * fps)), max(1, (last-first)//2))

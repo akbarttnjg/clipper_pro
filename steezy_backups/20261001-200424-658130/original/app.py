@@ -18,7 +18,6 @@ load_dotenv(ROOT / '.env')
 load_dotenv(ROOT / '.env.pro', override=True)
 from clipper.config import Config, validate_overrides, validate_brand
 from clipper import pipeline, boundaries, story, editorial, stock, illustrations, intelligence
-from clipper import library_paths
 from clipper.storage import read_json, write_json
 from clipper.looks import LOOKS, VISUAL_FIELDS
 from clipper.font_catalog import FONTS
@@ -37,7 +36,7 @@ STATES.mkdir(parents=True, exist_ok=True)
 JOBS, JOB_STATE = {}, {}
 PROCESS_LOCK = threading.Lock()
 STATE_LOCK = threading.RLock()
-ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating', 'automatic', 'discovering'}
+ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating', 'automatic'}
 
 
 def persist(job_id):
@@ -60,7 +59,7 @@ def restore():
                 settings['title_card'] = False
             st['edits'] = {int(k): v for k, v in st.get('edits', {}).items()}
             st['scored'] = [boundaries.annotate(c, st.get('edits', {}).get(i, st.get('transcript', {}).get('words', [])),
-                                              st['cfg'].max_clip_s + st['cfg'].topic_grace_s) for i, c in enumerate(st.get('scored', []))]
+                                              st['cfg'].max_clip_s) for i, c in enumerate(st.get('scored', []))]
             if job['status'] in ACTIVE:
                 job.update(status='interrupted', message='Sesi terhenti. Kandidat dan koreksi yang tersimpan tetap ada.')
             JOB_STATE[file.stem], JOBS[file.stem] = st, job
@@ -92,8 +91,6 @@ def state(job_id, idx=None):
 def public(job_id):
     st, job = state(job_id)
     return {**job, 'id': job_id, 'candidates': st.get('scored', []),
-            'selection_report': read_json(Path(st['cfg'].work_dir) / 'selection-report.json', {}),
-            'correction_report': st.get('transcript', {}).get('correction_report', {}),
             'elapsed': round(time.time() - job.get('started', time.time())) if job['status'] in ACTIVE else job.get('elapsed', 0)}
 
 
@@ -114,16 +111,6 @@ def worker(job_id, action, indices=None):
                 transcript, clips = pipeline.analyze(st['media'], st['cfg'], progress)
                 st.update(transcript=transcript, scored=clips, edits={})
                 job.update(status='review', percent=100, message='Periksa pembuka, penutup, dan teks; pilih clip untuk render.')
-            elif action == 'discovering':
-                cfg = replace(st['cfg'], search_depth='broad', num_clips=0)
-                found = story.select(st['transcript'], cfg, progress)
-                before = len(st['scored'])
-                for candidate in found:
-                    if candidate.get('selection_source') != 'manual-required' and not any(
-                            story.duplicate(candidate, prior, st['transcript']['words']) for prior in st['scored']):
-                        st['scored'].append(candidate)
-                job.update(status='review', percent=100,
-                    message=f'{len(st["scored"])-before} kandidat tambahan. Koreksi dan hasil clip sebelumnya tetap tersimpan.')
             elif action == 'reviewing':
                 try:
                     for n, idx in enumerate(indices):
@@ -194,8 +181,6 @@ def worker(job_id, action, indices=None):
                         job['failures'].append({'index': idx, 'title': c['title'], 'error': str(exc)})
                         persist(job_id)
                         continue
-                    old_result = next((r for r in job['clips'] if r.get('index') == idx), None)
-                    library_paths.archive_previous(cfg, old_result, res)
                     job['clips'] = [r for r in job['clips'] if r.get('index') != idx] + [{**res, 'index': idx}]
                     job['clips'].sort(key=lambda r: r['index'])
                     completed += 1
@@ -234,19 +219,11 @@ def worker(job_id, action, indices=None):
                     c['start'] = cursor
                     c['cold_open_span'] = None
                     cfg = replace(cfg, cold_open=False, title_card=False)
-                preview_words = st.get('edits', {}).get(idx, st['transcript']['words'])
                 cfg = replace(cfg, preview_seconds=12, target_w=640 if cfg.target_w > cfg.target_h else 360,
                               target_h=360 if cfg.target_w > cfg.target_h else 640)
-                key = library_paths.fingerprint(st['media'], preview_words, c, cfg)
-                cache = Path(st['cfg'].work_dir) / 'cache' / 'previews' / key
-                result = read_json(cache / 'result.json')
-                reused = bool(result and (cache / 'output' / result['file']).is_file())
-                if not reused:
-                    preview_cfg = replace(cfg, work_dir=str(cache / 'work'), out_dir=str(cache / 'output'))
-                    result = pipeline.render_clip(st['media'], preview_words, c, 'preview-' + str(idx), preview_cfg, progress)
-                    result['url'] = f'/api/preview-file/{job_id}/{key}/{result["file"]}'
-                    write_json(cache / 'result.json', result)
-                job.update(status='review', percent=100, message=f"Preview {result['length']:.1f} detik siap" + (' · cache dipakai kembali.' if reused else '. Pilih tab Preview.'),
+                result = pipeline.render_clip(st['media'], st.get('edits', {}).get(idx, st['transcript']['words']),
+                                              c, 'preview-' + str(idx) + '-' + uuid.uuid4().hex[:6], cfg, progress)
+                job.update(status='review', percent=100, message=f"Preview {result['length']:.1f} detik siap. Pilih tab Preview.",
                            preview={**result, 'index': idx, 'source_start': cursor})
             elif action == 'exporting':
                 from clipper.projects import export_bundle
@@ -278,7 +255,6 @@ def new_job(path, options, music='', sfx='', original_name=None):
         raise HTTPException(400, 'File tidak mempunyai track suara.')
     job_id = uuid.uuid4().hex[:12]
     preset = next((p['settings'] for p in LOOKS if p['id'] == options.get('style_preset')), {})
-    options = {'num_clips': '0', **options}
     cfg = replace(base_cfg, job_id=job_id, music_path=music, sfx_path=sfx,
                   work_dir=str(Path(base_cfg.work_dir) / job_id), **{**preset, **validate_overrides(options)})
     JOB_STATE[job_id] = {'cfg': cfg, 'media': str(Path(path).resolve()), 'transcript': {},
@@ -567,11 +543,6 @@ def editor_save(job_id: str, idx: int, data: dict = Body(...)):
             raise ValueError('Keywords harus berupa daftar.')
         old = st['scored'][idx]
         existing = st.get('edits', {}).get(idx, st['transcript']['words'])
-        old_words = {w.get('word_id'): w for w in existing if w.get('word_id') is not None}
-        for word in words:
-            prior = old_words.get(word.get('word_id'))
-            if prior and word['word'] != prior['word']:
-                word['manually_edited'] = True
         lo, hi = min(w['start'] for w in words), max(w['end'] for w in words)
         outside = [w for w in existing if w['end'] <= lo or w['start'] >= hi]
         combined = sorted(outside + words, key=lambda w: w['start'])
@@ -592,7 +563,7 @@ def editor_save(job_id: str, idx: int, data: dict = Body(...)):
         if not isinstance(settings, dict):
             raise ValueError('Pengaturan clip harus berupa objek.')
         overrides = {**st.get('clip_settings', {}).get(str(idx), {}), **validate_overrides(settings)}
-        c = boundaries.annotate(c, combined, st['cfg'].max_clip_s + st['cfg'].topic_grace_s)
+        c = boundaries.annotate(c, combined, st['cfg'].max_clip_s)
         review_cfg = replace(st['cfg'], **overrides)
         decision = c.get('intelligence')
         if decision and decision.get('signature') != intelligence.signature(c, combined, review_cfg.audience):
@@ -721,9 +692,7 @@ def subtitle_review(job_id: str, idx: int):
     cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
     words = st.get('edits', {}).get(idx, st['transcript']['words'])
     words = [w for w in words if w['start'] < c['end'] and w['end'] > c['start']]
-    display, changes, warnings = clean(words, cfg.caption_cleanup, cfg.caption_punctuation, cfg)
-    changes = [r for r in st['transcript'].get('correction_report', {}).get('changes', [])
-               if c['start'] <= r.get('start', -1) < c['end']] + changes
+    display, changes, warnings = clean(words, cfg.caption_cleanup)
     return {'original': words, 'display': display, 'changes': changes, 'warnings': warnings}
 
 
@@ -807,93 +776,9 @@ def set_brand(accent_hex: str = Form(...), caption_style: str = Form(...), font_
     return {'ok': True, **values}
 
 
-@app.get('/api/storage')
-def storage_status():
-    return {**library_paths.cache_summary(base_cfg.work_dir, base_cfg.out_dir),
-            'busy': any(j.get('status') in ACTIVE for j in JOBS.values()),
-            'output_folder': str(base_cfg.out_dir)}
-
-
-@app.post('/api/storage/clear-cache')
-def clear_cache():
-    if not PROCESS_LOCK.acquire(blocking=False):
-        raise HTTPException(409, 'Tunggu proses video selesai sebelum membersihkan cache.')
-    try:
-        with STATE_LOCK:
-            if any(j.get('status') in ACTIVE for j in JOBS.values()):
-                raise HTTPException(409, 'Masih ada proyek dalam antrean/proses.')
-            result = library_paths.clear_previews(base_cfg.work_dir, base_cfg.out_dir)
-            for ident, job in JOBS.items():
-                if job.pop('preview', None):
-                    persist(ident)
-            return result
-    finally:
-        PROCESS_LOCK.release()
-
-
-@app.post('/api/storage/organize')
-def organize_outputs():
-    if not PROCESS_LOCK.acquire(blocking=False):
-        raise HTTPException(409, 'Tunggu proses video selesai dahulu.')
-    try:
-        with STATE_LOCK:
-            if any(j.get('status') in ACTIVE for j in JOBS.values()):
-                raise HTTPException(409, 'Masih ada proyek dalam antrean/proses.')
-            count = 0
-            for ident, st in JOB_STATE.items():
-                moved = library_paths.organize_legacy(st['cfg'])
-                count += len(moved)
-                for result in JOBS[ident].get('clips', []):
-                    old = result.get('file', '')
-                    if old in moved:
-                        result['file'] = moved[old]
-                        result['url'] = library_paths.url(moved[old])
-                        for field, ext in [('ass_url', '.ass'), ('srt_url', '.srt'), ('credits_url', '.credits.txt')]:
-                            target = moved.get(str(Path(old).with_suffix(ext)))
-                            if target:
-                                result[field] = library_paths.url(target)
-                if moved:
-                    persist(ident)
-            return {'moved_files': count}
-    finally:
-        PROCESS_LOCK.release()
-
-
-@app.get('/api/preview-file/{job_id}/{key}/{name}')
-def preview_file(job_id: str, key: str, name: str):
-    import re
-    st, _ = state(job_id)
-    if not re.fullmatch('[a-f0-9]{24}', key) or Path(name).name != name or Path(name).suffix != '.mp4':
-        raise HTTPException(404, 'Preview tidak ditemukan.')
-    p = library_paths.contained(Path(st['cfg'].work_dir) / 'cache' / 'previews', f'{key}/output/{name}')
-    if not p.is_file():
-        raise HTTPException(404, 'Cache preview sudah dibersihkan. Buat preview kembali.')
-    return FileResponse(p, media_type='video/mp4')
-
-
-@app.post('/api/discover/{job_id}')
-def discover_more(job_id: str):
-    st, _ = state(job_id)
-    if not st.get('transcript', {}).get('words'):
-        raise HTTPException(409, 'Transkripsi belum tersedia. Pulihkan sesi dahulu.')
-    enqueue(job_id, 'discovering')
-    return {'ok': True}
-
-
-@app.get('/clips/{name:path}')
+@app.get('/clips/{name}')
 def clip(name: str):
-    try:
-        p = library_paths.contained(base_cfg.out_dir, name)
-    except ValueError:
-        raise HTTPException(404, 'File tidak ditemukan.')
-    # Saved 3.1 download links remain valid after organizing old outputs.
-    if not p.is_file() and '/' not in name and len(name.split('-')[0]) == 12:
-        ident = name.split('-')[0]
-        for folder in ('video', 'subtitles', 'reports'):
-            candidate = library_paths.contained(base_cfg.out_dir, f'{ident}/{folder}/{name}')
-            if candidate.is_file():
-                p = candidate
-                break
+    p = Path(base_cfg.out_dir) / Path(name).name
     if not p.is_file() or (p.suffix not in ('.mp4', '.ass', '.srt') and not p.name.endswith('.credits.txt')):
         raise HTTPException(404, 'Clip tidak ditemukan.')
     if p.suffix == '.mp4':
@@ -902,5 +787,5 @@ def clip(name: str):
 
 
 if __name__ == '__main__':
-    print('Clipper Studio Local 3.2 -> http://localhost:8765')
+    print('Clipper Studio Local 3.1 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

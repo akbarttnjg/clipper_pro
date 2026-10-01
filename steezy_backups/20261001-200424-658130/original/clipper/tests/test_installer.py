@@ -60,21 +60,3 @@ def test_rollback_refuses_to_overwrite_later_changes(tmp_path):
     with pytest.raises(ValueError,match='berubah'):
         installer.rollback(target,backup)
     assert (target/'app.py').read_text()=='edited after installation'
-
-
-@pytest.mark.parametrize('version', ['3.1', '3.2', '2.4'])
-def test_upgrade_checks_baseline_before_writing(tmp_path, version):
-    target, package = fixture(tmp_path)
-    (target/'clipper/pipeline.py').write_text(f"RENDER_VERSION = '{version}'\n")
-    path = package/'manifest.json'
-    manifest = json.loads(path.read_text())
-    manifest['requires_versions'] = ['3.1', '3.2']
-    path.write_text(json.dumps(manifest))
-    if version == '2.4':
-        with pytest.raises(ValueError, match='Versi target'):
-            installer.install(target, package, install_deps=False)
-        assert (target/'app.py').read_text() == 'original'
-        assert not (target/'steezy_backups').exists()
-    else:
-        assert installer.install(target, package, install_deps=False)
-        assert (target/'app.py').read_text() == 'updated'

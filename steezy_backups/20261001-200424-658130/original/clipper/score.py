@@ -66,7 +66,7 @@ def _clean(raw, duration, cfg):
     for c in sorted(cleaned, key=lambda x: x['score'], reverse=True):
         if not any(_overlap(c, old) > .3 for old in picked):
             picked.append(c)
-        if cfg.num_clips > 0 and len(picked) >= cfg.num_clips:
+        if len(picked) >= cfg.num_clips:
             break
     return picked
 
