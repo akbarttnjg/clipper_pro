@@ -161,20 +161,3 @@ def merge_recheck(words, heard):
         changes.append({'word_id': old.get('word_id'), 'start': old['start'], 'end': old['end'],
                         'before': old['word'], 'after': replacement, 'reason': 'audio_recheck'})
     return result, changes
-
-
-def refresh_saved(transcript, edits, cfg, clip_settings=None):
-    """Apply the glossary to saved ASR without retranscribing or erasing edits."""
-    from dataclasses import replace
-    refined=refine(transcript,cfg)
-    refined['correction_report']['source']='saved_transcript_glossary'
-    old={(w['start'],w['end']):w['word'] for w in transcript['words']}
-    updated={}
-    for index,words in edits.items():
-        marked=copy.deepcopy(words)
-        for w in marked:
-            if w['word']!=old.get((w['start'],w['end']),w['word']):
-                w['manually_edited']=True
-        local_cfg=replace(cfg,**(clip_settings or {}).get(str(index),{}))
-        updated[index]=correct_words(marked,local_cfg)[0]
-    return refined,updated

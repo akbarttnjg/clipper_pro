@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '3.3'
+RENDER_VERSION = '3.2'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -61,7 +61,7 @@ def clip_name(clip, i):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
-    name = name + f"-r{clip.get('revision', 0)}-v33"
+    name = name + f"-r{clip.get('revision', 0)}-v32"
     work = Path(cfg.work_dir) / 'renders' / name
     locations = library_paths.destinations(cfg, name)
     video_base, text_base, report_base = locations['video'], locations['text'], locations['report']
@@ -89,6 +89,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         recipe = clip.get('_broll_recipe') or illustrations.prepare(words, clip, cfg, lambda p,m: on_progress(7+p//8,m))
         illustrations.attach(plan, recipe, cfg)
         placement.protect_broll(plan, cfg)
+        render.broll_plates(plan, cfg, work)
     write_json(report_base.with_suffix('.credits.json'), illustrations.credits(plan))
     report_base.with_suffix('.credits.txt').write_text('\n'.join(c['credit'] for c in illustrations.credits(plan)), encoding='utf-8')
     from .subtitle_edit import clean
@@ -100,13 +101,9 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     write_json(report_base.with_suffix('.subtitle-review.json'), plan['subtitle_cleanup'])
     ass = captions_pro.write_ass(display, work / 'captions.ass', cfg,
         keywords=clip.get('keywords', []),
-        anchors=placement.caption_anchors(plan, cfg))
+        anchors=placement.caption_anchors(plan))
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
     plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg)
-    for event in plan.get('broll', []):
-        event['image_height'] = min(s.get('image_height') or cfg.target_h for s in plan['shots']
-            if s['start'] < event['end'] and s['end'] > event['start'])
-    render.broll_plates(plan, cfg, work)
     plan['style'] = {'accent': cfg.accent_hex, 'base': cfg.base_hex, 'caption_style': cfg.caption_style,
                      'motion_intensity': cfg.motion_intensity, 'font_main': cfg.font_main,
                      'font_accent': cfg.font_accent, 'contrast': cfg.caption_backdrop, 'caption_position': cfg.caption_position,

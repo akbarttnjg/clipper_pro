@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const state = {job:null,index:null,data:null,editor:null,dirty:false,mode:'source',selected:new Set(),poll:null,draw:null,drag:null,loadedRevision:null,seen:new Set(),selectionToken:0,drawOld:''};
 const optionIds = ['aspect','caption_style','motion_intensity','layout','caption_position','caption_align','caption_scale','accent_hex','punch_zoom','accent_font','cold_open','trim','music_db','sfx_db','framing_x','material_rect','speaker_rect','material_share','font_main','font_accent','caption_cleanup','caption_punctuation','transcript_correction','glossary','caption_backdrop','safe_placement','source_kind','audience','broll_mode','broll_provider','broll_max','preserve_material_pauses'];
-const active = new Set(['queued','analyzing','reviewing','rendering','previewing','exporting','illustrating','automatic','discovering','correcting']);
+const active = new Set(['queued','analyzing','reviewing','rendering','previewing','exporting','illustrating','automatic','discovering']);
 const busy = () => active.has(state.data?.status);
 function toast(text){$('toast').textContent=text;$('toast').classList.remove('hidden');clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),6000)}
 function tc(t, precision=false){t=Math.max(0,Number(t)||0);const seconds=Math.floor(t);return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(x=>String(x).padStart(2,'0')).join(':')+(precision?'.'+String(Math.floor((t-seconds)*100+.001)).padStart(2,'0'):'')}
@@ -29,7 +29,7 @@ function paintIntelligence(c){
   const e=d.evidence?.[key];if(!e)continue;const b=el('button',name+' · '+tc(e.source_start),'quiet small');
   b.onclick=()=>playAt(e.source_start);box.append(b,el('p','“'+e.quote+'”','evidence-quote'));
  }
- box.append(el('p','B-roll: '+(d.status!=='ready'?'Belum diputuskan; ilustrasi diperiksa terpisah. ':d.broll==='contextual'?'Ilustrasi bila relevan. ':'Pertahankan pembicara. ')+(d.broll_reason||''),'tiny'));
+ box.append(el('p','B-roll: '+(d.broll==='contextual'?'Ilustrasi bila relevan. ':'Pertahankan pembicara. ')+(d.broll_reason||''),'tiny'));
  box.append(el('p',d.hook?'Kutipan pembuka: '+d.hook.quote:'Hook memakai pembukaan asli.','tiny'));
  if(d.issues?.length){const list=el('ul');for(const issue of d.issues)list.append(el('li',issue));box.append(list)}
  box.append(el('p','Pemeriksaan AI membantu seleksi; hasil ini bukan prediksi FYP.','tiny'));
@@ -40,24 +40,24 @@ function paintCandidates(){
   const card=el('div',undefined,'card'+(i===state.index?' active':''));card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-pressed',String(i===state.index));card.onclick=()=>selectClip(i);card.onkeydown=e=>{if(e.key==='Enter')selectClip(i)};
   const check=document.createElement('input');check.type='checkbox';check.checked=state.selected.has(i);check.setAttribute('aria-label','Pilih '+c.title);check.onclick=e=>e.stopPropagation();check.onchange=()=>{check.checked?state.selected.add(i):state.selected.delete(i);updateControls()};
   card.append(check,el('div',String(i+1).padStart(2,'0')+' · '+Math.round(c.end-c.start)+' dtk','meta'),el('h3',c.title),el('div',tc(c.start)+' → '+tc(c.end),'meta'),el('p',c.reason,'reason'));
-  const warning=issues(c).length||c.boundary_review?.status==='needs_review';const result=state.data.clips?.find(r=>r.index===i&&r.revision===c.revision&&r.render_version==='3.3');
+  const warning=issues(c).length||c.boundary_review?.status==='needs_review';const result=state.data.clips?.find(r=>r.index===i&&r.revision===c.revision&&r.render_version==='3.2');
   card.append(el('div',result?'✓ Render tersimpan':warning?'Periksa batas pembahasan':c.intelligence?.status==='ready'?'Cerita lolos pemeriksaan AI':c.boundary_review?.status==='checked'?'Konteks diperiksa · dengarkan hasilnya':'Kandidat · belum diperiksa','rubric'+(warning?' warn':'')));parent.append(card);
  }
  parent.scrollTop=scroll;
 }
 function updateControls(){
  const chosen=state.index!==null,selected=state.selected.size>0;document.body.classList.toggle('busy',!!busy());
- for(const id of ['saveEdit','preview','markIn','markOut','playBeginning','playEnding','playClip','refreshTranscript','context','reviewBoundary','drawMaterial','drawSpeaker','openTemplates','savePreset','reviewCleanup','usePreset','prepareBroll'])$(id).disabled=!chosen||!!busy();
+ for(const id of ['saveEdit','preview','markIn','markOut','playBeginning','playEnding','playClip','context','reviewBoundary','drawMaterial','drawSpeaker','openTemplates','savePreset','reviewCleanup','usePreset','prepareBroll'])$(id).disabled=!chosen||!!busy();
  $('applyLook').disabled=!chosen||!selected||!!busy();$('render').disabled=!selected||!!busy();$('autoRun').disabled=!selected||!!busy();$('reviewAll').disabled=!state.data?.candidates?.length||!!busy();$('discoverMore').disabled=!state.data?.candidates?.length||!!busy();$('addClip').disabled=!state.data?.candidates?.length||!!busy();$('saveEdit').textContent=state.dirty?'Simpan koreksi •':'Simpan koreksi';$('render').textContent='Render '+(state.selected.size||'')+' pilihan';
  for(const id of optionIds)$(id).disabled=!chosen||!!busy();if(chosen)updateFontSample();updatePlacementHint();
  const result=state.data?.clips?.find(r=>r.index===state.index);$('resultTab').disabled=!result;$('download').classList.toggle('hidden',!result);
- $('resultTab').textContent=result&&(state.dirty||result.revision!==state.editor?.clip.revision||result.render_version!=='3.3')?'Hasil sebelumnya':'Hasil';
+ $('resultTab').textContent=result&&(state.dirty||result.revision!==state.editor?.clip.revision||result.render_version!=='3.2')?'Hasil sebelumnya':'Hasil';
  $('downloadCredits').classList.toggle('hidden',!result?.broll_count);if(result?.broll_count)$('downloadCredits').href=result.credits_url||'/clips/'+encodeURIComponent(result.file.replace(/\.mp4$/,'.credits.txt'));
- $('downloadAss').classList.toggle('hidden',!result||result.render_version!=='3.3');
+ $('downloadAss').classList.toggle('hidden',!result||result.render_version!=='3.2');
  if(result){$('downloadAss').href=result.ass_url||'/clips/'+encodeURIComponent(result.file.replace(/\.mp4$/,'.ass'));$('downloadAss').download=result.file.replace(/\.mp4$/,'.ass');$('download').href=result.url||'/clips/'+encodeURIComponent(result.file);$('download').download=result.file}
- const exportReady=!state.dirty&&selected&&[...state.selected].every(i=>state.data?.clips?.some(r=>r.index===i&&r.revision===(state.data.candidates[i].revision||0)&&r.render_version==='3.3'));
+ const exportReady=!state.dirty&&selected&&[...state.selected].every(i=>state.data?.clips?.some(r=>r.index===i&&r.revision===(state.data.candidates[i].revision||0)&&r.render_version==='3.2'));
  $('export').disabled=!exportReady||!!busy();$('downloadBundle').classList.toggle('hidden',!state.data?.export);if(state.data?.export)$('downloadBundle').href='/api/download/'+state.job;
- const preview=state.data?.preview;$('previewTab').classList.toggle('hidden',!preview||preview.index!==state.index||preview.revision!==state.editor?.clip.revision||preview.render_version!=='3.3');$('previewTab').textContent=state.dirty?'Preview sebelumnya':'Preview';
+ const preview=state.data?.preview;$('previewTab').classList.toggle('hidden',!preview||preview.index!==state.index||preview.revision!==state.editor?.clip.revision||preview.render_version!=='3.2');$('previewTab').textContent=state.dirty?'Preview sebelumnya':'Preview';
  if(result&&state.editor&&result.revision!==state.editor.clip.revision&&!state.dirty)$('saveState').textContent='Koreksi tersimpan · render perlu diperbarui';
 }
 async function loadJob(id){
@@ -70,7 +70,7 @@ async function refresh(){
   const oldStatus=state.data?.status,oldPreview=state.data?.preview?.file,oldResult=state.data?.clips?.find(r=>r.index===state.index)?.file;const data=await api('/api/status/'+job);if(job!==state.job)return;state.data=data;
   $('projectName').textContent=data.name||'Proyek lokal';$('message').textContent=data.message;$('progress').value=data.percent||0;$('elapsed').textContent=tc(data.elapsed);
   const report=data.selection_report||{};$('searchCoverage').textContent=report.windows?`${report.processed_windows}/${report.windows} jendela diperiksa · ${report.candidate_pool||0} kandidat unik · ${report.automatic_ready||0} lolos otomatis${report.coverage_complete?'':' · jelajah belum lengkap'}`:'Jumlah clip mengikuti isi yang layak.';$('error').textContent=data.error||'';$('errorDetails').classList.toggle('hidden',!data.error);$('resume').classList.toggle('hidden',!['interrupted','error'].includes(data.status));
-  $('timings').textContent=Object.entries(data.timings||{}).map(([k,v])=>({analyzing:'Analisis',reviewing:'Review AI',rendering:'Render',previewing:'Preview',exporting:'Ekspor',illustrating:'Ilustrasi',automatic:'Otomatis',correcting:'Koreksi istilah'}[k]||k)+': '+tc(v)).join(' · ');
+  $('timings').textContent=Object.entries(data.timings||{}).map(([k,v])=>({analyzing:'Analisis',reviewing:'Review AI',rendering:'Render',previewing:'Preview',exporting:'Ekspor',illustrating:'Ilustrasi',automatic:'Otomatis'}[k]||k)+': '+tc(v)).join(' · ');
   for(const [i,c] of data.candidates.entries())if(!state.seen.has(i)){state.seen.add(i);if(!issues(c).length&&c.boundary_review?.status!=='needs_review'&&c.selection_source!=='manual-required')state.selected.add(i)}
   if(!busy()){
    if(oldStatus==='reviewing')for(const i of state.selected)if(issues(data.candidates[i]||{}).length)state.selected.delete(i);
@@ -213,5 +213,3 @@ $('organizeOutputs').onclick=async()=>{try{$('organizeOutputs').disabled=true;co
 $('discoverMore').onclick=async()=>{try{if(state.dirty)await save();await post('/api/discover/'+state.job,{});await refresh()}catch(e){toast(e.message)}};
 const controlHelp={preview:'Render contoh 12 detik mulai dari posisi video saat ini. Simpan koreksi otomatis terlebih dahulu.',saveEdit:'Simpan kata, batas, dan pengaturan untuk clip aktif.',autoRun:'Periksa cerita pada clip yang dicentang, lalu render hanya yang lolos dan buat paket editor.',render:'Render clip yang dicentang menggunakan koreksi tersimpan.',export:'Buat paket editable dari render terbaru: video tanpa teks, subtitle, audio, dan timeline editor.',reviewBoundary:'Periksa pembuka dan penutup clip aktif dengan konteks sumber. Tidak mengulang Whisper.',discoverMore:'Jelajah sumber yang tersimpan untuk mencari cerita tambahan; jumlah hasil tidak dipaksakan.',caption_style:'Pilih bagaimana teks masuk. Font dan posisi bisa diatur terpisah.',caption_position:'Otomatis mencari area aman. Kiri, kanan, dan bawah mengunci posisi manual.',caption_scale:'Ukuran dasar teks. Mesin mengecilkan frasa panjang agar tetap muat.',caption_punctuation:'Minimal hanya menyembunyikan tanda baca tepi kata; angka dan persentase dipertahankan.',glossary:'Kamus ejaan. Contoh: XAUUSD = hausd | xausd. Koreksi manual tidak ditimpa.',safe_placement:'Deteksi wajah dan pola tulisan pada beberapa frame. Area penuh mendapat jalur subtitle terpisah.',broll_mode:'Ilustrasi hanya dipakai bila relevan; AI boleh memilih tanpa sisipan.'};
 for(const [id,help] of Object.entries(controlHelp)){const node=$(id);node.title=help;node.addEventListener('focus',()=>{$('editHelp').textContent=help});node.addEventListener('mouseenter',()=>{$('editHelp').textContent=help})}
-
-$('refreshTranscript').onclick=async()=>{try{if(state.dirty)await save();await post('/api/refresh-transcript/'+state.job,{});await refresh()}catch(e){toast(e.message)}};

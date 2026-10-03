@@ -57,15 +57,6 @@ def install(target, package, dry_run=False, install_deps=True):
         contained(target, row['path'])
         if not src.is_file() or digest(src) != row['sha256']:
             raise ValueError('Paket rusak/tidak lengkap: ' + row['path'])
-    conflicts = []
-    for entry in entries:
-        dst = contained(target, entry['path'])
-        if 'base_text_sha256' in entry and dst.is_file() and digest(dst) != entry['sha256']:
-            normalized = hashlib.sha256(dst.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
-            if normalized not in (entry.get('base_text_sha256'), entry.get('text_sha256')):
-                conflicts.append(entry['path'])
-    if conflicts:
-        raise ValueError('Kode lokal berbeda dari dasar paket. Simpan dan bandingkan perubahan ini sebelum memasang: ' + ', '.join(conflicts))
     changes = [e for e in entries if not contained(target, e['path']).is_file()
                or digest(contained(target, e['path'])) != e['sha256']]
     print(f'Target: {target}\nFile yang diperbarui: {len(changes)}')

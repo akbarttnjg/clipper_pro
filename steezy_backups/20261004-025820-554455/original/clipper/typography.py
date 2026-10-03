@@ -156,24 +156,16 @@ def row_left(x, width, row_width, align):
 
 
 def scene_groups(words, cfg, anchors):
-    # Composition cuts must not duplicate a word or turn a phrase into a flash.
-    return groups(words, cfg)
-
-
-def phrase_anchor(phrase, anchors, cfg):
-    if not anchors:
-        return None
-    start, end = phrase[0]['start'], phrase[-1]['end']
-    touching = [a for a in anchors if a.get('start', -1) < end and a.get('end', -1) > start]
-    chosen = max(touching, key=lambda a: min(end, a['end'])-max(start, a['start'])) if touching else min(anchors, key=lambda a: abs(a['time']-(start+end)/2))
-    anchor = dict(chosen)
-    anchor['end'] = max(end+.16, anchor.get('end', end))
-    if len(touching)>1 and cfg.caption_position=='auto':
-        from .placement import choose_panel
-        boxes = [b for a in touching for b in a.get('protected', [])]
-        panel_box, pos, _ = choose_panel(boxes, cfg.target_w, cfg.target_h, anchor.get('panel'))
-        anchor.update(panel=panel_box, position=pos, protected=boxes)
-    return anchor
+    if not anchors or not all('start' in a and 'end' in a for a in anchors):
+        return groups(words, cfg)
+    # A phrase never straddles a composition change. Only display intervals split;
+    # speech and saved source timestamps stay unchanged.
+    result = []
+    for anchor in anchors:
+        visible = [{**w, 'start': max(w['start'], anchor['start']), 'end': min(w['end'], anchor['end'])}
+                   for w in words if w['start'] < anchor['end'] and w['end'] > anchor['start']]
+        result.extend(groups(visible, cfg))
+    return result
 
 
 def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
@@ -194,7 +186,7 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
         x, y, width, height = panel(cfg, pos)
         if anchors:
             middle = (phrase[0]['start'] + phrase[-1]['end']) / 2
-            anchor = phrase_anchor(phrase, anchors, cfg)
+            anchor = next((a for a in anchors if a.get('start', -1) <= middle < a.get('end', -1)), None)
             if anchor and anchor.get('panel') and cfg.caption_position == 'auto':
                 x, y, width, height = anchor['panel']
                 pos = anchor['position']
@@ -279,7 +271,8 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
         pos = position
         anchor = None
         if anchors:
-            anchor = phrase_anchor(phrase, anchors, cfg)
+            containing = [a for a in anchors if a.get('start', -1) <= middle < a.get('end', -1)]
+            anchor = containing[0] if containing else min(anchors,key=lambda a:abs(a['time']-middle))
             pos = anchor['position']
         if cfg.caption_position != 'auto':
             pos = cfg.caption_position

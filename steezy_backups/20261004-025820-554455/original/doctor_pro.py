@@ -37,6 +37,6 @@ except Exception:
     print('Ollama belum berjalan. Buka aplikasi Ollama; mode video utuh tidak membutuhkan Ollama.')
 print('Font berpasangan:', 'OK' if all((Path(cfg.fonts_dir) / f['file']).is_file() for f in FONTS.values()) else 'BELUM LENGKAP')
 print('Galeri tipografi:', 'OK' if all((Path(__file__).parent / 'static/templates' / (t['id']+'.mp4')).is_file() for t in LOOKS) else 'BELUM LENGKAP')
-print('Studio 3.3: jelajah luas -> koreksi istilah -> posisi aman -> render -> proyek editable')
+print('Studio 3.2: jelajah luas -> koreksi istilah -> posisi aman -> render -> proyek editable')
 print('Model wajah lokal:', 'OK' if (Path(__file__).parent / 'clipper/models/face_detection_yunet.onnx').is_file() else 'Belum tersedia; detektor cadangan dipakai')
 print('Native CapCut/Resolve: periksa satu proyek percobaan pada editor Anda.')

@@ -49,7 +49,7 @@ def region(value, width, height):
     return [round(x*width/100), round(y*height/100), even(w*width/100), even(h*height/100)]
 
 
-def material_panel(frame, faces=()):
+def material_panel(frame):
     """Detect a large bright presentation panel. This is geometry, not OCR.
 
     Confidence gates avoid treating an entire bright room as a slide. Manual
@@ -82,33 +82,6 @@ def material_panel(frame, faces=()):
         side = bright[:, :left] if left > width-right else bright[:, right:]
         if side.size and np.mean(side) < .23 and np.mean(bright[top:bottom, left:right]) > .55:
             candidates.append(((right-left)*(bottom-top), [int(left), top, int(right-left), bottom-top]))
-    def writing(rect):
-        x,y,w,h=rect
-        boxes=placement.text_regions(frame[y:y+h,x:x+w])
-        cells={(min(3,int((bx+bw/2)/w*4)),min(3,int((by+bh/2)/h*4))) for bx,by,bw,bh in boxes}
-        return len(boxes)>=4 and len(cells)>=3
-    for contour in contours:
-        x,y,w,h=cv2.boundingRect(contour)
-        if w*h/(width*height)>.80 and cv2.contourArea(contour)/max(1,w*h)>.60 and writing([x,y,w,h]):
-            candidates.append((w*h,[x,y,w,h]))
-    neutral=cv2.inRange(hsv,np.array([0,0,140]),np.array([180,95,255]))
-    neutral=cv2.morphologyEx(neutral,cv2.MORPH_CLOSE,np.ones((7,7),np.uint8))
-    for contour in cv2.findContours(neutral,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)[0]:
-        x,y,w,h=cv2.boundingRect(contour)
-        if not .045<w*h/(width*height)<.55 or cv2.contourArea(contour)/max(1,w*h)<.60: continue
-        tile=hsv[y:y+h,x:x+w]
-        ink=(tile[:,:,1]>110)&(tile[:,:,2]>100)&((tile[:,:,0]<12)|(tile[:,:,0]>165)|((tile[:,:,0]>35)&(tile[:,:,0]<95)))
-        ys,xs=np.where(ink)
-        if .002<np.mean(ink)<.16 and len(xs) and xs.max()-xs.min()>w*.25 and ys.max()-ys.min()>h*.2:
-            candidates.append((w*h,[x,y,w,h]))
-    candidates=[(area,rect) for area,rect in candidates if area>.65*width*height or
-                not any(placement.overlap(rect,face)>=face[2]*face[3]*.2 for face in faces)]
-    if len(candidates)>1:
-        boxes=[r for _,r in candidates]
-        x=min(r[0] for r in boxes);y=min(r[1] for r in boxes)
-        w=max(r[0]+r[2] for r in boxes)-x;h=max(r[1]+r[3] for r in boxes)-y
-        if w*h<width*height*.70 and not any(placement.overlap([x,y,w,h],face)>0 for face in faces):
-            candidates.append((w*h,[x,y,w,h]))
     return max(candidates, default=(0, None), key=lambda r:r[0])[1]
 
 
@@ -158,7 +131,7 @@ def analyze(media, plan, cfg, info):
         cv2.normalize(hist, hist)
         area = [round(v / ratio) for v in active_area(small)]
         area[2], area[3] = min(area[2], W - area[0]), min(area[3], H - area[1])
-        panel = material_panel(small, [[v*ratio for v in face] for face in faces])
+        panel = material_panel(small)
         panel = [round(v/ratio) for v in panel] if panel else None
         texts = [[round(v/ratio) for v in box] for box in placement.text_regions(small)]
         return {'t': t, 'faces': faces, 'hist': hist, 'area': area, 'panel': panel, 'texts': texts}
@@ -173,7 +146,7 @@ def analyze(media, plan, cfg, info):
             groups, current = [], [samples[0]]
             boundaries = [a]
             for prior, item in zip(samples, samples[1:]):
-                distance = cv2.compareHist(prior['hist'], item['hist'], cv2.HISTCMP_BHATTACHARYYA) if prior['hist'] is not None and item['hist'] is not None else 0
+                distance = cv2.compareHist(prior['hist'], item['hist'], cv2.HISTCMP_BHATTACHARYYA)
                 if distance > .53 and item['t'] - boundaries[-1] > 1.5:
                     # Locate the cut to ~2 frames instead of switching framing 1.5 seconds late.
                     lo, hi = prior['t'], item['t']
@@ -185,9 +158,6 @@ def analyze(media, plan, cfg, info):
                             hi = mid['t']
                         else:
                             lo = mid['t']
-                    if hi-a<.35 or b-hi<.35:
-                        current.append(item)
-                        continue
                     boundaries.append(hi)
                     groups.append(current)
                     current = []

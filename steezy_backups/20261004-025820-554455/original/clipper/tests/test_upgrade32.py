@@ -249,18 +249,14 @@ def test_moving_faces_use_union_and_manual_placement_wins():
 
 def test_broll_protection_and_shot_change_keep_subtitle_safe():
     cfg=Config(target_w=1920,target_h=1080,caption_style='magazine')
-    first={**shot(),'source_start':0,'source_end':5,'start_frame':0,'duration_frames':150}
-    second={**shot(),'start':5,'end':10,'source_start':5,'source_end':10,'start_frame':150,'duration_frames':150}
-    ws=words('Pembahasan pertama kemudian lanjut pembahasan berikutnya.',step=1.1)
-    plan={'shots':[first,second],'source':{'width':1920,'height':1080},'fps':30,'words':ws,
+    first=shot();second={**shot(), 'start':5,'end':10}
+    plan={'shots':[first,second], 'source':{'width':1920,'height':1080},
           'broll':[{'start':4,'end':6,'duration':2}]}
     placement.protect_broll(plan,cfg)
-    assert not plan['shots'][0].get('image_height') and not plan['shots'][-1].get('image_height')
-    layout=typography.make_plan(ws,cfg,anchors=placement.caption_anchors(plan,cfg))
-    assert min(p['end']-p['start'] for p in layout['phrases'])>.2
-    ids=[w['word_id'] for group in typography.scene_groups(ws,cfg,[]) for w in group]
-    assert ids==[w['word_id'] for w in ws]
-
+    assert plan['broll'][0]['image_height']==first['image_height']==second['image_height']
+    ws=words('Pembahasan pertama kemudian lanjut pembahasan berikutnya.',step=1.1)
+    layout=typography.make_plan(ws,cfg,anchors=placement.caption_anchors(plan))
+    assert all(not(p['start']<5<p['end']) for p in layout['phrases'])
 
 
 def app_fixture(tmp_path, monkeypatch):

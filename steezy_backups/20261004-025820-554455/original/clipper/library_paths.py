@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from urllib.parse import quote
 
-LEGACY_PREVIEW = re.compile(r'^[a-f0-9]{12}-preview-\d+-(?:[a-f0-9]{6}-)?r\d+-v\d+(?:\.(?:mp4|ass|srt|credits\.(?:json|txt)|subtitle-review\.json|qc\.json|filter\.txt|render\.log))?$')
+LEGACY_PREVIEW = re.compile(r'^[a-f0-9]{12}-preview-\d+-[a-f0-9]{6}-r\d+-v\d+(?:\.(?:mp4|ass|srt|credits\.(?:json|txt)|subtitle-review\.json|qc\.json|filter\.txt|render\.log))?$')
 
 
 def contained(root, relative):
@@ -53,7 +53,7 @@ def fingerprint(media, words, clip, cfg):
     assets = [identity(cfg.music_path), identity(cfg.sfx_path)]
     for scene in clip.get('_broll_recipe', {}).get('scenes', []):
         assets.append(identity(scene.get('asset', {}).get('path', '')))
-    value = [identity(media), words, clip, settings, assets, 'preview-3.3']
+    value = [identity(media), words, clip, settings, assets, 'preview-3.2']
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:24]
 
 

@@ -18,7 +18,7 @@ load_dotenv(ROOT / '.env')
 load_dotenv(ROOT / '.env.pro', override=True)
 from clipper.config import Config, validate_overrides, validate_brand
 from clipper import pipeline, boundaries, story, editorial, stock, illustrations, intelligence
-from clipper import library_paths, transcript_correction
+from clipper import library_paths
 from clipper.storage import read_json, write_json
 from clipper.looks import LOOKS, VISUAL_FIELDS
 from clipper.font_catalog import FONTS
@@ -37,7 +37,7 @@ STATES.mkdir(parents=True, exist_ok=True)
 JOBS, JOB_STATE = {}, {}
 PROCESS_LOCK = threading.Lock()
 STATE_LOCK = threading.RLock()
-ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating', 'automatic', 'discovering', 'correcting'}
+ACTIVE = {'queued', 'analyzing', 'reviewing', 'rendering', 'previewing', 'exporting', 'illustrating', 'automatic', 'discovering'}
 
 
 def persist(job_id):
@@ -124,19 +124,6 @@ def worker(job_id, action, indices=None):
                         st['scored'].append(candidate)
                 job.update(status='review', percent=100,
                     message=f'{len(st["scored"])-before} kandidat tambahan. Koreksi dan hasil clip sebelumnya tetap tersimpan.')
-            elif action == 'correcting':
-                progress(10,'Memperbarui istilah dari transkrip tersimpan')
-                backup=Path(st['cfg'].work_dir)/'session-history'/(time.strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:6]+'-before-correction.json')
-                write_json(backup,{'transcript':st['transcript'],'edits':st.get('edits',{}),'scored':st['scored']})
-                transcript,edits=transcript_correction.refresh_saved(st['transcript'],st.get('edits',{}),st['cfg'],st.get('clip_settings',{}))
-                st.update(transcript=transcript,edits=edits)
-                for c in st['scored']:
-                    c['revision']=c.get('revision',0)+1
-                    c['intelligence']={'status':'stale','issues':['Istilah transkrip diperbarui. Jalankan Periksa AI untuk memeriksa cerita kembali.']}
-                write_json(Path(st['cfg'].work_dir)/'transcript.json',transcript)
-                write_json(Path(st['cfg'].work_dir)/'transcript-corrections.json',transcript['correction_report'])
-                job.pop('export',None);job.pop('preview',None)
-                job.update(status='review',percent=100,message='Koreksi istilah selesai tanpa Whisper ulang. Edit manual dipertahankan; periksa cerita lalu render ulang.')
             elif action == 'reviewing':
                 try:
                     for n, idx in enumerate(indices):
@@ -145,7 +132,7 @@ def worker(job_id, action, indices=None):
                         cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
                         if not (automatic and (intelligence.ready(st['scored'][idx], transcript['words'], cfg)
                                 or st['scored'][idx].get('selection_source') == 'full')):
-                            st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, cfg) if automatic else story.review_candidate(st['scored'][idx], transcript, cfg, refresh=True)
+                            st['scored'][idx] = story.review_candidate(st['scored'][idx], transcript, cfg)
                         persist(job_id)
                 finally:
                     editorial.release(st['cfg'])
@@ -178,14 +165,11 @@ def worker(job_id, action, indices=None):
                     recipe=illustrations.prepare(st.get('edits',{}).get(idx,st['transcript']['words']),
                         st['scored'][idx],cfg,lambda p,m:progress(round((100*n+p)/len(indices)),m),refresh=True)
                     st['scored'][idx]['revision']=st['scored'][idx].get('revision',0)+1
-                    job.setdefault('illustration_status',{})[str(idx)]={'count':len(recipe['scenes']),'notes':recipe['notes'],'status':recipe['status'],
+                    job.setdefault('illustration_status',{})[str(idx)]={'count':len(recipe['scenes']),'notes':recipe['notes'],
                         'recipe':illustrations.recipe_path(st.get('edits',{}).get(idx,st['transcript']['words']),st['scored'][idx],cfg).name}
                     persist(job_id)
                 job.pop('export',None)
-                count=sum(job['illustration_status'][str(i)]['count'] for i in indices)
-                notes=list(dict.fromkeys(note for i in indices for note in job['illustration_status'][str(i)]['notes']))
-                message=f'{count} sisipan ilustrasi tersedia. Tinjau pada tab Visual.' if count else 'Tidak ada sisipan ilustrasi. '+ ' '.join(notes)
-                job.update(status='review',percent=100,message=message)
+                job.update(status='review',percent=100,message='Ilustrasi disiapkan. Tinjau hasil pada tab Visual sebelum render.')
             elif action == 'rendering':
                 pipeline.ffmpeg_util.filter_file_args('preflight')
                 job.pop('export', None)
@@ -245,12 +229,12 @@ def worker(job_id, action, indices=None):
                 cfg = replace(st['cfg'], **st.get('clip_settings', {}).get(str(idx), {}))
                 if cfg.broll_mode != 'off':
                     c['_broll_recipe'] = illustrations.prepare(st.get('edits', {}).get(idx, st['transcript']['words']), c, cfg, progress)
-                preview_words = intelligence.annotate_words(st.get('edits', {}).get(idx, st['transcript']['words']), c, cfg)
                 cursor = job.pop('preview_source_start', c['start'])
                 if cursor > c['start'] + .05:
                     c['start'] = cursor
                     c['cold_open_span'] = None
                     cfg = replace(cfg, cold_open=False, title_card=False)
+                preview_words = st.get('edits', {}).get(idx, st['transcript']['words'])
                 cfg = replace(cfg, preview_seconds=12, target_w=640 if cfg.target_w > cfg.target_h else 360,
                               target_h=360 if cfg.target_w > cfg.target_h else 640)
                 key = library_paths.fingerprint(st['media'], preview_words, c, cfg)
@@ -693,17 +677,6 @@ def automatic_selected(job_id: str, data: dict = Body(...)):
     return {'ok': True}
 
 
-@app.post('/api/refresh-transcript/{job_id}')
-def refresh_transcript(job_id: str):
-    st,job=state(job_id)
-    if job['status'] in ACTIVE:
-        raise HTTPException(409,'Tunggu proses selesai.')
-    if not st.get('transcript'):
-        raise HTTPException(400,'Transkrip belum tersedia.')
-    enqueue(job_id,'correcting')
-    return {'ok':True}
-
-
 @app.post('/api/review-boundaries/{job_id}')
 def review_boundaries(job_id: str, data: dict = Body(...)):
     st, _ = state(job_id)
@@ -929,5 +902,5 @@ def clip(name: str):
 
 
 if __name__ == '__main__':
-    print('Clipper Studio Local 3.3 -> http://localhost:8765')
+    print('Clipper Studio Local 3.2 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

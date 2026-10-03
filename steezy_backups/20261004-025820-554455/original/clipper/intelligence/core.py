@@ -8,15 +8,13 @@ import json
 import re
 from ..typography import token, STOP
 
-VERSION = '3.3'
+VERSION = '3.2'
 
 
-def schema(segment_ids=None):
+def schema():
     evidence = {'type': 'object', 'properties': {
         'segment_id': {'type': 'integer'}, 'quote': {'type': 'string'}},
         'required': ['segment_id', 'quote'], 'additionalProperties': False}
-    if segment_ids is not None:
-        evidence['properties']['segment_id']['enum'] = list(segment_ids)
     properties = {
         'verdict': {'type': 'string', 'enum': ['complete', 'needs_context', 'unfinished']},
         'summary': {'type': 'string'},
@@ -28,8 +26,6 @@ def schema(segment_ids=None):
         'broll': {'type': 'string', 'enum': ['preserve_speaker', 'contextual']},
         'broll_reason': {'type': 'string'},
     }
-    if segment_ids is not None:
-        properties['hook_segment']['enum'] = [-1, *segment_ids]
     return {'type': 'object', 'properties': properties, 'required': list(properties),
             'additionalProperties': False}
 
@@ -82,7 +78,7 @@ def _ground(row, by_id, words, minimum=3):
 def assess(raw, clip, block, words, cfg):
     """Fail closed for automation; keep invalid candidates visible for manual review."""
     result = {'version': VERSION, 'status': 'needs_review', 'evidence': {}, 'emphasis': [],
-              'hook': None, 'issues': [], 'broll': 'undecided',
+              'hook': None, 'issues': [], 'broll': 'preserve_speaker',
               'broll_reason': 'Belum ada keputusan editorial yang terverifikasi.',
               'signature': signature(clip, words, cfg.audience)}
     if not isinstance(raw, dict):
