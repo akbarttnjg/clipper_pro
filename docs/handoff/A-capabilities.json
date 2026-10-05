@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "producer_version": "A-01-22.1",
+  "baseline_sha": "b4772099c5591e8a83152a767ecb1004972b266b",
+  "base_sha": "f67b03280774089f8f95ae8d94018377c4897b93",
+  "branch": "feature/upgrade01-22",
+  "shared_contract_tests_passed": true,
+  "production_integration_verified": false,
+  "upgrades": [
+    {
+      "upgrade": "01",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Alias topik/konteks, istilah keuangan, alasan dan asal koreksi",
+      "verification": "Istilah XAUUSD, bearish dan timeframe; percakapan umum tidak ikut diganti",
+      "remaining_owner": "B",
+      "integration_action": "Daftarkan konfigurasi dan memori proyek"
+    },
+    {
+      "upgrade": "02",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Pemeriksaan ulang audio berbasis frasa, alignment konservatif, gabung lineage; angka/negasi/manual dilindungi",
+      "verification": "Mock hasil ASR, confidence, waktu dan penggabungan frasa",
+      "remaining_owner": "B",
+      "integration_action": "Fingerprint ASR harus menyertakan budget dan alias revision; akurasi Whisper nyata belum diukur"
+    },
+    {
+      "upgrade": "03",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "OCR CPU berbatas sampel; saran waktu/box/teks/keyakinan, tanpa mengganti ucapan otomatis",
+      "verification": "RapidOCR nyata pada fixture dan satu frame hasil pengguna; saran tidak memodifikasi transkrip",
+      "remaining_owner": "B",
+      "integration_action": "Scan media kanonis, lampirkan bukti ke transkrip"
+    },
+    {
+      "upgrade": "04",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Heard words tetap utuh; teks tampilan membersihkan spasi/tanda baca",
+      "verification": "Tes angka `1.250,50`, negasi, sumber asli dan lineage",
+      "remaining_owner": "B",
+      "integration_action": "Simpan heard/display/override terpisah"
+    },
+    {
+      "upgrade": "05",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Alias dapat dibuat, diubah, diganti ID, dinonaktifkan dan dihapus; helper perubahan murni",
+      "verification": "Tes scope topik, rename, disable, angka dan negasi",
+      "remaining_owner": "B",
+      "integration_action": "Jalankan `propose_change` di transaksi revisi B"
+    },
+    {
+      "upgrade": "06",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Komponen antrean tinjauan: alasan, saran, konteks audio, koreksi dan draf",
+      "verification": "Browser nyata dengan layanan simulasi: konflik, refresh, respons klip terlambat",
+      "remaining_owner": "B",
+      "integration_action": "Sambungkan pemutar audio dan mutation service"
+    },
+    {
+      "upgrade": "07",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Pemenggalan frasa/baris memperhitungkan istilah majemuk, negasi dan laju baca",
+      "verification": "Tes compound dan kata negatif, render nyata fixture",
+      "remaining_owner": "B",
+      "integration_action": "Berikan kata render dari timeline B"
+    },
+    {
+      "upgrade": "08",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Kalibrasi cap-height tujuh font; ukuran aksen dan kata biasa lebih konsisten",
+      "verification": "Tujuh font + render 9:16 dan 16:9",
+      "remaining_owner": "B",
+      "integration_action": "Hash isi font menjadi dependensi caption"
+    },
+    {
+      "upgrade": "09",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Meaning emphasis valid dipertahankan; penekanan frasa menyertakan negasi",
+      "verification": "Tes keyword majemuk, fallback dan suite intelligence lama",
+      "remaining_owner": "B",
+      "integration_action": "Batalkan hint yang tidak cocok dengan revisi transkrip"
+    },
+    {
+      "upgrade": "10",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Durasi diam lebih panjang, gerak masuk/keluar terikat durasi; QC seluruh envelope animasi",
+      "verification": "Lima gaya × dua rasio; batas gambar, kata/frasa hilang, alignment",
+      "remaining_owner": "B",
+      "integration_action": "Delegasikan QC ke `caption_checks` dan tampilkan peringatan waktu baca"
+    },
+    {
+      "upgrade": "11",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Komposisi materi/pembicara menyesuaikan rasio/aspek materi",
+      "verification": "FFmpeg nyata dua rasio dengan geometri kanonis fixture",
+      "remaining_owner": "B",
+      "integration_action": "MediaContext dan normalisasi rotasi B38"
+    },
+    {
+      "upgrade": "12",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Kotak OCR/wajah/materi dilindungi; posisi panel tetap jika masih aman",
+      "verification": "Koordinat, slide lama, collision dan render fixture",
+      "remaining_owner": "B",
+      "integration_action": "Gunakan hasil scene untuk anchor caption varian"
+    },
+    {
+      "upgrade": "13",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Pencarian pendek/panjang, jembatan batas dan putaran tujuan tambahan",
+      "verification": "Tes jendela akhir sumber dan panggilan pencarian baru; model disimulasikan",
+      "remaining_owner": "B",
+      "integration_action": "Teruskan daftar kandidat lama saat “cari lagi”"
+    },
+    {
+      "upgrade": "14",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Alasan format/waktu/evidence/editorial dicatat dan tersedia di panel",
+      "verification": "Tes seleksi dan laporan penolakan",
+      "remaining_owner": "B",
+      "integration_action": "Simpan laporan sesuai analysis revision, tautkan tinjau batas"
+    },
+    {
+      "upgrade": "15",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Bukti konteks sebelum/sesudah, rekam batas sebelum/sesudah perbaikan",
+      "verification": "Suite review/grounding/boundary lama + baru",
+      "remaining_owner": "B",
+      "integration_action": "Edit batas tetap memakai timeline/revision service B"
+    },
+    {
+      "upgrade": "16",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Petunjuk pergantian slide, perubahan gambar, energi suara dan awal ucapan",
+      "verification": "OCR/audio fixture nyata, pemilihan jendela cue",
+      "remaining_owner": "B",
+      "integration_action": "Jalankan tahap source evidence sebelum discovery"
+    },
+    {
+      "upgrade": "17",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Pemeriksaan semantik lokal untuk parafrasa; beda jenis cerita/angka/negasi tidak dibuang sembarang",
+      "verification": "Respons Ollama disimulasikan; pengecualian diuji",
+      "remaining_owner": "B",
+      "integration_action": "Benchmark keragaman pada sumber mentah dengan model lokal"
+    },
+    {
+      "upgrade": "18",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Coverage, putaran, revision, asal legacy/manual/analysis dan kandidat siap dibedakan",
+      "verification": "Tes “cari lagi”, histori dan status legacy stale",
+      "remaining_owner": "B",
+      "integration_action": "ID konten/kandidat/proyek stabil dari C0"
+    },
+    {
+      "upgrade": "19",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Poster dari frame terbaca, durasi/status/error/retry dalam komponen",
+      "verification": "Decode video nyata dan browser memuat poster/metadata",
+      "remaining_owner": "B",
+      "integration_action": "B menyajikan URL aset aman dan menyinkronkan hasil scheduler"
+    },
+    {
+      "upgrade": "20",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Beberapa kueri konkret/sinonim, ranking metadata, kandidat berikutnya bila visual ditolak; cache pilihan divalidasi",
+      "verification": "Cache rusak diperbaiki; pencarian lokal; kandidat kedua dicoba",
+      "remaining_owner": "B",
+      "integration_action": "Kunci provider tetap di pengaturan B; invalidasi koleksi/intent"
+    },
+    {
+      "upgrade": "21",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Sampel frame aktual, kualitas, biaya proses dan vision lokal opsional; status metadata terpisah",
+      "verification": "Frame nyata, payload tiga gambar dengan model mock, cache dan mode required",
+      "remaining_owner": "B",
+      "integration_action": "Model multimodal nyata belum diunduh/diuji; gunakan antrean GPU berurutan"
+    },
+    {
+      "upgrade": "22",
+      "implemented": true,
+      "targeted_tests_passed": true,
+      "integration": "C0_compatible_pending_production_host",
+      "implementation": "Materi OCR sumber, koleksi lokal bertag, asal/izin, diagram DBD/RBR dengan SVG editable",
+      "verification": "Sumber/diagram/MP4/poster nyata; metadata lokal",
+      "remaining_owner": "B",
+      "integration_action": "B menjadwalkan aset dan menyediakan tautan unduh/pemutar"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ from clipper.looks import LOOKS
 from clipper.ffmpeg_util import nvenc_available, nvenc_diagnostic, render_diagnostic
 cfg = Config()
 print('Python:', sys.version.split()[0])
-for name in ('faster_whisper', 'cv2', 'PIL', 'requests', 'fastapi', 'uvicorn', 'multipart', 'pycapcut'):
+for name in ('faster_whisper', 'cv2', 'PIL', 'requests', 'fastapi', 'uvicorn', 'multipart', 'pycapcut', 'rapidocr_onnxruntime'):
     print(name + ':', 'OK' if importlib.util.find_spec(name) else 'BELUM TERPASANG')
 for name in ('ffmpeg', 'ffprobe'):
     print(name + ':', 'OK' if shutil.which(name) else 'TIDAK DITEMUKAN')
@@ -37,6 +37,6 @@ except Exception:
     print('Ollama belum berjalan. Buka aplikasi Ollama; mode video utuh tidak membutuhkan Ollama.')
 print('Font berpasangan:', 'OK' if all((Path(cfg.fonts_dir) / f['file']).is_file() for f in FONTS.values()) else 'BELUM LENGKAP')
 print('Galeri tipografi:', 'OK' if all((Path(__file__).parent / 'static/templates' / (t['id']+'.mp4')).is_file() for t in LOOKS) else 'BELUM LENGKAP')
-print('Studio 3.3: jelajah luas -> koreksi istilah -> posisi aman -> render -> proyek editable')
+print('Studio 4.0: sumber -> pilih cerita -> edit per rasio -> hasil; antrean persisten dan cache per proyek')
 print('Model wajah lokal:', 'OK' if (Path(__file__).parent / 'clipper/models/face_detection_yunet.onnx').is_file() else 'Belum tersedia; detektor cadangan dipakai')
 print('Native CapCut/Resolve: periksa satu proyek percobaan pada editor Anda.')

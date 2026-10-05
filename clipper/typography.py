@@ -38,6 +38,22 @@ def valid_words(words):
     return sorted(out, key=lambda w: w["start"])
 
 
+@lru_cache(maxsize=64)
+def optical_factor(fonts_dir, family):
+    """Equal visible capital height across families, not equal nominal point size."""
+    reference = font(fonts_dir,100,'dm_sans').getbbox('H')[3] - font(fonts_dir,100,'dm_sans').getbbox('H')[1]
+    box = font(fonts_dir,100,family).getbbox('H')
+    return max(.78,min(1.32,reference/max(1,box[3]-box[1])))
+
+
+def protected_pair(left, right):
+    from .transcript_correction import PROTECTED
+    a,b = token(left['word'].split()[-1]),token(right['word'].split()[0])
+    return (a in PROTECTED or (a,b) in {('stop','loss'),('take','profit'),('time','frame'),
+        ('risk','reward'),('drop','base'),('base','drop'),('rally','base'),('base','rally'),
+        ('supply','demand'),('support','resistance')})
+
+
 def groups(words, cfg):
     # Optimize adjacent phrase boundaries together to avoid orphan words.
     runs, current = [], []
@@ -60,6 +76,11 @@ def groups(words, cfg):
                 if count>1 and run[b-1]['end']-run[a]['start'] > max(3.4,cfg.editorial_phrase_s+.6):
                     break
                 penalty = (count-4.5)**2*.3 + (9 if count==1 else 0)
+                characters = sum(len(w['word']) for w in run[a:b])+count-1
+                duration = max(.05,run[b-1]['end']-run[a]['start'])
+                penalty += max(0,characters/duration-22)*.12
+                if b<n and protected_pair(run[b-1],run[b]):
+                    penalty += 80
                 if b<n and token(run[b-1]['word']) in weak:
                     penalty += 8
                 # Source-grounded phrases from the editorial review must stay
@@ -98,6 +119,7 @@ def balanced_rows(phrase, measures, space, width, max_rows, emphasis):
             for row in rows:
                 if len(row)==1 and n>2 and row[0] not in emphasis: score+=1.8
                 if row[-1]<n-1 and token(phrase[row[-1]]['word']) in weak: score+=2.2
+                if row[-1]<n-1 and protected_pair(phrase[row[-1]],phrase[row[-1]+1]): score+=20
             if score<best_score: best,best_score=rows,score
     return best
 
@@ -107,6 +129,15 @@ def emphasis_indices(words, keywords=()):
     if semantic:
         # Keep a short meaningful phrase, including its negation, emphasized.
         return semantic
+    # Prefer a complete keyword phrase; retain a preceding negation in fallback.
+    tokens = [token(w['word']) for w in words]
+    for phrase in sorted(keywords,key=lambda x:len(str(x).split()),reverse=True):
+        target = [token(s) for s in str(phrase).split()]
+        if len(target)<2:
+            continue
+        for a in range(len(words)-len(target)+1):
+            if tokens[a:a+len(target)] == target:
+                return set(range(a,a+len(target)))
     keys = {token(k) for phrase in keywords for k in str(phrase).split()}
     scores = []
     for i, w in enumerate(words):
@@ -115,7 +146,13 @@ def emphasis_indices(words, keywords=()):
             continue
         score = 10 * (t in keys) + 5 * bool(re.search(r"\d", t)) + min(len(t), 12) / 12
         scores.append((score, i))
-    return {i for _, i in sorted(scores, reverse=True)[:1]}
+    selected = {i for _, i in sorted(scores, reverse=True)[:1]}
+    if selected:
+        from .transcript_correction import PROTECTED
+        i = next(iter(selected))
+        if i>0 and token(words[i-1]['word']) in PROTECTED:
+            selected.add(i-1)
+    return selected
 
 
 def _wrap(words, sizes, width, cfg, families=None):
@@ -204,7 +241,7 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
         families = [cfg.font_accent if i in emph and cfg.accent_font else cfg.font_main for i in range(len(phrase))]
         # Measure at the largest animation scale, so the pop stays inside its panel.
         for fs in range(max(18, base), 5, -1):
-            sizes = [round(fs * (1.20 if i in emph and cfg.caption_style == "editorial" else 1)) for i in range(len(phrase))]
+            sizes = [round(fs * optical_factor(cfg.fonts_dir,families[i]) * (1.18 if i in emph and cfg.caption_style == "editorial" else 1)) for i in range(len(phrase))]
             rows, space = _wrap(phrase, sizes, width / 1.035, cfg, families)
             total_h = sum(max(v[1] for v in row) * 1.42 for row in rows)
             if len(rows) <= 2 and total_h <= height and all(v[2] <= width / 1.035 for row in rows for v in row):
@@ -227,6 +264,7 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
             cx = row_left(x, width, row_w, alignment(cfg, pos))
             for w, size, measured in row:
                 placed.append({"text": w["word"], "word_id": w.get("word_id"),
+                               "word_ids":w.get('word_ids',[]),"token_ids":w.get('token_ids',[]),
                                "start": w["start"], "end": w["end"],
                                "x": round(cx + measured / 2, 2), "y": round(baseline - size * .36, 2),
                                "baseline": round(baseline, 2), **font_info(families[flat]),
@@ -252,7 +290,8 @@ def display_units(words):
     units = []
     suffixes = {'juta','miliar','milyar','triliun','ribu','persen','%','rupiah','tahun','bulan','kali'}
     for original in valid_words(words):
-        w = {**original, 'word_ids':[original.get('word_id')]}
+        w = {**original, 'word_ids':original.get('source_word_ids',[original.get('word_id')]),
+             'token_ids':[original.get('token_id',original.get('word_id'))]}
         if units:
             prior = units[-1]; a, b = prior['word'], w['word']
             close = w['start'] - prior['end'] <= .65 and w.get('part') == prior.get('part')
@@ -264,6 +303,8 @@ def display_units(words):
                 prior['word'] = (a.rstrip('.') if currency else a.rstrip('.,') if decimal else a) + ('' if currency or decimal or percent else ' ') + b
                 prior['end'] = max(prior['end'], w['end'])
                 prior['word_ids'] += w['word_ids']
+                prior['token_ids'] += w['token_ids']
+                prior['meaning_emphasis'] = prior.get('meaning_emphasis',False) or w.get('meaning_emphasis',False)
                 continue
         units.append(w)
     return units
@@ -295,10 +336,9 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
         focus = next(iter(emphasis), -1)
         base = round(min(W,H)*(.073 if side else .070)*cfg.caption_scale)
         for fs in range(max(18,base), 7, -1):
-            accent_size = 1.52 if cfg.caption_style == 'magazine' else 1.45 if cfg.caption_style == 'impact' else 1.25
-            sizes = [round(fs*(accent_size if i in emphasis else
-                     .65 if cfg.caption_style == 'magazine' and token(phrase[i]['word']) in STOP else .83)) for i in range(len(phrase))]
+            accent_size = 1.20 if cfg.caption_style in ('magazine','impact') else 1.15
             families = [cfg.font_accent if i in emphasis and cfg.accent_font else cfg.font_main for i in range(len(phrase))]
+            sizes = [round(fs*optical_factor(cfg.fonts_dir,families[i])*(accent_size if i in emphasis else 1.)) for i in range(len(phrase))]
             measures = [font(cfg.fonts_dir,sizes[i],families[i]).getlength(w['word']) for i,w in enumerate(phrase)]
             space = fs*.29
             rows = balanced_rows(phrase, measures, space, width*.9, 2 if height<H*.2 else 3, emphasis)
@@ -322,7 +362,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
             reveal=max(0,min(phrase[i]['start'] for i in row)-start-.055)
             for i in row:
                 w=phrase[i]; size=sizes[i]
-                word_reveal = max(reveal,min(w['start']-start-.06,end-start-.20)) if i in emphasis else reveal
+                word_reveal = min(max(0,end-start-.65),max(reveal,w['start']-start-.06) if i in emphasis else reveal)
                 kind,samples=frames(cfg.caption_style,end-start,max(0,word_reveal),idx,i in emphasis,cfg,position=pos)
                 wx, wy = cx+measures[i]/2, cy+rh/2
                 # Keep the entire animation inside the chosen empty-space panel.
@@ -332,6 +372,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
                     sample['dx'] = round(max(x+half_w-wx, min(sample['dx'], x+width-half_w-wx)), 3)
                     sample['dy'] = round(max(y+half_h-wy, min(sample['dy'], y+height-half_h-wy)), 3)
                 placed.append({'text':w['word'],'word_id':w.get('word_id'),'word_ids':w.get('word_ids',[]),
+                    'token_ids':w.get('token_ids',[]),
                     'start':w['start'],'end':w['end'],'x':round(cx+measures[i]/2,3),'y':round(cy+rh/2,3),
                     'baseline':round(cy+rh*.8,3), **font_info(families[i]), 'size':size,
                     'ass_size':sum(font(cfg.fonts_dir,size,families[i]).getmetrics()),'width':measures[i],

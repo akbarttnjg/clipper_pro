@@ -124,6 +124,8 @@ def speaker_panel(area, material, face, aspect):
 
 
 def analyze(media, plan, cfg, info):
+    from . import evidence
+    source_evidence = evidence.load(cfg)
     automatic_placement = cfg.caption_position == 'auto' and cfg.safe_placement
     cap = cv2.VideoCapture(str(media))
     W, H = info['width'], info['height']
@@ -234,8 +236,14 @@ def analyze(media, plan, cfg, info):
                 caption_panel = None
                 image_height = None
                 material_image_height = None
+                material_share = cfg.material_share
                 if mode == 'stream' and cfg.target_h > cfg.target_w:
-                    top = round(cfg.target_h*cfg.material_share)//2*2
+                    if cfg.layout == 'auto' and automatic_placement and material:
+                        natural_h = min(cfg.target_h*.52,rect[3]*cfg.target_w/rect[2])
+                        material_share = max(.40,min(.72,natural_h/cfg.target_h+.19))
+                        if not explicit_face:
+                            face_rect = speaker_panel(area,material,face,cfg.target_w/(cfg.target_h*(1-material_share)))
+                    top = round(cfg.target_h*material_share)//2*2
                     shown_h = min(top, rect[3]*cfg.target_w/rect[2])
                     gap = top-shown_h
                     if automatic_placement and gap <= cfg.target_h*.17:
@@ -268,17 +276,21 @@ def analyze(media, plan, cfg, info):
                     'start': start, 'end': end, 'start_frame': span['start_frame'] + left,
                     'duration_frames': right - left, 'rect': rect, 'mode': mode, 'position': pos,
                     'face': face, 'zoom_at': zoom, 'zoom_amount': cfg.zoom_amount,
-                    'face_rect': face_rect, 'material_share': cfg.material_share, 'caption_panel': caption_panel,
+                    'face_rect': face_rect, 'material_share': material_share, 'caption_panel': caption_panel,
                     'image_height': image_height, 'material_image_height': material_image_height, 'has_material': material is not None})
                 if mode == 'fit' and cfg.target_h > cfg.target_w:
                     plan['warnings'].append('Materi/tamu dipertahankan utuh. Periksa keterbacaan dalam format vertikal atau pilih 16:9.')
                 protected = [{'kind': 'face', 'box': f} for r in group for f in r['faces']]
                 protected += [{'kind': 'text', 'box': box} for r in group for box in r.get('texts', [])]
+                protected += [{'kind':'ocr','box':box} for box in evidence.protected_boxes(source_evidence,
+                    a+left/plan['fps'],a+right/plan['fps'],W,H)]
                 if material:
                     protected.append({'kind': 'material', 'box': material})
                 if explicit_face:
                     protected.append({'kind': 'face', 'box': explicit_face})
                 shots[-1]['protected_source'] = protected
+                shots[-1]['composition_reason'] = ('Materi dan pembicara dipisah; ruang teks mengikuti rasio materi' if mode=='stream'
+                    else 'Materi utuh, tanpa memangkas diagram' if material else 'Framing pembicara')
     finally:
         cap.release()
     plan['shots'] = shots

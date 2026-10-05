@@ -62,7 +62,8 @@ def install(target, package, dry_run=False, install_deps=True):
         dst = contained(target, entry['path'])
         if 'base_text_sha256' in entry and dst.is_file() and digest(dst) != entry['sha256']:
             normalized = hashlib.sha256(dst.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
-            if normalized not in (entry.get('base_text_sha256'), entry.get('text_sha256')):
+            allowed={entry.get('base_text_sha256'),entry.get('text_sha256'),*entry.get('allowed_base_text_sha256',[])}
+            if normalized not in allowed:
                 conflicts.append(entry['path'])
     if conflicts:
         raise ValueError('Kode lokal berbeda dari dasar paket. Simpan dan bandingkan perubahan ini sebelum memasang: ' + ', '.join(conflicts))

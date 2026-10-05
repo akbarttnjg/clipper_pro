@@ -1,5 +1,7 @@
 # clipper
 
+**Studio 4 — versi uji gabungan A 01–22 + B 23–43.** Mulai dari [panduan pemasangan dan pemakaian](PANDUAN_STUDIO_4.md). Alur baru: Sumber → Pilih cerita → Edit → Hasil. [Status integrasi dan gate yang masih terbuka](docs/handoff/B.md): impor native CapCut/DaVinci dan benchmark mutu pada video acuan belum lulus verifikasi akhir.
+
 **Drop in a long video. Get back scored, captioned, vertical shorts — entirely on your own machine.**
 
 No upload, no cloud API, no subscription. faster-whisper listens, a local Qwen3 model picks

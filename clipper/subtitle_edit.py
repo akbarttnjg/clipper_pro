@@ -13,7 +13,11 @@ def clean(words, mode='safe', punctuation='original', cfg=None):
         changes.extend(corrections)
     for index, original in enumerate(words):
         word = dict(original)
-        text = str(word['word']).strip()
+        text = re.sub(r'\s+', ' ', str(word['word'])).strip()
+        if text != word['word']:
+            changes.append({'word_id':word.get('word_id'),'start':word['start'],
+                            'before':word['word'],'after':text,'reason':'display_spacing'})
+        word['word'] = text
         norm = re.sub(r'[^\w]', '', text.lower())
         previous = result[-1] if result else None
         contiguous = previous and word.get('part') == previous.get('part') and word['start'] - previous['end'] <= .35

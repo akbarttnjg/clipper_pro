@@ -391,14 +391,17 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
             raise ValueError('Sumber dipindahkan. Pulihkan path sumber sebelum ekspor.')
         from . import render, qc
         original = copy.deepcopy(p)
+        exchange=Path(result.get('exchange_path',Path(result['plan_path']).with_name('exchange.json')))
+        if exchange.is_file():shutil.copyfile(exchange,root/f'exchange-{i+1:02}.json')
         clean_cfg = replace(cfg, target_w=p['width'], target_h=p['height'], output_fps=p['fps'],
                             **p.get('render_config', {}))
         clean = Path(result['plan_path']).parent / 'video-clean.mp4'
         cache = clean.with_suffix('.cache.json')
         fingerprint = {k:p.get(k) for k in ('shots','source','width','height','fps','duration','render_config')}
         fingerprint['version'] = '2.4-source-only'
-        fingerprint['media_mtime'] = Path(p['source']['path']).stat().st_mtime_ns
-        fingerprint['mix_mtime'] = Path(p['audio']['mix']).stat().st_mtime_ns
+        from .dependency_cache import content_id
+        fingerprint['media_content_id'] = content_id(p['source']['path'],fresh=True)
+        fingerprint['mix_content_id'] = content_id(p['audio']['mix'],fresh=True)
         key = hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
         if not clean.exists() or read_json(cache,{}).get('key') != key:
             progress(round(5+30*i/max(1,len(results))), f'Menyiapkan video tanpa teks {i+1}/{len(results)}')
@@ -502,6 +505,9 @@ per clip, yang disimpan untuk dipakai kembali selama revisi tidak berubah.
     if capcut_error:
         guide += '\nEKSPOR CAPCUT GAGAL: ' + capcut_error + '\nInstal requirements-pro.txt lalu ekspor ulang.\n'
     (root / 'BACA_DULU.txt').write_text(guide, encoding='utf-8')
+    from .export_verify import validate_bundle
+    verification = validate_bundle(root, results)
+    write_json(root / 'verification.json', verification)
     zip_path = shutil.make_archive(str(root), 'zip', root)
     return {'zip': zip_path, 'folder': str(root), 'timelines': len(items), 'capcut_error': capcut_error,
             'note': 'Impor native perlu verifikasi di editor. Baca BACA_DULU.txt.'}

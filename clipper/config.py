@@ -138,6 +138,26 @@ class Config:
     material_rect: str = ""
     speaker_rect: str = ""
     material_share: float = .62
+    # Studio 4: analysis registration and production controls.
+    ocr_enabled: bool = True
+    ocr_max_frames: int = 48
+    ocr_interval_s: float = 8.
+    discovery_extra_windows: int = 8
+    visual_cues: bool = True
+    broll_query_limit: int = 3
+    broll_visual_candidates: int = 2
+    vision_model: str = ''
+    vision_policy: str = 'optional'
+    approved_aliases: list | None = None
+    audio_stream_index: int = -1
+    source_content_id: str = ''
+    audio_stream_id: str = ''
+    variant_id: str = ''
+    edit_style: str = 'balanced'
+    audio_target_lufs: float = -16.
+    audio_peak_db: float = -1.5
+    join_fade_ms: float = 5.
+    cache_limit_gb: float = 0.
 
     @property
     def video_codec(self) -> str:
@@ -246,6 +266,33 @@ def validate_overrides(form: dict) -> dict:
                 except (ValueError, TypeError):
                     raise ValueError('Area gambar harus x,y,lebar,tinggi dalam persen, seluruhnya di dalam frame.')
             out[key] = value
+    # Analysis fields are registered here so the application and A use one config.
+    from .analysis_options import validate_settings,SETTINGS
+    typed={}
+    for key,spec in SETTINGS.items():
+        if key not in form:continue
+        value=form[key]
+        if isinstance(value,str):
+            if spec['type']=='boolean':value=value.lower() in ('1','true')
+            elif spec['type']=='integer':value=int(value)
+            elif spec['type']=='number':value=float(value)
+        typed[key]=value
+    out.update(validate_settings(typed))
+    if 'audio_stream_index' in form:
+        value=int(form['audio_stream_index'])
+        if not -1<=value<=128:raise ValueError('Track audio tidak valid')
+        out['audio_stream_index']=value
+    for key,lo,hi in [('audio_target_lufs',-24,-12),('audio_peak_db',-6,-1),('join_fade_ms',0,15),('cache_limit_gb',0,1000)]:
+        if key in form:
+            value=float(form[key])
+            if not __import__('math').isfinite(value) or not lo<=value<=hi:raise ValueError(key+' di luar batas')
+            out[key]=value
+    for key in ('music_path','sfx_path'):
+        if key in form:
+            value=str(form[key]).strip()
+            if value and (not Path(value).expanduser().is_file() or Path(value).suffix.lower() not in ('.wav','.mp3','.m4a','.aac','.flac','.ogg','.mp4')):raise ValueError('Berkas audio tidak ditemukan atau format tidak didukung')
+            out[key]=str(Path(value).expanduser().resolve()) if value else ''
+    if form.get('edit_style') in ('balanced','lesson','energetic','podcast'):out['edit_style']=form['edit_style']
     return out
 
 

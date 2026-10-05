@@ -928,6 +928,10 @@ def clip(name: str):
     return FileResponse(p, media_type='text/plain; charset=utf-8', filename=p.name)
 
 
+from clipper.api_studio import install as install_studio4
+studio4 = install_studio4(app, ROOT, base_cfg, JOB_STATE, PROCESS_LOCK)
+
+
 if __name__ == '__main__':
-    print('Clipper Studio Local 3.3 -> http://localhost:8765')
+    print('Clipper Studio Local 4.0 -> http://localhost:8765')
     uvicorn.run(app, host='127.0.0.1', port=8765, log_level='warning')

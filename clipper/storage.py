@@ -2,15 +2,20 @@
 import hashlib
 import json
 import os
+import uuid
 from pathlib import Path
 
 
 def write_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + '.tmp')
-    temp.write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding='utf-8')
-    os.replace(temp, path)
+    temp = path.with_name(path.name + '.' + uuid.uuid4().hex + '.tmp')
+    try:
+        with temp.open('w',encoding='utf-8') as stream:
+            stream.write(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False))
+            stream.flush();os.fsync(stream.fileno())
+        os.replace(temp, path)
+    finally:temp.unlink(missing_ok=True)
 
 
 def read_json(path, default=None):
@@ -24,15 +29,8 @@ def source_key(path, cfg):
     p = Path(path)
     if not p.exists():
         return None
-    stat = p.stat()
-    # Header/tail + size/mtime avoid hashing a multi-GB source before every review.
-    h = hashlib.sha256()
-    with p.open('rb') as stream:
-        h.update(stream.read(1024 * 1024))
-        if stat.st_size > 1024 * 1024:
-            stream.seek(max(0, stat.st_size - 1024 * 1024))
-            h.update(stream.read())
-    h.update(json.dumps([stat.st_size, stat.st_mtime_ns, cfg.whisper_model,
-                         cfg.language, cfg.whisper_compute, cfg.glossary, cfg.audience,
-                         cfg.asr_second_pass, cfg.transcript_correction, 'asr-v3.2']).encode())
-    return h.hexdigest()
+    from .dependency_cache import content_id
+    from .analysis_adapter import asr_fingerprint
+    actual=content_id(p,fresh=True)
+    return asr_fingerprint(getattr(cfg,'source_content_id','') or actual,
+        getattr(cfg,'audio_stream_id','') or 'audio:0',cfg,alias_revision=None)+':'+actual

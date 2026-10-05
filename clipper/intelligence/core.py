@@ -161,7 +161,9 @@ def ready(clip, words, cfg):
 def annotate_words(words, clip, cfg):
     """Add source-local phrase hints without rewriting words, digits or timestamps."""
     hints = clip.get('intelligence', {})
-    if hints.get('signature') != signature(clip, words, cfg.audience):
+    # Clear stale hints before any fallback, including words from a saved edit.
+    words=[{k:v for k,v in w.items() if k not in ('meaning_group','meaning_emphasis')} for w in words]
+    if hints.get('signature') != signature(clip, words, cfg.audience) or hints.get('status')!='ready':
         return words
     phrases = hints.get('emphasis', [])
     result = []

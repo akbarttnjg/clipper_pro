@@ -210,7 +210,20 @@ def download(item):
     return {**{k:v for k,v in item.items() if k!='url'},'path':str(dest.resolve())}
 
 
-def choose(candidates, query, context, cfg):
+def valid_choice(result,rows):
+    if not isinstance(result,dict) or type(result.get('index')) is not int or not isinstance(result.get('reason'),str) or not result['reason'].strip():
+        return False
+    i=result['index']
+    if i==-1:
+        return isinstance(result.get('metadata_quote'),str)
+    if not 0<=i<len(rows) or not isinstance(result.get('metadata_quote'),str):
+        return False
+    quote=' '.join(result['metadata_quote'].lower().split())
+    metadata=' '.join(' '.join(rows[i][k].lower().split()) for k in ('title','tags','description'))
+    return len(quote)>=4 and quote in metadata
+
+
+def choose(candidates, query, context, cfg, _attempt=0):
     """Compare semantic metadata against the sentence, with an explicit no-match.
 
     This is not visual recognition. Providers with vague/missing descriptions may
@@ -228,6 +241,9 @@ def choose(candidates, query, context, cfg):
     path = CACHE / 'relevance' / (key + '.json')
     try:
         result = read_json(path)
+        if result is not None and not valid_choice(result,rows):
+            path.unlink(missing_ok=True)
+            result=None
         if result is None:
             response = requests.post(editorial.local_url(cfg) + '/api/generate', json={
                 'model': cfg.model, 'stream': False, 'think': False, 'keep_alive': 0,
@@ -249,8 +265,8 @@ def choose(candidates, query, context, cfg):
             if payload.get('done_reason') == 'length':
                 raise ValueError('Penilaian stok terpotong.')
             result = json.loads(payload['response'])
-            if not isinstance(result, dict):
-                raise ValueError('Penilaian stok tidak valid.')
+            if not valid_choice(result,rows):
+                raise ValueError('Pilihan stok atau kutipan metadata tidak valid.')
             write_json(path, result)
         i = result.get('index')
         quote = ' '.join(str(result.get('metadata_quote', '')).lower().split())
@@ -261,37 +277,115 @@ def choose(candidates, query, context, cfg):
             return None, ['Stok dilewati karena alasan pilihan tidak didukung metadata.']
         return {**candidates[i], 'relevance': {'basis': 'metadata', 'reason': str(result['reason'])[:350],
                 'evidence': quote, 'visual_verified': False}}, []
-    except (requests.RequestException, ValueError, KeyError, TypeError, OSError):
+    except (ValueError,KeyError,TypeError):
+        path.unlink(missing_ok=True)
+        if _attempt==0:
+            return choose(candidates,query,context,cfg,_attempt=1)
+        return None, ['Model memberi pilihan stok tidak valid setelah perbaikan; coba Siapkan ilustrasi lagi.']
+    except (requests.RequestException, OSError):
         return None, ['Penilaian relevansi stok belum tersedia; pembicara asli dipertahankan.']
     finally:
         editorial.release(cfg)
 
 
+def query_variants(query,local_query='',limit=3):
+    translations={'papan tulis':'whiteboard teaching','mengetik':'typing keyboard','keterampilan':'skilled worker practice',
+        'keahlian':'professional work','belajar':'studying learning','bisnis':'business office',
+        'grafik':'chart analysis','emas':'gold trading','pasar':'market','wawancara':'interview conversation',
+        'hutan':'forest','sungai':'river','uang':'money budgeting','laptop':'laptop computer'}
+    variants=[' '.join(str(query).split())[:95]]
+    translated=str(local_query).lower()
+    for source,target in translations.items():
+        translated=translated.replace(source,target)
+    if translated.strip():variants.append(' '.join(translated.split())[:95])
+    synonyms={'typing':'working','studying':'learning','chart':'financial chart','worker':'professional','teaching':'explaining'}
+    expanded=variants[0]
+    for source,target in synonyms.items():
+        if re.search(r'\b'+source+r'\b',expanded,re.I):
+            expanded=re.sub(r'\b'+source+r'\b',target,expanded,flags=re.I);break
+    variants.append(expanded)
+    return list(dict.fromkeys(v for v in variants if 1<=len(v.split())<=10))[:max(1,limit)]
+
+
+def save_local_metadata(asset_id,data):
+    item=next((a for a in local_assets() if a['id']==asset_id),None)
+    if item is None:raise ValueError('Aset koleksi tidak ditemukan')
+    p=Path(item['path']).resolve();root=Path(settings()['local_dir']).resolve()
+    if not p.is_relative_to(root):raise ValueError('Aset harus berada di folder koleksi')
+    path=p.with_suffix('.json');saved=read_json(path,{}) or {}
+    for key in ('title','tags','author','source_url','license_url','attribution'):
+        if key in data:
+            value=str(data[key]).strip()
+            if len(value)>1200:raise ValueError('Metadata maksimal 1.200 karakter per kolom')
+            if key in ('source_url','license_url') and value and not value.startswith(('https://','http://')):
+                raise ValueError('Alamat sumber/lisensi harus http atau https')
+            saved[key]=value
+    write_json(path,saved)
+    return saved
+
+
 def find(query,local_query,provider='auto',online=True,portrait=False,excluded=(),cfg=None,context=''):
+    from .analysis_options import configured
+    cfg=configured(cfg) if cfg is not None else None
     wanted=terms(query+' '+local_query)
     matches=[a for a in local_assets() if a['id'] not in excluded and terms(a['title']+' '+a['tags']) & wanted]
     matches.sort(key=lambda a:len(terms(a['title']+' '+a['tags'])&wanted),reverse=True)
     notes=[]
+    def inspect_asset(item):
+        asset=download(item)
+        if cfg is not None:
+            from .asset_review import verify
+            report=verify(asset,query,context,cfg)
+            asset['visual_review']=report
+            asset['relevance']={**asset.get('relevance',{}),'visual_verified':report['visual_verified']}
+            if not report['accept']:
+                notes.append(report['reason']);return None
+        return asset
     if matches:
         if cfg is None:
             return matches[0],[]
-        item, why = choose(matches, query, context, cfg)
-        notes.extend(why)
-        if item:
-            return item, notes
+        remaining=matches[:6]
+        for _ in range(min(len(remaining),cfg.broll_visual_candidates)):
+            item, why = choose(remaining, query, context, cfg)
+            notes.extend(why)
+            if not item:break
+            try:
+                asset=inspect_asset(item)
+                if asset:return asset,notes
+            except (ValueError,OSError,subprocess.SubprocessError) as exc:
+                notes.append(str(exc)[:180])
+            remaining=[a for a in remaining if a['id']!=item['id']]
     if not online:
         return None,notes or ['Tidak ada aset lokal dengan tag yang cocok.']
+    variants=query_variants(query,local_query,cfg.broll_query_limit if cfg else 1)
+    searched=set()
     for name in (PROVIDERS if provider=='auto' else (provider,)):
         try:
-            candidates=[a for a in search(name,query,portrait) if a['id'] not in excluded]
+            candidates=[]
+            for variant in variants:
+                for a in search(name,variant,portrait):
+                    key=a['provider']+':'+a['id']
+                    if a['id'] not in excluded and key not in excluded and key not in searched:
+                        candidates.append({**a,'matched_query':variant});searched.add(key)
+            wanted=terms(query+' '+local_query+' '+context)
+            candidates.sort(key=lambda a:(len(terms(a.get('title','')+' '+str(a.get('tags','')))&wanted),
+                (a.get('height',0)>a.get('width',0))==portrait),reverse=True)
             if cfg is not None:
-                item, why = choose(candidates, query, context, cfg)
-                notes.extend(why)
-                candidates = [item] if item else []
+                remaining=candidates[:6]
+                for _ in range(min(len(remaining),cfg.broll_visual_candidates)):
+                    item,why=choose(remaining,query,context,cfg);notes.extend(why)
+                    if not item:break
+                    try:
+                        asset=inspect_asset(item)
+                        if asset:return asset,notes
+                    except (ValueError,OSError,subprocess.SubprocessError) as exc:notes.append(str(exc))
+                    remaining=[a for a in remaining if a['id']!=item['id']]
+                continue
             for item in candidates[:2]:
                 try:
-                    return download(item),notes
-                except ValueError as exc:
+                    asset=inspect_asset(item)
+                    if asset:return asset,notes
+                except (ValueError,OSError,subprocess.SubprocessError) as exc:
                     notes.append(str(exc))
         except (ValueError,OSError) as exc:
             notes.append(str(exc))

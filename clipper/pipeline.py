@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '3.3'
+RENDER_VERSION = '4.0'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -33,6 +33,10 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
             write_json(work / 'asr-cache.json', {'key': key, 'transcript': transcript})
     if not transcript['words']:
         raise RuntimeError('Tidak ada percakapan yang terdeteksi.')
+    if cfg.source_content_id:
+        from . import evidence
+        report = evidence.scan(media_path, cfg, transcript['duration'], on_progress, input_fingerprint=key)
+        transcript['ocr_suggestions'] = evidence.suggestions(transcript['words'], report)
     transcript = transcript_correction.refine(transcript, cfg)
     write_json(work / 'transcript-corrections.json', transcript['correction_report'])
     asr_seconds = time.monotonic() - started
@@ -61,7 +65,7 @@ def clip_name(clip, i):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
-    name = name + f"-r{clip.get('revision', 0)}-v33"
+    name = name + f"-r{clip.get('revision', 0)}-v40"
     work = Path(cfg.work_dir) / 'renders' / name
     locations = library_paths.destinations(cfg, name)
     video_base, text_base, report_base = locations['video'], locations['text'], locations['report']
@@ -102,7 +106,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         keywords=clip.get('keywords', []),
         anchors=placement.caption_anchors(plan, cfg))
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
-    plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg)
+    plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg, expected_words=display)
     for event in plan.get('broll', []):
         event['image_height'] = min(s.get('image_height') or cfg.target_h for s in plan['shots']
             if s['start'] < event['end'] and s['end'] > event['start'])
@@ -121,6 +125,9 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     write_srt(plan, text_base.with_suffix('.srt'))
     on_progress(25, 'Menyiapkan suara dan musik')
     mix = render.audio_stems(media_path, plan, cfg, work)
+    from . import audio_quality
+    plan['audio_quality'] = audio_quality.inspect(mix, cfg)
+    plan['warnings'].extend(plan['audio_quality'].get('issues', []))
     plan['status'] = 'rendering'
     write_json(plan_path, plan)
     try:
@@ -130,6 +137,9 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         on_progress(96, 'Memeriksa durasi, gambar, dan suara')
         checked = qc.inspect(rendered, cfg, plan['duration'])
         checked['caption_layout'] = plan['caption_checks']
+        plan['audio_quality'] = audio_quality.inspect(rendered, cfg)
+        checked['audio_quality'] = plan['audio_quality']
+        plan['warnings'].extend(plan['audio_quality'].get('issues', []))
         checked['editorial'] = {'status': 'needs_review' if notices or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',
             'subtitle_flags': len(notices), 'boundary': clip.get('boundary_review', {}),
             'intelligence': clip.get('intelligence', {}),

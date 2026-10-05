@@ -1,0 +1,27 @@
+<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A isolated UI fixture — simulated revision service</title>
+<link rel="stylesheet" href="../../../static/features/analysis.css">
+<style>body{background:#101826;color:#f4f7fc;margin:24px auto;padding:0 18px;max-width:860px;font-family:system-ui}h1{font-size:24px}</style>
+<h1>Fixture komponen A · layanan revisi simulasi</h1><p>Halaman uji mandiri. Bukan sesi atau transkrip pengguna.</p><div id="analysis-root"></div>
+<script type="module">
+import {mountAnalysis} from '../../../static/features/analysis.js';
+const revisions={},texts={},calls=[],late=[];let conflict=true;
+const target=id=>({project_id:'fixture-project',clip_id:id,variant_id:'vertical'});
+function snap(t){return {schema_version:1,target:t,revision:revisions[t.clip_id]||1,
+ capabilities:{correction:true,aliases:true,assets:true,asset_changes:true,discovery:true},
+ data:{aliases:[],transcript:{schema_version:1,kind:'TranscriptSnapshot',state:'ready',producer_version:'fixture',input_fingerprint:'fixture-transcript',source_id:'fixture:audio',payload:{transcript_id:'fixture:asr',revision:1,
+ heard_words:[{word_id:1,word:'hausd'}],display_tokens:[{token_id:'tok-'+t.clip_id,origin_word_ids:[1],text:texts[t.clip_id]||'hausd',source_start:2,source_end:2.4}],
+ review_queue:[{token_id:'tok-'+t.clip_id,start:2,end:2.4,text:texts[t.clip_id]||'hausd',reason:'Fixture keyakinan rendah',suggestions:['XAUUSD']}]}},
+ asset_proposals:{schema_version:1,kind:'AssetProposalSet',state:'ready',producer_version:'fixture',source_id:'fixture:audio',input_fingerprint:'fixture-assets',payload:{proposals:[{proposal_id:'proposal-fixture',asset_id:'fixture:media',source_start:5,source_end:8,visual_intent:'Materi sumber fixture',reason:'Uji poster, pemuatan, dan status bukti',
+ preview_url:'/qa-parallel-a/synthetic-source.mp4',poster_url:'/qa-parallel-a/synthetic-source.png',duration:14,availability:'available',enabled:true,
+ metadata_status:'ready',visual_status:'unavailable',usage_status:'not_scheduled',rights:{permission_status:'generated',attribution:'Gambar sintetis untuk pengujian komponen'}}]}}}}}
+const api={
+ get_snapshot(t){if(t.clip_id==='slow')return new Promise(resolve=>late.push(()=>resolve(snap(t))));return Promise.resolve(snap(t))},
+ submit_changes(request){calls.push(request);if(conflict){revisions[request.clip_id]=2;conflict=false;return Promise.resolve({status:'conflict',revision:2})}
+  const rev=(revisions[request.clip_id]||1)+1;revisions[request.clip_id]=rev;const op=request.operations[0];if(op.op==='correct_token')texts[request.clip_id]=op.after;
+  return Promise.resolve({status:'ready',revision:rev})},
+ run_stage(request){calls.push(request);return Promise.resolve({status:'queued',message:'Fixture: antrean B simulasi'})}
+};
+const component=mountAnalysis(document.querySelector('#analysis-root'),{api,target:target('initial'),revision:1});
+window.fixture={component,calls,target,resolveLate(){late.splice(0).forEach(resolve=>resolve())}};
+</script></html>

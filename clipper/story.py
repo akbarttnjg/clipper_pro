@@ -15,6 +15,7 @@ from .boundaries import segments_from_words, annotate
 from .typography import token, STOP
 from .storage import read_json, write_json
 from .intelligence import core as intelligence
+from . import discovery
 
 
 def windows(segments, cfg):
@@ -40,7 +41,7 @@ def windows(segments, cfg):
         i = max(i + 1, next((k for k in range(i + 1, j) if segments[k]['start'] >= next_time), j))
 
 
-REVIEW_VERSION = '3.3'
+REVIEW_VERSION = '3.4-step1'
 
 
 def request(block, cfg, candidate=None, focus=None, feedback=None):
@@ -53,6 +54,8 @@ def request(block, cfg, candidate=None, focus=None, feedback=None):
                    for k in ('value', 'opening', 'closure')})
     fields['complete'] = {'type': 'boolean'}
     fields['keywords'] = {'type': 'array', 'items': {'type': 'string'}, 'maxItems': 8}
+    fields['story_kind'] = {'type':'string','enum':['explanation','example','howto','comparison','mistake','answer','experience']}
+    fields['main_claim'] = {'type':'string','description':'Kutipan PERSIS 4–30 kata inti gagasan dari transkrip, termasuk syarat/negasi.'}
     if candidate is not None:
         fields['intelligence'] = intelligence.schema(ids)
     schema = {'type': 'object', 'properties': {'clips': {'type': 'array', 'maxItems': 1 if candidate else 5,
@@ -85,6 +88,7 @@ def request(block, cfg, candidate=None, focus=None, feedback=None):
         'finance': 'edukasi keuangan: angka beserta asumsi dan risiko, tanpa janji hasil',
         'students': 'pelajar: penjelasan runtut, analogi dan langkah belajar'}[cfg.audience]
     system += (' Sasaran utama: ' + audience + '. reason menjelaskan manfaat konkret bagi mereka. '
+        'story_kind membedakan fungsi cerita; main_claim adalah kutipan asli inti gagasan, bukan judul atau parafrasa. '
         'Utamakan contoh, konflik gagasan, atau jawaban yang memenuhi janji pembuka. '
         'Jangan pilih salam penutup live, ajakan komentar, atau pertanyaan baru yang belum dijawab sebagai payoff. '
         'Jangan menebak nominal/singkatan meragukan untuk dijadikan klaim judul. Tidak ada jaminan FYP.')
@@ -189,11 +193,20 @@ def ground(raw, block, words, cfg, duration, diagnostics=None):
                 clip['intelligence'] = intelligence.assess(item['intelligence'], clip, block, words, cfg)
                 hook = clip['intelligence']['hook']
                 clip['cold_open_span'] = [hook['source_start'], hook['source_end']] if hook else None
+            claim = ' '.join(str(item.get('main_claim','')).split())
+            normalized_claim = ' '.join(token(t) for t in claim.split())
+            normalized_source = ' '.join(token(t) for w in cw for t in w['word'].split())
+            if 4<=len(claim.split())<=30 and normalized_claim in normalized_source:
+                clip.update(main_claim=claim,story_kind=item.get('story_kind','explanation'))
             result.append(clip)
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
             if diagnostics is not None:
                 diagnostics.append({'code': reason, 'start_segment': item.get('start_segment') if isinstance(item, dict) else None,
-                    'end_segment': item.get('end_segment') if isinstance(item, dict) else None, 'detail': str(exc)[:180]})
+                    'end_segment': item.get('end_segment') if isinstance(item, dict) else None, 'detail': str(exc)[:180],
+                    'title':str(item.get('title','Kandidat ditolak'))[:120] if isinstance(item,dict) else 'Jawaban tidak valid',
+                    'start':by_id.get(item.get('start_segment'),{}).get('start') if isinstance(item,dict) and isinstance(item.get('start_segment'),int) else None,
+                    'end':by_id.get(item.get('end_segment'),{}).get('end') if isinstance(item,dict) and isinstance(item.get('end_segment'),int) else None,
+                    'action':'adjust_boundary' if reason in ('duration','incomplete','ending_quote') else 'review'})
             continue
     return result
 
@@ -244,8 +257,11 @@ def validated_response(path, block, words, cfg, duration, candidate=None, focus=
 def duplicate(c, prior, words):
     overlap = max(0, min(c['end'], prior['end']) - max(c['start'], prior['start']))
     share = overlap / max(.01, min(c['end']-c['start'], prior['end']-prior['start']))
-    if share > .60:
+    if share > .93:
         return True
+    # Explicitly different source-grounded stories can share context footage.
+    if c.get('main_claim') and prior.get('main_claim') and c['main_claim'] != prior['main_claim']:
+        return False
     def tokens(clip):
         return [token(w['word']) for w in words if clip['start'] <= w['start'] < clip['end'] and token(w['word'])]
     a, b = tokens(c), tokens(prior)
@@ -270,25 +286,36 @@ def distinct(candidates, words, cfg):
     return sorted(selected, key=lambda c: c['start'])
 
 
-def select(transcript, cfg, progress=lambda p, m: None):
+def select(transcript, cfg, progress=lambda p, m: None, existing=None):
+    from .analysis_options import configured
+    cfg=configured(cfg) if cfg is not None else None
+    existing = existing or []
+    previous_rounds = discovery.history(cfg)
+    round_number = len(previous_rounds)
+    exclusions = [{'start':c['start'],'end':c['end'],'title':c['title'],
+        'claim':c.get('main_claim',c.get('ending_evidence',''))} for c in existing if c.get('selection_source')!='manual-required']
+    objective = discovery.OBJECTIVES[round_number%len(discovery.OBJECTIVES)]
     segments = segments_from_words(transcript['words'])
     blocks = list(windows(segments, cfg))
     candidates, failures, timings, completed = [], [], [], set()
+    rejections = []
     journal = Path(cfg.work_dir) / 'topic-windows'
     unbounded = replace(cfg, num_clips=0)
     consecutive_offline = 0
     def discover(block, focus=None):
         key = hashlib.sha256(json.dumps([block, cfg.model, cfg.min_clip_s, cfg.max_clip_s,
-            cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, focus, cfg.selection_floor, 'topic-v3.3'], ensure_ascii=False).encode()).hexdigest()[:24]
+            cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, focus, cfg.selection_floor, 'topic-v3.4-step1'], ensure_ascii=False).encode()).hexdigest()[:24]
         path = journal / (key + '.json')
-        found, cached, proposed, _ = validated_response(path, block, transcript['words'], cfg, transcript['duration'], focus=focus)
+        found, cached, proposed, audit = validated_response(path, block, transcript['words'], cfg, transcript['duration'], focus=focus)
+        rejections.extend(audit.get('rejections',[]))
         return found, cached, proposed
     try:
         for i, block in enumerate(blocks):
             progress(32 + round(32 * i / max(1, len(blocks))), f'Menjelajah seluruh sumber {i + 1}/{len(blocks)}')
             started = time.monotonic()
             try:
-                found, cached, proposed = discover(block)
+                focus = [*exclusions,{'instruction':objective,'search_round':round_number+1}] if existing else None
+                found, cached, proposed = discover(block,focus)
                 candidates.extend(found)
                 completed.add(i)
                 consecutive_offline = 0
@@ -307,17 +334,41 @@ def select(transcript, cfg, progress=lambda p, m: None):
                       len([c for c in pool if b[0]['start'] <= (c['start']+c['end'])/2 <= b[-1]['end']]) < 2]
             for n, (i, block) in enumerate(sparse):
                 progress(65 + round(10*n/max(1, len(sparse))), f'Mencari pembahasan terlewat {n+1}/{len(sparse)}')
-                exclusions = [{'start': c['start'], 'end': c['end'], 'title': c['title']} for c in pool
+                local_exclusions = [{'start': c['start'], 'end': c['end'], 'title': c['title']} for c in [*existing,*pool]
                               if c['end'] > block[0]['start'] and c['start'] < block[-1]['end']]
                 try:
-                    found, cached, proposed = discover(block, exclusions or [{'instruction': 'Cari contoh, tips atau tanya-jawab yang mandiri.'}])
+                    found, cached, proposed = discover(block, [*local_exclusions,{'instruction':objective}])
                     candidates.extend(found)
                     timings.append({'window': i+1, 'pass': 'discovery', 'cached': cached, 'proposed': proposed, 'grounded': len(found)})
                 except (requests.RequestException, ValueError, KeyError) as exc:
                     failures.append({'window': i+1, 'pass': 'discovery', 'error': str(exc)[:300]})
                     if isinstance(exc, (requests.ConnectionError, requests.Timeout)):
                         break
+            from .evidence import load as load_evidence
+            extras = discovery.extra_windows(segments,cfg,[*existing,*pool],load_evidence(cfg).get('cues',[]),round_number)
+            seen_blocks = {(b[0]['id'],b[-1]['id']) for b in blocks if b}
+            for n,(block,kind) in enumerate(extras):
+                if (block[0]['id'],block[-1]['id']) in seen_blocks:
+                    continue
+                progress(75,f'Jelajah {kind} {n+1}/{len(extras)}')
+                try:
+                    found,cached,proposed=discover(block,[*exclusions,{'instruction':objective,'scale':kind,'search_round':round_number+1}])
+                    candidates.extend(found)
+                    timings.append({'window':n+1,'pass':kind,'cached':cached,'proposed':proposed,'grounded':len(found),
+                                    'start':block[0]['start'],'end':block[-1]['end']})
+                except (requests.RequestException,ValueError,KeyError) as exc:
+                    failures.append({'pass':kind,'error':str(exc)[:300]})
+                    if isinstance(exc,(requests.ConnectionError,requests.Timeout)):
+                        break
         pool = distinct(candidates, transcript['words'], unbounded)
+        for c in candidates:
+            if not any(c is p for p in pool):
+                rejections.append({'code':'duplicate','start':c['start'],'end':c['end'],'title':c['title'],
+                    'detail':'Rentang atau isi sangat mirip kandidat yang lebih lengkap.','action':'compare'})
+        pool = [c for c in pool if not any(duplicate(c,p,transcript['words']) for p in existing)]
+        removed, semantic_report = discovery.semantic_groups(pool,cfg)
+        rejections.extend(semantic_report)
+        pool = [c for i,c in enumerate(pool) if i not in removed]
         write_json(Path(cfg.work_dir) / 'candidate-pool.json', pool)
         result = []
         if cfg.topic_review:
@@ -344,13 +395,17 @@ def select(transcript, cfg, progress=lambda p, m: None):
         editorial.release(cfg)
     reviewed_count = len(result) if cfg.topic_review else 0
     result = distinct(result, transcript['words'], cfg)
-    write_json(Path(cfg.work_dir) / 'selection-report.json', {'windows': len(blocks), 'processed_windows': len(completed), 'errors': failures,
+    discovery.save_report({'version':'3.4-step1','analysis_revision':discovery.revision(transcript,cfg),
+        'model':cfg.model,'objective':objective,'existing_candidates':len(existing),'new_candidates':len(result),
+        'coverage':discovery.coverage(blocks,completed,transcript['duration']),
+        'rejections':rejections,'extra_window_budget':cfg.discovery_extra_windows,
+        'windows': len(blocks), 'processed_windows': len(completed), 'errors': failures,
         'coverage_complete': len(completed) == len(blocks), 'missing_windows': [i+1 for i in range(len(blocks)) if i not in completed],
         'search_depth': cfg.search_depth, 'proposed': sum(t.get('proposed', 0) for t in timings),
         'candidate_pool': len(pool), 'reviewed': reviewed_count, 'limit': cfg.num_clips,
         'accepted': len(result), 'needs_review': sum(c.get('boundary_review', {}).get('status') == 'needs_review' for c in result),
         'automatic_ready': sum(intelligence.ready(c, transcript['words'], cfg) for c in result),
-        'timings': timings, 'rubric': '0–5 editorial; bukan probabilitas FYP'})
+        'timings': timings, 'rubric': '0–5 editorial; bukan probabilitas FYP'},cfg)
     if not result:
         # A manual starting point, never disguised as a high-scoring AI selection.
         end_limit = min(cfg.max_clip_s, transcript['duration'])
@@ -380,6 +435,7 @@ def review_candidate(candidate, transcript, cfg, refresh=False):
         cfg.ollama_num_ctx, cfg.topic_grace_s, 'boundary-v3.3'], ensure_ascii=False).encode()).hexdigest()[:24]
     path = Path(cfg.work_dir) / 'boundary-reviews' / (key + '.json')
     c = annotate(candidate, words, cfg.max_clip_s + cfg.topic_grace_s)
+    c['source_context'] = discovery.context(candidate,transcript)
     c['revision'] = candidate.get('revision', 0) + 1
     # Never retain a previously successful decision after a failed new review.
     c['intelligence'] = intelligence.assess(None, c, block, words, cfg)
@@ -402,6 +458,10 @@ def review_candidate(candidate, transcript, cfg, refresh=False):
         new = annotate(options[0], words, cfg.max_clip_s + cfg.topic_grace_s, verified=True)
         new['review_diagnostics'] = audit
         new['previous_boundary'] = {'start': c['start'], 'end': c['end'], 'title': c['title']}
+        new['source_context'] = discovery.context(new,transcript)
+        new['boundary_repair'] = {'before':{'start':c['start'],'end':c['end']},
+            'after':{'start':new['start'],'end':new['end']},'evidence':new.get('ending_evidence',''),
+            'method':'source_segment_review','approved_by':'local_model'}
         new['revision'] = candidate.get('revision', 0) + 1
         new['selection_source'] = 'context-reviewed'
         if 'intelligence' not in new:

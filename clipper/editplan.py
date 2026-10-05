@@ -7,6 +7,8 @@ def build(words, clip, cfg):
     cw = [w for w in words if w['end'] > clip['start'] and w['start'] < clip['end']]
     body = (trim.keep_spans(cw, clip['start'], clip['end'], cfg) if cfg.trim_silence
             else [(clip['start'], clip['end'])])
+    if clip.get('manual_keep_spans'):
+        body = [(max(clip['start'], a), min(clip['end'], b)) for a,b in clip['manual_keep_spans'] if max(clip['start'],a)<min(clip['end'],b)]
     raw = [('body', a, b) for a, b in body]
     warnings = []
     cold = clip.get('cold_open_span')

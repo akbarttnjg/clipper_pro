@@ -152,13 +152,22 @@ def place_shot(shot, cfg):
 
 
 def apply(plan, cfg):
+    previous = None
     for shot in plan['shots']:
+        if previous and previous['mode'] == shot['mode'] and not shot.get('caption_panel'):
+            # Prefer the previous position only when geometry remains similar.
+            a,b = previous['rect'],shot['rect']
+            stable = overlap(a,b)/max(1,min(a[2]*a[3],b[2]*b[3])) > .8
+            if stable:
+                shot['caption_panel'] = previous.get('caption_panel')
         place_shot(shot, cfg)
+        previous = shot
     plan['placement_summary'] = {
         'shots': len(plan['shots']),
         'empty_space': sum(s.get('placement', {}).get('mode') == 'empty_space' for s in plan['shots']),
         'reserved_band': sum(s.get('placement', {}).get('mode') == 'reserved_band' for s in plan['shots']),
-        'note': 'Deteksi wajah dan pola tulisan pada frame sampel; gunakan area manual bila deteksi meleset.'}
+        'ocr_regions':sum(b['kind']=='ocr' for s in plan['shots'] for b in s.get('protected_source',[])),
+        'note': 'Wajah, geometri tulisan dan OCR pada sampel; posisi dikunci per frasa. Periksa preview bila deteksi meleset.'}
 
 
 def protect_broll(plan, cfg):

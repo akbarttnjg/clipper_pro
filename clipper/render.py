@@ -27,8 +27,10 @@ def audio_stems(source, plan, cfg, folder):
     end = max(s['source_end'] for s in plan['spans'])
     parts = []
     for i, s in enumerate(plan['spans']):
-        parts.append(f"[0:a]atrim=start={s['source_start'] - seek:.8f}:end={s['source_end'] - seek:.8f},asetpts=PTS-STARTPTS[a{i}]")
-    norm = (f',apad=pad_dur=3,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,atrim=duration={duration:.8f}'
+        fade = min(cfg.join_fade_ms/1000, (s['source_end']-s['source_start'])/4)
+        edges = f',afade=t=in:d={fade:.6f},afade=t=out:st={s["source_end"]-s["source_start"]-fade:.6f}:d={fade:.6f}' if fade>0 else ''
+        parts.append(f"[0:a]atrim=start={s['source_start'] - seek:.8f}:end={s['source_end'] - seek:.8f},asetpts=PTS-STARTPTS{edges}[a{i}]")
+    norm = (f',apad=pad_dur=3,loudnorm=I={cfg.audio_target_lufs}:TP={cfg.audio_peak_db}:LRA=11,aresample=48000,atrim=duration={duration:.8f}'
             if cfg.audio_normalize else '')
     parts.append(''.join(f'[a{i}]' for i in range(len(plan['spans']))) + f"concat=n={len(plan['spans'])}:v=0:a=1{norm}[voice]")
     voice = folder / 'voice.wav'
@@ -66,7 +68,7 @@ def audio_stems(source, plan, cfg, folder):
     inputs = []
     for path in stems.values():
         inputs.extend(['-i', path])
-    graph = ''.join(f'[{i}:a]' for i in range(len(stems))) + f'amix=inputs={len(stems)}:normalize=0:duration=longest,alimiter=limit=0.84:level=0:latency=1[out]'
+    graph = ''.join(f'[{i}:a]' for i in range(len(stems))) + f'amix=inputs={len(stems)}:normalize=0:duration=longest,alimiter=limit={10**(cfg.audio_peak_db/20):.6f}:level=0:latency=1[out]'
     run_audio([*inputs, '-filter_complex', graph, '-map', '[out]', '-t', duration], master, folder / 'audio.log')
     plan['audio'] = {'stems': stems, 'mix': str(master.resolve()), 'music_original': cfg.music_path,
                      'music_db': cfg.music_db, 'sfx_original': cfg.sfx_path, 'sfx_events': events}
@@ -153,7 +155,7 @@ def broll_plates(plan,cfg,folder):
         try:
             height=event.get('image_height')
             offset=event.get('source_asset_start',event.get('asset_start',0.))
-            key=hashlib.sha256(str([str(original),original.stat().st_mtime_ns,W,H,fps,event['duration'],height,offset,'plate-3.3']).encode()).hexdigest()[:20]
+            key=hashlib.sha256(str([str(original),__import__('clipper.dependency_cache',fromlist=['content_id']).content_id(original,fresh=True),W,H,fps,event['duration'],height,offset,'plate-3.3']).encode()).hexdigest()[:20]
             target=Path(folder)/('broll-'+key+'.mp4')
             if not target.exists():
                 pending=target.with_suffix('.rendering.mp4')
@@ -170,5 +172,8 @@ def broll_plates(plan,cfg,folder):
                     pending.unlink(missing_ok=True)
             event['path']=str(target.resolve());event['framed_plate']=True;event['source_asset_start']=offset;event['asset_start']=0.;kept.append(event)
         except (ValueError,OSError,subprocess.TimeoutExpired):
+            for row in plan.get('broll_schedule',[]):
+                if row.get('proposal_id')==event.get('id') and row.get('start')==event.get('start'):
+                    row.update(status='skipped',reason='Konversi aset gagal; sumber asli dipakai')
             plan['warnings'].append('Aset B-roll gagal disiapkan; bagian itu memakai sumber asli.')
     plan['broll']=kept

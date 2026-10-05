@@ -4,3 +4,6 @@ pycapcut==0.0.3
 fastapi>=0.115.6,<1
 starlette>=0.41.3,<2
 python-multipart>=0.0.20
+
+# CPU OCR for source text evidence; it is released before local vision stages.
+rapidocr-onnxruntime>=1.4.4,<2
