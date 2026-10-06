@@ -7,6 +7,7 @@ import copy
 import json
 import math
 import uuid
+from functools import cached_property
 from dataclasses import asdict, fields, replace
 from pathlib import Path
 from .config import Config, validate_overrides
@@ -46,6 +47,12 @@ def apply_corrections(words,document,clip_id=None):
 
 
 class StudioService:
+    @cached_property
+    def runtime(self):
+        from .runtime.manager import RuntimeManager
+        from .runtime.state import runtime_root
+        return RuntimeManager(self.root,runtime_root(self.root,self.work),autostart=self.queue.autostart)
+
     def __init__(self,root,base=None,*,db_path=None,resource_lock=None,autostart=True,recover=True):
         self.root=Path(root).resolve();base=base or Config()
         self.base=replace(base,work_dir=str((self.root/base.work_dir).resolve()),out_dir=str((self.root/base.out_dir).resolve()))

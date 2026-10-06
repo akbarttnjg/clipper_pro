@@ -171,7 +171,16 @@ def main():
     cfg=Config(**{k:v for k,v in settings.items() if k in CONFIG_FIELDS})
     cfg=replace(cfg,work_dir=str(Path(args.db).resolve().parent))
     service=StudioService(Path(__file__).resolve().parent.parent,cfg,db_path=args.db,autostart=False,recover=False)
-    try:execute(service,job)
+    from .runtime.gpu import GPULease
+    from .runtime.state import runtime_root
+    import os
+    os.environ['CLIPPER_RUNTIME_DIR']=str(runtime_root(service.root,service.work))
+    try:
+        with GPULease(runtime_root(service.root,service.work),'proyek '+job['kind']):
+            try:execute(service,job)
+            finally:
+                from .editorial import release
+                release(service.config(doc))
     except StaleJob as exc:queue.update(args.job,status='stale',message=str(exc),error=str(exc))
     except BaseException as exc:
         traceback.print_exc();queue.update(args.job,status='failed',message='Proses gagal; perubahan dan hasil sebelumnya tetap tersedia.',error=str(exc)[-4000:]);return 1
