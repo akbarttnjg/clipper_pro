@@ -63,7 +63,7 @@ def clip_name(clip, i):
     return f'{i+1:02d}-{slug}'
 
 
-def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None):
+def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
     started = time.monotonic()
     name = name + f"-r{clip.get('revision', 0)}-v40"
     work = Path(cfg.work_dir) / 'renders' / name
@@ -78,7 +78,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         raise ValueError('Sumber tidak mempunyai track audio.')
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
-    words = intelligence.annotate_words(words, clip, cfg)
+    words = intelligence.annotate_words(words, clip, cfg, context_words=context_words)
     edit_cfg = replace(cfg, trim_silence=False) if cfg.source_kind == 'board' and cfg.preserve_material_pauses else cfg
     plan = editplan.build(words, clip, edit_cfg)
     composition.analyze(media_path, plan, cfg, info)

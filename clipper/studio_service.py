@@ -13,7 +13,7 @@ from .config import Config, validate_overrides
 from .contracts import fingerprint
 from .project_store import ProjectStore, Conflict, dumps
 from .job_queue import JobQueue
-from .dependency_cache import content_id, asset_id, settings_impact
+from .dependency_cache import VERSION as DEPENDENCY_VERSION, content_id, asset_id, settings_impact, active_recipe
 from .storage import read_json, write_json
 
 CONFIG_FIELDS={f.name for f in fields(Config)}
@@ -138,7 +138,24 @@ class StudioService:
                         result['available']=Path(result.get('absolute_file','')).is_file()
                         result['url']=self.register_file(project_id,result.get('absolute_file'))
                         result['stale']=result.get('dependency')!=dependency
+                variant['export_readiness']=self.export_readiness(doc,cid,vid,dependency=dependency)
         out['jobs']=self.queue.list(project_id);return out
+
+    def export_readiness(self,doc,clip_id,variant_id,*,dependency=None,fresh=False):
+        result=self.variant(doc,clip_id,variant_id).get('result')
+        if not result:
+            return {'status':'missing','action':'render','message':'Buat render final sebelum menyiapkan paket editor.'}
+        path=Path(result.get('absolute_file',''))
+        if not path.is_file():
+            return {'status':'missing','action':'render','message':'Berkas final tidak tersedia. Render ulang klip ini.'}
+        dependency=dependency or self.dependency(doc,clip_id,variant_id,fresh=fresh)
+        if result.get('dependency')!=dependency:
+            return {'status':'stale','action':'render','message':'Pengaturan atau bahan klip berubah. Render final revisi aktif dahulu, lalu buat paket editor.',
+                'input_revision':result.get('input_revision')}
+        if fresh and result.get('output_content_id')!=content_id(path,fresh=True):
+            return {'status':'changed','action':'render','message':'Isi berkas final berubah. Render ulang sebelum ekspor.'}
+        return {'status':'ready','action':'export','message':'Final sesuai bahan dan pengaturan aktif. Paket editor dapat dibuat.',
+            'input_revision':result.get('input_revision')}
 
     def transcript(self,doc,clip_id=None):
         if not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia; jalankan analisis sumber')
@@ -165,12 +182,12 @@ class StudioService:
 
     def dependency(self,doc,clip_id=None,variant_id=None,*,fresh=False,kind='render'):
         source=doc['source'];source_hash=asset_id(source['path'],fresh=fresh)
-        base=[source_hash,source['source_id'],doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections')]
+        base=[DEPENDENCY_VERSION,source_hash,source['source_id'],doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections')]
         if not clip_id:return fingerprint(base+[doc['settings'],kind])
         variant=self.variant(doc,clip_id,variant_id);clip=doc['clips'][clip_id]
         cfg=self.config(doc,clip_id,variant_id);settings=asdict(cfg)
         for key in ('out_dir','work_dir','pexels_key','variant_id','cache_limit_gb'):settings.pop(key,None)
-        recipe=variant.get('recipe',{})
+        recipe=active_recipe(variant.get('recipe',{}),cfg)
         assets=[asset_id(s.get('asset',{}).get('path'),fresh=fresh) for s in recipe.get('scenes',[])]
         assets += [asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
         fonts=[asset_id(p,fresh=fresh) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
@@ -290,6 +307,9 @@ class StudioService:
         if kind not in ('analyze','source_evidence','waveform') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
         target={'clip_id':clip_id,'variant_id':variant_id}
         request={'dependency':self.dependency(doc,clip_id,variant_id,fresh=True,kind=kind),'options':options or {}}
+        if kind=='export':
+            readiness=self.export_readiness(doc,clip_id,variant_id,dependency=request['dependency'],fresh=True)
+            if readiness['status']!='ready':raise ValueError(readiness['message'])
         return self.queue.enqueue(project_id,kind,target,request)
 
     def analysis_snapshot(self,target,document=None):

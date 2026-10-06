@@ -101,7 +101,7 @@ def execute(service,job):
             if path.is_file() and cached.get('output_content_id')==content_id(path,fresh=True):result=cached
             else:
                 name=f'{cid}-{vid}-{key[:12]}'
-                result=pipeline.render_clip(source,words,clip,name,cfg,progress)
+                result=pipeline.render_clip(source,words,clip,name,cfg,progress,context_words=transcript['words'])
                 path=Path(cfg.out_dir)/result['file']
                 result.update(absolute_file=str(path.resolve()),output_content_id=content_id(path,fresh=True),fingerprint=key,dependency=dependency,
                     variant_id=vid,input_revision=doc['revision'],kind=kind,quality=job['request'].get('options',{}).get('quality','draft') if kind=='preview' else 'final')
@@ -125,6 +125,7 @@ def execute(service,job):
             if not Path(final['absolute_file']).is_file() or content_id(final['absolute_file'],fresh=True)!=final['output_content_id']:raise ValueError('Berkas final berubah atau hilang; render ulang')
             result=projects.export_bundle([final],cfg,progress)
             result['url']=service.register_file(pid,result['zip']);result['clip_id']=cid;result['variant_id']=vid
+            result.update(dependency=dependency,input_revision=doc['revision'])
     check()
     def publish(current):
         old_take=current.get('transcript_id');old_source=current['source']['source_id']
