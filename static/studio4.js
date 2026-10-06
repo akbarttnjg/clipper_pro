@@ -1,5 +1,5 @@
 import {mountAnalysis} from './features/analysis.js';
-import {mountRuntime} from './features/runtime.js';
+import {mountRuntime} from './features/runtime.js?v=4.0.2a';
 const $=q=>document.querySelector(q),main=$('#main');
 const S={doc:null,step:'source',clip:null,variant:'portrait',view:'source',page:null,baseRevision:0,styles:[],fonts:[],query:'',analysis:null,offset:0,dirty:new Map(),panels:new Map(),polling:false};
 $('#runtime').onclick=()=>mountRuntime($('#dialog'),api,toast,S.doc?.source?.path||'').catch(e=>toast(e.message,true));

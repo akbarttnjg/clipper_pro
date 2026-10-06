@@ -43,7 +43,13 @@ class RuntimeManager:
         return out
 
     def jobs(self):
-        with self.connect() as db:rows=db.execute('SELECT id FROM jobs ORDER BY created DESC LIMIT 40').fetchall()
+        # A long history must never hide a worker that can still be canceled.
+        with self.connect() as db:
+            rows=db.execute("""SELECT id FROM jobs
+                WHERE status IN ('queued','running','cancel_requested') OR id IN
+                    (SELECT id FROM jobs WHERE status NOT IN ('queued','running','cancel_requested')
+                     ORDER BY created DESC LIMIT 40)
+                ORDER BY created DESC""").fetchall()
         return [self.job(row['id']) for row in rows]
 
     def update(self,jid,**values):
@@ -88,6 +94,16 @@ class RuntimeManager:
         if row['status'] in ACTIVE:
             self.update(jid,status='canceled' if row['status']=='queued' else 'cancel_requested',message='Pembatalan diminta; unduhan parsial dipertahankan')
         return self.job(jid)
+
+    def cancel_queued(self):
+        # Claim and batch cancellation share a write transaction. A running
+        # worker stays running; files, checkpoints, and completed jobs stay put.
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            ids=[row['id'] for row in db.execute("SELECT id FROM jobs WHERE status='queued'")]
+            db.execute("UPDATE jobs SET status='canceled',message=?,updated=? WHERE status='queued'",
+                       ('Antrean dibatalkan; unduhan parsial dipertahankan',time.time()))
+        return dict(canceled=len(ids),job_ids=ids,message='Antrean menunggu dibatalkan; proses yang sedang berjalan tetap tersedia untuk dibatalkan terpisah.')
 
     def resume(self,jid):
         row=self.job(jid)
@@ -212,7 +228,7 @@ class RuntimeManager:
         if self.thread:self.thread.join(timeout=12)
 
 
-def redact(text):
+def redact(text,limit=3000):
     for key,value in os.environ.items():
         if value and len(value)>=4 and any(word in key.upper() for word in ('TOKEN','KEY','PASSWORD','SECRET')):text=text.replace(value,'[disembunyikan]')
-    return text[-3000:]
+    return text if limit is None else text[-limit:]
