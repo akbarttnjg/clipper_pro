@@ -20,6 +20,8 @@ def guarded(fn):
 
 def create_router(service):
     router=APIRouter(prefix='/api/studio',tags=['studio4'])
+    from .api_runtime import router as runtime_router
+    router.include_router(runtime_router(service))
     @router.get('/projects')
     def projects():return service.store.list()
 
@@ -150,6 +152,8 @@ def install(app,root,base,states,resource_lock):
     @app.on_event('startup')
     def start():service.queue.start()
     @app.on_event('shutdown')
-    def stop():service.queue.close()
+    def stop():
+        service.queue.close()
+        if 'runtime' in service.__dict__:service.runtime.close()
     app.state.studio=service
     return service

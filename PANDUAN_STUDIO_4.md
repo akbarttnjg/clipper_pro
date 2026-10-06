@@ -55,7 +55,7 @@ Posisi subtitle otomatis mempertimbangkan wajah, tulisan, dan materi yang berhas
 
 ## Status pengujian dan batas rilis
 
-Suite otomatis, uji dua tab browser, empat render media sintetis untuk dua rasio, geometri media, dan struktur ekspor sudah diperiksa. Rekaman sintetis menguji integrasi teknis, bukan akurasi Whisper atau selera pemilihan cerita.
+Catatan pengujian rilis awal 4.0 mencakup suite otomatis, uji dua tab browser, empat render media sintetis untuk dua rasio, geometri media, dan struktur ekspor. Untuk perubahan fondasi ekspor/revisi setelah rilis awal, baca [hasil pengujian dan batasnya](docs/studio4-foundation.md). Rekaman sintetis menguji integrasi teknis, bukan akurasi Whisper atau selera pemilihan cerita.
 
 **B34 belum lulus impor native:** paket CapCut/DaVinci mempunyai laporan pemeriksaan struktur dan video referensi, tetapi belum dibuka pada aplikasi desktop tujuan. Efek tertentu tidak identik, terutama blur/fade teks; periksa `verification.json` dan `BACA_DULU.txt` dalam paket editor.
 

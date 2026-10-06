@@ -101,7 +101,7 @@ def execute(service,job):
             if path.is_file() and cached.get('output_content_id')==content_id(path,fresh=True):result=cached
             else:
                 name=f'{cid}-{vid}-{key[:12]}'
-                result=pipeline.render_clip(source,words,clip,name,cfg,progress)
+                result=pipeline.render_clip(source,words,clip,name,cfg,progress,context_words=transcript['words'])
                 path=Path(cfg.out_dir)/result['file']
                 result.update(absolute_file=str(path.resolve()),output_content_id=content_id(path,fresh=True),fingerprint=key,dependency=dependency,
                     variant_id=vid,input_revision=doc['revision'],kind=kind,quality=job['request'].get('options',{}).get('quality','draft') if kind=='preview' else 'final')
@@ -125,6 +125,7 @@ def execute(service,job):
             if not Path(final['absolute_file']).is_file() or content_id(final['absolute_file'],fresh=True)!=final['output_content_id']:raise ValueError('Berkas final berubah atau hilang; render ulang')
             result=projects.export_bundle([final],cfg,progress)
             result['url']=service.register_file(pid,result['zip']);result['clip_id']=cid;result['variant_id']=vid
+            result.update(dependency=dependency,input_revision=doc['revision'])
     check()
     def publish(current):
         old_take=current.get('transcript_id');old_source=current['source']['source_id']
@@ -170,7 +171,16 @@ def main():
     cfg=Config(**{k:v for k,v in settings.items() if k in CONFIG_FIELDS})
     cfg=replace(cfg,work_dir=str(Path(args.db).resolve().parent))
     service=StudioService(Path(__file__).resolve().parent.parent,cfg,db_path=args.db,autostart=False,recover=False)
-    try:execute(service,job)
+    from .runtime.gpu import GPULease
+    from .runtime.state import runtime_root
+    import os
+    os.environ['CLIPPER_RUNTIME_DIR']=str(runtime_root(service.root,service.work))
+    try:
+        with GPULease(runtime_root(service.root,service.work),'proyek '+job['kind']):
+            try:execute(service,job)
+            finally:
+                from .editorial import release
+                release(service.config(doc))
     except StaleJob as exc:queue.update(args.job,status='stale',message=str(exc),error=str(exc))
     except BaseException as exc:
         traceback.print_exc();queue.update(args.job,status='failed',message='Proses gagal; perubahan dan hasil sebelumnya tetap tersedia.',error=str(exc)[-4000:]);return 1
