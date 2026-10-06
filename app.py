@@ -98,7 +98,9 @@ def public(job_id):
 
 
 def worker(job_id, action, indices=None):
-    with PROCESS_LOCK:
+    from clipper.runtime.gpu import GPULease
+    from clipper.runtime.state import runtime_root
+    with PROCESS_LOCK, GPULease(runtime_root(ROOT,Path(base_cfg.work_dir)),'pekerjaan '+action):
         st, job = state(job_id)
         job.update(status=action, started=time.time(), error=None)
         persist(job_id)

@@ -15,7 +15,7 @@ from .contracts import fingerprint
 ACTIVE=('queued','running','cancel_requested')
 
 
-def process_birth(pid):
+def process_birth(pid,*,visible=False):
     try:
         if os.name=='nt':
             import ctypes
@@ -30,7 +30,27 @@ def process_birth(pid):
                 if not ctypes.windll.kernel32.GetProcessTimes(handle,*[ctypes.byref(v) for v in values]):return None
                 return str(values[0].value)
             finally:ctypes.windll.kernel32.CloseHandle(handle)
-        return Path(f'/proc/{pid}/stat').read_text().rsplit(')',1)[1].split()[19]
+        target=Path(f'/proc/{pid}')
+        if not visible:
+            # /proc can expose outer PIDs while getpid/Popen report namespace
+            # PIDs (containers with a host procfs mount). Match the namespace,
+            # never borrow a different process's start time for cancellation.
+            current_namespace=os.readlink('/proc/self/ns/pid')
+            if int(pid)==os.getpid():target=Path('/proc/self')
+            else:
+                try:same_namespace=os.readlink(target/'ns/pid')==current_namespace
+                except OSError:same_namespace=False
+                if not same_namespace:
+                    target=None
+                    for candidate in Path('/proc').iterdir():
+                        if not candidate.name.isdigit():continue
+                        try:
+                            if os.readlink(candidate/'ns/pid')!=current_namespace:continue
+                            line=next(row for row in (candidate/'status').read_text().splitlines() if row.startswith('NSpid:'))
+                            if int(line.split()[-1])==int(pid):target=candidate;break
+                        except (OSError,ValueError,StopIteration):continue
+                    if target is None:return None
+        return (target/'stat').read_text().rsplit(')',1)[1].split()[19]
     except (OSError,IndexError,ValueError):return None
 
 

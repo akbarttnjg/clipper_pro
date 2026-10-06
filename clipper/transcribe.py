@@ -6,7 +6,7 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from .config import Config
 
@@ -97,12 +97,19 @@ def _run(media_path, cfg):
 def transcribe(media_path, cfg):
     if not cfg.whisper_isolate:
         return _run(media_path, cfg)
+    from .runtime.bridge import managed_asr
+    managed=managed_asr(cfg)
+    worker_cfg=replace(cfg,whisper_model=managed['weights'],whisper_device=managed['recommended_device'] if cfg.whisper_device=='auto' else cfg.whisper_device) if managed else cfg
+    environment=os.environ.copy()
+    if managed:
+        environment['PYTHONPATH']=str(Path(__file__).resolve().parent.parent)
+        environment['PYTHONNOUSERSITE']='1'
     with tempfile.TemporaryDirectory(prefix='steezy-asr-') as tmp:
         config_path, result_path = Path(tmp) / 'config.json', Path(tmp) / 'transcript.json'
-        config_path.write_text(json.dumps(asdict(cfg)), encoding='utf-8')
-        r = subprocess.run([sys.executable, '-m', 'clipper.transcribe', '--worker',
+        config_path.write_text(json.dumps(asdict(worker_cfg)), encoding='utf-8')
+        r = subprocess.run([managed['python'] if managed else sys.executable, '-m', 'clipper.transcribe', '--worker',
                            str(Path(media_path).resolve()), str(config_path), str(result_path)],
-                           cwd=str(Path(__file__).resolve().parent.parent), capture_output=True,
+                           cwd=str(Path(__file__).resolve().parent.parent), capture_output=True,env=environment,
                            text=True, encoding='utf-8', errors='replace')
         if r.returncode or not result_path.exists():
             raise RuntimeError('Transkripsi gagal. ' + r.stderr[-2500:])
