@@ -13,7 +13,7 @@ export async function mountRuntime(dialog,api,toast,sourcePath=''){
   const modelLabel=el('label','Bobot faster-whisper'),model=el('select');for(const id of ['small','medium']){const option=el('option',id);option.value=id;model.append(option)}modelLabel.append(model);
   const deviceLabel=el('label','Perangkat uji'),device=el('select');for(const [id,text] of [['cpu','CPU (awal)'],['cuda','CUDA (ukur & fallback CPU)']]){const option=el('option',text);option.value=id;device.append(option)}deviceLabel.append(device);
   controls.append(pathLabel,modelLabel,deviceLabel);dialog.append(controls,summary,jobs,body);
-  let closed=false,polling=false,timer=null,lastSignature='';
+  let closed=false,polling=false,timer=null,lastSignature='';const shownLogs=new Map();
   function button(parent,text,fn){const b=el('button',text);b.type='button';b.onclick=async()=>{b.disabled=true;try{await fn();await refresh(true)}catch(e){toast(e.message,true)}finally{b.disabled=false}};parent.append(b);return b}
   async function queue(component,action){const options={model:model.value,device:device.value};if(action==='sample'&&path.value.trim())options.source=path.value.trim();await api('/runtime/jobs',{component,action,options});toast('Proses ditambahkan ke antrean komponen')}
   const top=el('div',undefined,'row');dialog.insertBefore(top,controls);
@@ -70,7 +70,7 @@ export async function mountRuntime(dialog,api,toast,sourcePath=''){
       const progress=el('progress');progress.max=100;progress.value=job.progress||0;c.append(progress,el('p',job.message||'','help'));
       const r=el('div',undefined,'row');if(['queued','running','cancel_requested'].includes(job.status))button(r,'Batalkan',()=>api('/runtime/jobs/'+job.id+'/cancel',{}));
       if(['failed','interrupted','canceled'].includes(job.status))button(r,'Lanjutkan rencana yang sama',()=>api('/runtime/jobs/'+job.id+'/resume',{}));
-      button(r,'Lihat log',async()=>{const log=await api('/runtime/jobs/'+job.id+'/log');const old=c.querySelector('pre');if(old)old.remove();else c.append(el('pre',log.text))});c.append(r);jobs.append(c);
+      button(r,'Lihat log',async()=>{if(shownLogs.has(job.id))shownLogs.delete(job.id);else{const log=await api('/runtime/jobs/'+job.id+'/log');shownLogs.set(job.id,log.text)}});c.append(r);if(shownLogs.has(job.id))c.append(el('pre',shownLogs.get(job.id)));jobs.append(c);
     }
   }
   async function refresh(force=false){
@@ -84,5 +84,5 @@ export async function mountRuntime(dialog,api,toast,sourcePath=''){
     }finally{polling=false}
   }
   const cleanup=()=>{closed=true;clearInterval(timer);dialog.classList.remove('runtime-dialog');dialog.removeEventListener('close',cleanup)};
-  dialog.addEventListener('close',cleanup);dialog.showModal();await refresh(true);timer=setInterval(()=>refresh().catch(e=>toast(e.message,true)),2500);
+  dialog.addEventListener('close',cleanup);dialog.showModal();await refresh(true);if(!closed)timer=setInterval(()=>refresh().catch(e=>toast(e.message,true)),2500);
 }
