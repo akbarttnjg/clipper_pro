@@ -6,7 +6,13 @@ from pathlib import Path
 from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
-VERSION='studio4-content-v1'
+VERSION='studio4-content-v2'
+
+
+def active_recipe(recipe, cfg):
+    if cfg.broll_mode == 'off':
+        return {}
+    return {'scenes': [s for s in recipe.get('scenes', []) if s.get('enabled', True)]}
 
 
 def content_id(path,*,fresh=False):
@@ -42,7 +48,7 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     for key in irrelevant:settings.pop(key,None)
     fonts=[(p.name,content_id(p,fresh=fresh)) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
     assets=[asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
-    recipe=clip.get('_broll_recipe',{})
+    recipe=active_recipe(clip.get('_broll_recipe',{}),cfg)
     for scene in recipe.get('scenes',[]):assets.append(asset_id(scene.get('asset',{}).get('path'),fresh=fresh))
     # Runtime metadata and result paths do not affect rendered pixels.
     candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe')}

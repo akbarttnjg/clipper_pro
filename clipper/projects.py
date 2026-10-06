@@ -15,6 +15,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 from PIL import Image
 from .storage import read_json, write_json
+from .timebase import seconds_to_us, endpoint_range, video_track_ranges
 
 
 def srt_stamp(t):
@@ -212,7 +213,7 @@ def resolve_export(items, root):
             f' local ok = item:ImportFusionComp(here .. {lua_string(prefix)} .. string.format("text-%03d.comp",i))',
             ' if not ok then note("Fusion teks belum terpasang: " .. tostring(i)) end', 'end']
         if title:
-            commands += ['local titles = tl:GetItemListInTrack("video", 3) or {}',
+            commands += [f'local titles = tl:GetItemListInTrack("video", {4 if plan.get("broll") else 3}) or {{}}',
                          f'if titles[1] then titles[1]:ImportFusionComp(here .. {lua_string(prefix + "title.comp")}) end']
         commands += ['end']
     commands += ['pm:SaveProject()', 'print("Impor selesai. Periksa jumlah timeline, font, framing, dan track audio.")',
@@ -228,25 +229,25 @@ def capcut_export(items, root):
     drafts = cc.DraftFolder(str(cap))
     timelines = []
     now = int(time.time() * 1e6)
-    us = lambda seconds: round(seconds * 1e6)
+    us = seconds_to_us
     for i, item in enumerate(items):
         p = item['plan']; W, H = p['width'], p['height']
+        video_ranges, timeline_duration = video_track_ranges(p)
         name = f'CLIP_{i+1:02d}'
         script = drafts.create_draft(name, W, H, fps=p['fps'])
         script.add_track(cc.TrackType.video, 'Video')
         src = p['source']; fontmap = {}
-        for shot in p['shots']:
+        for shot, (target_start, duration) in zip(p['shots'], video_ranges):
             x, y, w, h = shot['rect']
             crop = cc.CropSettings(upper_left_x=x/src['width'], upper_left_y=y/src['height'],
                 upper_right_x=(x+w)/src['width'], upper_right_y=y/src['height'],
                 lower_left_x=x/src['width'], lower_left_y=(y+h)/src['height'],
                 lower_right_x=(x+w)/src['width'], lower_right_y=(y+h)/src['height'])
             material = cc.VideoMaterial(src['path'], crop_settings=crop)
-            duration = us(shot['end'] - shot['start'])
             source_start = us(shot['source_start'])
             # Some files round metadata down by a few microseconds.
             source_start = min(source_start, max(0, material.duration - duration))
-            segment = cc.VideoSegment(material, trange(us(shot['start']), duration),
+            segment = cc.VideoSegment(material, trange(target_start, duration),
                 source_timerange=trange(source_start, duration), volume=0)
             if shot['zoom_at'] is not None:
                 z = shot['zoom_at']
@@ -259,16 +260,17 @@ def capcut_export(items, root):
             script.add_track(cc.TrackType.video, 'Ilustrasi B-roll', relative_index=1)
             for event in p['broll']:
                 material=cc.VideoMaterial(event['path'])
-                duration=min(us(event['duration']),material.duration)
-                script.add_segment(cc.VideoSegment(material,trange(us(event['start']),duration),
+                start, duration = endpoint_range(event['start'], event['end'])
+                duration=min(duration,material.duration)
+                script.add_segment(cc.VideoSegment(material,trange(start,duration),
                     source_timerange=trange(0,duration),volume=0),'Ilustrasi B-roll')
         for kind, path in p['audio']['stems'].items():
             script.add_track(cc.TrackType.audio, kind)
             material = cc.AudioMaterial(path)
-            difference = us(p['duration'])-material.duration
+            difference = timeline_duration-material.duration
             if difference > 2000:
                 raise ValueError(f'Track {kind} kurang {difference/1e6:.3f} detik dari timeline. Render ulang clip sebelum ekspor.')
-            script.add_segment(cc.AudioSegment(material, trange(0, min(us(p['duration']), material.duration))), kind)
+            script.add_segment(cc.AudioSegment(material, trange(0, min(timeline_duration, material.duration))), kind)
         maxwords = max((len(ph['words']) for ph in p['captions']['phrases']), default=0)
         for k in range(maxwords):
             script.add_track(cc.TrackType.text, f'Kata {k+1}', relative_index=k)
@@ -283,11 +285,12 @@ def capcut_export(items, root):
             duration = end-start-reveal
             if duration < .015:
                 return
-            seg = cc.TextSegment(w['text'], trange(us(start+reveal), us(duration)),
+            target_start, target_duration = endpoint_range(start+reveal, end)
+            seg = cc.TextSegment(w['text'], trange(target_start, target_duration),
                 style=cc.TextStyle(size=w['size'] * 120 / min(W,H), bold=w.get('bold',w.get('family')!='regular'), italic=bool(w.get('italic')), color=rgb, align=1),
                 clip_settings=cc.ClipSettings(transform_x=2*w['x']/W-1, transform_y=1-2*w['y']/H),
                 border=cc.TextBorder(width=0 if samples else 8, alpha=.65))
-            timed = {min(us(duration), max(0, us(k['t']-reveal))): k for k in samples if k['t'] >= reveal}
+            timed = {min(target_duration, max(0, us(k['t']-reveal))): k for k in samples if k['t'] >= reveal}
             for when, key in sorted(timed.items()):
                 if key['t'] < reveal:
                     continue
@@ -311,6 +314,9 @@ def capcut_export(items, root):
         script.save()
         path = cap / name / 'draft_content.json'
         data = read_json(path)
+        # pycapcut's template reuses its draft ID. The wrapper indexes files by
+        # timeline ID; duplicates would overwrite earlier clips in the package.
+        data['id'] = str(uuid.uuid4()).upper()
         for material in data['materials']['texts']:
             body = json.loads(material['content'])
             fontpath = str((root / 'Fonts' / fontmap[material['id']]).resolve()).replace('\\','/')
@@ -439,17 +445,24 @@ def export_bundle(results, cfg, progress=lambda p,m: None):
         write_json(root / f'edit-plan-{i+1:02}.json', p)
         items.append({**result, 'plan': p})
     progress(35, 'Membuat timeline DaVinci dan komposisi teks editable')
-    resolve_export(items, root)
+    resolve_error = None
+    try:
+        resolve_export(items, root)
+    except Exception as exc:
+        resolve_error = str(exc)
     progress(65, 'Membuat draft CapCut dengan track video, kata, dan audio')
     capcut_error = None
     try:
         capcut_export(items, root)
     except Exception as exc:
         capcut_error = str(exc)
-    manifest = {'version': 3, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
+    manifest = {'version': 4, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
         'source_files': sorted({p['plan']['source']['path'] for p in items}),
         'capcut_status': 'experimental-generated' if capcut_error is None else 'failed', 'capcut_error': capcut_error,
-        'resolve_status': 'generated-unverified-in-editor', 'broll_layer': 'separate silent video track', 'limitations': [
+        'resolve_status': 'generated-unverified-in-editor' if resolve_error is None else 'failed', 'resolve_error': resolve_error,
+        'export_mode': 'hybrid', 'editable_layers': ['text', 'audio', 'broll'],
+        'baked_layers': ['source_framing', 'source_zoom'], 'native_editor_status': 'not_tested',
+        'broll_layer': 'separate silent video track', 'limitations': [
             'B-roll ada pada track terpisah; credits.txt berisi sumber untuk deskripsi publikasi.',
             'Video tanpa teks, WAV, font, ASS master dan SRT ada di paket. Framing/zoom sudah menyatu di video.',
             'DaVinci: Fusion Text+ dengan kurva posisi, ukuran, opacity dan blur; perlu verifikasi tampilan di editor.',
@@ -494,7 +507,8 @@ Jika folder proyek CapCut dipindah dari lokasi standar, gunakan --draft-root "D:
 Jangan hapus folder paket setelah impor karena aset direferensikan dari sini.
 
 BATAS VERIFIKASI
-File proyek telah dibuat secara terstruktur; impor di Resolve Free 21.0.4 / CapCut 9.5
+Status pembuatan dan kelengkapan tiap editor tersedia di verification.json.
+Impor di Resolve Free 21.0.4 / CapCut 9.5
 belum dijalankan dalam lingkungan pengembangan. Periksa satu clip dahulu.
 Perbedaan yang diketahui: blur dan fade teks CapCut belum dipetakan; ukuran font dan
 baseline kedua editor dapat berbeda. Semua efek penuh ada pada MP4 dan master ASS.
@@ -502,12 +516,20 @@ Komposisi kamera sudah menyatu di video tanpa teks. Ubah framing di aplikasi lal
 ekspor ulang jika ingin menggantinya. Pembuatan paket menambah satu render tanpa teks
 per clip, yang disimpan untuk dipakai kembali selama revisi tidak berubah.
 '''
-    if capcut_error:
-        guide += '\nEKSPOR CAPCUT GAGAL: ' + capcut_error + '\nInstal requirements-pro.txt lalu ekspor ulang.\n'
+    for editor, error in (('CAPCUT', capcut_error), ('DAVINCI', resolve_error)):
+        if error:
+            guide += '\nEKSPOR ' + editor + ' GAGAL: ' + error + '\nPeriksa verification.json; perbaiki penyebab tersebut lalu ekspor ulang.\n'
     (root / 'BACA_DULU.txt').write_text(guide, encoding='utf-8')
     from .export_verify import validate_bundle
     verification = validate_bundle(root, results)
     write_json(root / 'verification.json', verification)
+    manifest['structural_status'] = verification['structural_status']
+    manifest['editors'] = verification['editors']
+    write_json(root / 'manifest.json', manifest)
     zip_path = shutil.make_archive(str(root), 'zip', root)
-    return {'zip': zip_path, 'folder': str(root), 'timelines': len(items), 'capcut_error': capcut_error,
-            'note': 'Impor native perlu verifikasi di editor. Baca BACA_DULU.txt.'}
+    return {'zip': zip_path, 'folder': str(root), 'timelines': len(items),
+            'capcut_error': capcut_error, 'resolve_error': resolve_error,
+            'structural_status': verification['structural_status'], 'editors': verification['editors'],
+            'native_editor_status': 'not_tested', 'export_mode': 'hybrid',
+            'note': ('Paket perlu diperiksa. ' if verification['issues'] else 'Struktur paket lolos pemeriksaan. ')
+                    + 'Impor native perlu verifikasi di editor. Baca BACA_DULU.txt.'}

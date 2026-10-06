@@ -158,17 +158,25 @@ def ready(clip, words, cfg):
             and clip.get('selection_source') != 'manual-required')
 
 
-def annotate_words(words, clip, cfg):
+def annotate_words(words, clip, cfg, *, context_words=None):
     """Add source-local phrase hints without rewriting words, digits or timestamps."""
     hints = clip.get('intelligence', {})
     # Clear stale hints before any fallback, including words from a saved edit.
     words=[{k:v for k,v in w.items() if k not in ('meaning_group','meaning_emphasis')} for w in words]
-    if hints.get('signature') != signature(clip, words, cfg.audience) or hints.get('status')!='ready':
+    # Display token IDs and clip-only words are different from source context.
+    context = words if context_words is None else context_words
+    if (hints.get('signature') != signature(clip, context, cfg.audience)
+            or hints.get('version') != VERSION or hints.get('status')!='ready'):
         return words
+    context_ids = {i for w in context for i in w.get('source_word_ids', w.get('origin_word_ids', [w['word_id']]))}
     phrases = hints.get('emphasis', [])
     result = []
     for w in words:
         item = dict(w)
+        origins = w.get('source_word_ids', w.get('origin_word_ids', [w['word_id']]))
+        if not origins or not set(origins) <= context_ids:
+            result.append(item)
+            continue
         for i, p in enumerate(phrases):
             if p['source_start'] <= w['start'] and w['end'] <= p['source_end'] + .001:
                 item['meaning_group'] = i
