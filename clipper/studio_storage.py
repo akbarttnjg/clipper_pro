@@ -93,6 +93,8 @@ def backup(service,project_id,include_source=False):
             files[name]=digest;mapping[str(p.resolve())]=name
         archive.writestr('project.json',dumps(doc))
         takes={doc.get('transcript_id')}|{p['transcript_id'] for g in [doc.get('shared_corrections',{}),*doc.get('clip_corrections',{}).values()] for p in g.values()}
+        timing=doc.get('alignment_overrides',{})
+        takes|={p['transcript_id'] for g in [timing.get('shared',{}),*timing.get('clips',{}).values()] for p in g.values()}
         transcripts={take:service.store.transcript(take) for take in takes if take}
         archive.writestr('transcripts.json',dumps(transcripts));archive.writestr('history.json',dumps(service.store.history(project_id,100)))
         for name,value in [('project.json',dumps(doc)),('transcripts.json',dumps(transcripts))]:
@@ -140,6 +142,11 @@ def restore(service,path):
             if current.get('transcript_id'):current['transcript_id']=take_map[current['transcript_id']]
             for group in [current.get('shared_corrections',{}),*current.get('clip_corrections',{}).values()]:
                 for patch in group.values():patch['transcript_id']=take_map[patch['transcript_id']]
+            timing=current.get('alignment_overrides',{})
+            for group in [timing.get('shared',{}),*timing.get('clips',{}).values()]:
+                for patch in group.values():patch['transcript_id']=take_map[patch['transcript_id']]
+            if current.get('discovery',{}).get('transcript_id') in take_map:
+                current['discovery']['transcript_id']=take_map[current['discovery']['transcript_id']]
             current['restored_from']=old_id
         service.store.mutate(pid,0,identifier('restore'),{'restore':old_id},change,'Pulihkan sebagai proyek baru')
         return service.public(pid)

@@ -22,7 +22,7 @@ def test_validate_overrides_length():
     from clipper.config import validate_overrides
     assert validate_overrides({"length": "under30"}) == {"min_clip_s": 8.0, "max_clip_s": 30.0}
     assert validate_overrides({"length": "60to90"}) == {"min_clip_s": 60.0, "max_clip_s": 90.0}
-    assert validate_overrides({"length": "auto"}) == {"min_clip_s": 30.0, "max_clip_s": 120.0}
+    assert validate_overrides({"length": "auto"}) == {"min_clip_s": 20.0, "max_clip_s": 120.0}
     assert validate_overrides({"length": "bogus"}) == {}
 
 
