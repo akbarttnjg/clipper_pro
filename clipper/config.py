@@ -37,7 +37,7 @@ class Config:
     # --- Clip selection ---
     num_clips: int = _env_int("NUM_CLIPS", 0)  # 0 = all verified, distinct stories
     search_depth: str = 'broad'
-    min_clip_s: float = _env_float("MIN_CLIP_S", 30.0)
+    min_clip_s: float = _env_float("MIN_CLIP_S", 20.0)
     max_clip_s: float = _env_float("MAX_CLIP_S", 120.0)
 
     # --- Auto B-roll (Pexels stock video) ---
@@ -90,6 +90,7 @@ class Config:
     glossary: str = ''
     asr_second_pass: bool = True
     asr_recheck_windows: int = 12
+    alignment_model_path: str = os.environ.get('ALIGNMENT_MODEL_PATH','')
     caption_backdrop: bool = True
     safe_placement: bool = True
 
@@ -174,7 +175,7 @@ CAPTION_STYLES: tuple[str, ...] = ("magazine", "narrative", "pop", "slide", "blu
 LAYOUTS: tuple[str, ...] = ("auto", "fill", "fit", "stream", "split")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
-    "auto": (30.0, 120.0),
+    "auto": (20.0, 120.0),
     "60to120": (60.0, 120.0),
     "under30": (8.0, 30.0),
     "30to60": (30.0, 60.0),

@@ -17,7 +17,8 @@ def render_words(transcript,document,clip,cfg):
         clip_span=(clip['start'],clip['end']))
     return [{ 'word':t['text'],'start':t['source_start'],'end':t['source_end'],'word_id':t['token_id'],
         'token_id':t['token_id'],'source_word_ids':t['origin_word_ids'],'origin_word_ids':t['origin_word_ids'],
-        'manually_edited':t['correction_status']=='manual'} for t in snapshot['payload']['display_tokens']]
+        'manually_edited':t['correction_status']=='manual','timing_status':t.get('timing_status','asr'),
+        'alignment_method':t.get('alignment_method')} for t in snapshot['payload']['display_tokens']]
 
 
 def records(plan,result,document,clip_id,variant_id,cfg,media):

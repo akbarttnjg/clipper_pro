@@ -257,11 +257,16 @@ def validated_response(path, block, words, cfg, duration, candidate=None, focus=
 def duplicate(c, prior, words):
     overlap = max(0, min(c['end'], prior['end']) - max(c['start'], prior['start']))
     share = overlap / max(.01, min(c['end']-c['start'], prior['end']-prior['start']))
-    if share > .93:
-        return True
     # Explicitly different source-grounded stories can share context footage.
     if c.get('main_claim') and prior.get('main_claim') and c['main_claim'] != prior['main_claim']:
         return False
+    from .stage3 import fact_signature
+    if c.get('story_kind') and prior.get('story_kind') and c['story_kind']!=prior['story_kind']:return False
+    def claim(clip):
+        return (clip.get('main_claim') or ' '.join(w['word'] for w in words if clip['start']<=w['start']<clip['end']))+' '+clip.get('ending_evidence','')
+    if fact_signature(claim(c))!=fact_signature(claim(prior)):return False
+    if share > .93:
+        return True
     def tokens(clip):
         return [token(w['word']) for w in words if clip['start'] <= w['start'] < clip['end'] and token(w['word'])]
     a, b = tokens(c), tokens(prior)
@@ -304,7 +309,7 @@ def select(transcript, cfg, progress=lambda p, m: None, existing=None):
     consecutive_offline = 0
     def discover(block, focus=None):
         key = hashlib.sha256(json.dumps([block, cfg.model, cfg.min_clip_s, cfg.max_clip_s,
-            cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, focus, cfg.selection_floor, 'topic-v3.4-step1'], ensure_ascii=False).encode()).hexdigest()[:24]
+            cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, focus, cfg.selection_floor, 'topic-v4.0.3'], ensure_ascii=False).encode()).hexdigest()[:24]
         path = journal / (key + '.json')
         found, cached, proposed, audit = validated_response(path, block, transcript['words'], cfg, transcript['duration'], focus=focus)
         rejections.extend(audit.get('rejections',[]))
@@ -314,7 +319,8 @@ def select(transcript, cfg, progress=lambda p, m: None, existing=None):
             progress(32 + round(32 * i / max(1, len(blocks))), f'Menjelajah seluruh sumber {i + 1}/{len(blocks)}')
             started = time.monotonic()
             try:
-                focus = [*exclusions,{'instruction':objective,'search_round':round_number+1}] if existing else None
+                focus = [*exclusions,{'instruction':objective,'search_round':round_number+1,
+                    'diversity':'Cari jawaban, contoh, kesalahan, perbandingan, dan demonstrasi visual yang berbeda bila memang ada dalam DATA.'}]
                 found, cached, proposed = discover(block,focus)
                 candidates.extend(found)
                 completed.add(i)
@@ -365,6 +371,10 @@ def select(transcript, cfg, progress=lambda p, m: None, existing=None):
             if not any(c is p for p in pool):
                 rejections.append({'code':'duplicate','start':c['start'],'end':c['end'],'title':c['title'],
                     'detail':'Rentang atau isi sangat mirip kandidat yang lebih lengkap.','action':'compare'})
+        for c in pool:
+            if any(duplicate(c,p,transcript['words']) for p in existing):
+                rejections.append({'code':'existing_duplicate','start':c['start'],'end':c['end'],'title':c['title'],
+                    'detail':'Cerita ini sudah terwakili oleh klip yang disimpan.','action':'compare'})
         pool = [c for c in pool if not any(duplicate(c,p,transcript['words']) for p in existing)]
         removed, semantic_report = discovery.semantic_groups(pool,cfg)
         rejections.extend(semantic_report)
@@ -395,9 +405,11 @@ def select(transcript, cfg, progress=lambda p, m: None, existing=None):
         editorial.release(cfg)
     reviewed_count = len(result) if cfg.topic_review else 0
     result = distinct(result, transcript['words'], cfg)
-    discovery.save_report({'version':'3.4-step1','analysis_revision':discovery.revision(transcript,cfg),
+    from .stage3 import chapter_plan
+    source_coverage=discovery.coverage(blocks,completed,transcript['duration'])
+    discovery.save_report({'version':'4.0.3','analysis_revision':discovery.revision(transcript,cfg),
         'model':cfg.model,'objective':objective,'existing_candidates':len(existing),'new_candidates':len(result),
-        'coverage':discovery.coverage(blocks,completed,transcript['duration']),
+        'coverage':source_coverage,'chapters':chapter_plan(segments,transcript['duration'],[*existing,*result],source_coverage['source_ranges']),
         'rejections':rejections,'extra_window_budget':cfg.discovery_extra_windows,
         'windows': len(blocks), 'processed_windows': len(completed), 'errors': failures,
         'coverage_complete': len(completed) == len(blocks), 'missing_windows': [i+1 for i in range(len(blocks)) if i not in completed],
@@ -466,6 +478,12 @@ def review_candidate(candidate, transcript, cfg, refresh=False):
         new['selection_source'] = 'context-reviewed'
         if 'intelligence' not in new:
             new['intelligence'] = intelligence.assess(None, new, block, words, cfg)
+        if candidate.get('boundary_pin'):
+            c['boundary_proposal']={'start':new['start'],'end':new['end'],'title':new['title'],'evidence':new.get('ending_evidence',''),
+                'reason':'Batas manual dipertahankan. Usulan ini dapat diterapkan melalui penyimpanan batas oleh pengguna.'}
+            c['boundary_review']['status']='needs_review'
+            c['boundary_review']['issues'].append('Batas manual dikunci; tinjau usulan sebelum menerapkan perubahan.')
+            return c
         return new
     except (requests.RequestException, ValueError, KeyError) as exc:
         c['boundary_review']['status'] = 'needs_review'

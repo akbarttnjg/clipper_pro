@@ -12,7 +12,7 @@ from . import transcript_correction, subtitle_edit, typography, caption_checks
 from .analysis_options import configured,checkpoint,DEPENDENCIES
 from . import contracts
 
-VERSION='A-01-22.1'
+VERSION='A-4.0.3'
 
 
 def digest(value):
@@ -53,7 +53,8 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
     if any(i is None for i in identifiers) or len(set(identifiers))!=len(identifiers):
         raise ValueError('ID kata asal harus ada dan unik di transkrip ini')
     heard=[{**w,'source_id':source_id,'transcript_id':transcript_id,'origin_word_ids':[w['word_id']]} for w in heard]
-    display,changes,warnings=subtitle_edit.clean(refined['words'],cfg.caption_cleanup,cfg.caption_punctuation,cfg)
+    from .stage3 import expand_aligned
+    display,changes,warnings=subtitle_edit.clean(expand_aligned(refined['words']),cfg.caption_cleanup,cfg.caption_punctuation,cfg)
     tokens=[];occurrences={}
     for w in display:
         origins=transcript_correction.source_ids([w])
@@ -63,6 +64,7 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
         tokens.append(dict(token_id='tok-'+digest([source_id,transcript_id,origins,ordinal])[:24],
             origin_word_ids=origins,text=w['word'],source_start=w['start'],source_end=w['end'],
             correction_status='manual' if w.get('manually_edited') else w.get('correction','unchanged'),
+            timing_status=w.get('timing_status','asr'),alignment_method=w.get('alignment_method'),
             provenance={'reason':w.get('correction'),'before':w.get('raw_word'),'manual':bool(w.get('manually_edited'))},
             requires_alignment=alignment))
     queue=[]
