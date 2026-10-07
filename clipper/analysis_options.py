@@ -31,12 +31,15 @@ SETTINGS={
     'vision_model':dict(type='string',default='',max_length=100,stages=['asset_visual_review','asset_proposals']),
     'vision_policy':dict(type='enum',default='optional',values=['optional','required','off'],stages=['asset_visual_review','asset_proposals']),
     'asr_recheck_windows':dict(type='integer',default=12,min=0,max=64,stages=['asr']),
+    'alignment_model_path':dict(type='string',default='',max_length=2000,stages=['alignment']),
 }
 
 DEPENDENCIES={
     'asr':['source_content_hash','audio_stream_id','source_time_origin','whisper_model','language','whisper_compute',
            'glossary','audience','asr_second_pass','asr_recheck_windows','transcript_correction','alias_revision'],
     'correction':['transcript_id','transcript_revision','glossary','audience','alias_revision','manual_overrides'],
+    'asr_recheck':['source_content_hash','audio_stream_id','transcript_id','transcript_revision','whisper_model','language','glossary','manual_overrides','model_ref','origin_word_ids','limit'],
+    'alignment':['source_content_hash','audio_stream_id','transcript_id','transcript_revision','alignment_model_path','manual_overrides','origin_word_ids','limit'],
     'source_evidence':['source_content_hash','media_context_revision','ocr_enabled','ocr_max_frames','ocr_interval_s','visual_cues','ocr_engine_version'],
     'discovery':['transcript_id','transcript_revision','source_evidence_fingerprint','model','audience','min_clip_s','max_clip_s',
                  'topic_grace_s','selection_floor','search_depth','discovery_extra_windows','existing_candidate_ids','search_objective'],
@@ -72,6 +75,8 @@ def validate_settings(values):
         elif name=='vision_model':
             if not isinstance(value,str) or value and not re.fullmatch(r'[a-zA-Z0-9_.:/-]{1,100}',value) or 'cloud' in value.lower():
                 raise ValueError('Pilih nama model vision lokal yang valid')
+        elif kind=='string':
+            if not isinstance(value,str) or len(value)>spec['max_length']:raise ValueError(name+' tidak valid')
         result[name]=value
     return result
 

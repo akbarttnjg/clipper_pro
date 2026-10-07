@@ -1,5 +1,14 @@
 # clipper
 
+**Upgrade 4.0.3, Tahap 3:** transkrip penuh per halaman, perlindungan perubahan
+fakta, ASR ulang terarah dengan model lokal, timing kata terpisah, laporan cakupan
+sumber dan pemulihan kandidat ditolak. Lihat [panduan Tahap 3](docs/TAHAP_3_TRANSKRIP_CERITA.md).
+
+Paket offline untuk instalasi `main` commit `2b02a58` menyediakan pemeriksaan
+checksum, cadangan kode dan rollback. Pembuat paket ada di
+`tools/build_stage3_release.py`; pemasangnya di `tools/stage3_installer.py`.
+Model alignment lokal merupakan tambahan. Timing manual bisa dipakai langsung.
+
 **Studio 4 — versi uji gabungan A 01–22 + B 23–43.** Mulai dari [panduan pemasangan dan pemakaian](PANDUAN_STUDIO_4.md). Alur baru: Sumber → Pilih cerita → Edit → Hasil. [Status integrasi dan gate yang masih terbuka](docs/handoff/B.md): impor native CapCut/DaVinci dan benchmark mutu pada video acuan belum lulus verifikasi akhir.
 
 **Drop in a long video. Get back scored, captioned, vertical shorts — entirely on your own machine.**

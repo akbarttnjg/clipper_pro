@@ -17,7 +17,7 @@ class StaleJob(ValueError):pass
 
 
 def execute(service,job):
-    from . import pipeline, media_context, evidence, transcript_correction, story, analysis_adapter, illustrations, editorial
+    from . import media_context, evidence, transcript_correction, story, analysis_adapter, editorial
     pid=job['project_id'];target=job['target'];cid=target.get('clip_id');vid=target.get('variant_id','portrait');kind=job['kind']
     doc=service.store.get(pid);dependency=job['request']['dependency'];cfg=service.config(doc,cid,vid)
     work=Path(cfg.work_dir);work.mkdir(parents=True,exist_ok=True)
@@ -42,6 +42,7 @@ def execute(service,job):
     cfg=replace(cfg,source_content_id=media['source_id'],audio_stream_id=media['payload']['audio_stream_id'])
     source=media['payload']['working_path'];result={};updates={};variant_updates={}
     if kind=='analyze':
+        from . import pipeline
         transcript,candidates=pipeline.analyze(source,cfg,progress)
         # Stable immutable take IDs: cache reuse does not invalidate approved patches.
         take='asr-'+fingerprint([pid,media['source_id'],media['payload']['audio_stream_id'],transcript.get('raw_words',transcript['words'])])[:32]
@@ -67,10 +68,46 @@ def execute(service,job):
         elif kind=='discovery':
             candidates=story.select(transcript,cfg,progress,existing=list(doc['clips'].values()))
             updates['discovery']=read_json(work/'selection-report.json',{});result={'candidates':len(candidates)}
+        elif kind=='asr_recheck':
+            from . import speech_jobs
+            original=service.store.transcript(doc['transcript_id']);heard=copy.deepcopy(original.get('heard_words',original.get('raw_words',original['words'])))
+            groups=[doc.get('shared_corrections',{}),*doc.get('clip_corrections',{}).values()]
+            protected={i for group in groups for patch in group.values() if patch['transcript_id']==doc['transcript_id'] for i in patch['origin_word_ids']}
+            for word in heard:
+                if set(transcript_correction.source_ids([word]))&protected:word['manually_edited']=True
+            payload={**original,'words':heard};options=copy.deepcopy(job['request'].get('options',{}))
+            if cid and not options.get('origin_word_ids'):
+                selected=[w for w in heard if w['end']>doc['clips'][cid]['start'] and w['start']<doc['clips'][cid]['end'] and transcript_correction.suspect_reason(w)]
+                if not selected:result={'checked':0,'accepted':0,'note':'Tidak ada kata berkeyakinan rendah dalam klip ini.'}
+                else:options['origin_word_ids']=transcript_correction.source_ids(selected)[:80]
+            if not result:
+                progress(12,'Mendengarkan ulang rentang terarah dengan model ASR lokal')
+                response=speech_jobs.run(kind,source,payload,cfg,options);result=response['report']
+                if response['changes']:
+                    for word in response['words']:word.pop('manually_edited',None)
+                    refined=speech_jobs.rechecked_transcript(original,response,cfg)
+                    take='rechecked-'+fingerprint([pid,doc['transcript_id'],refined['heard_words']])[:32]
+                    try:service.store.transcript(take)
+                    except KeyError:service.store.save_transcript(pid,refined,take)
+                    updates['transcript_id']=take;updates['correction_report']=refined['correction_report']
+            updates['speech_reports']={**doc.get('speech_reports',{}),'asr_recheck':result}
+        elif kind=='alignment':
+            from . import speech_jobs
+            payload=transcript;options=copy.deepcopy(job['request'].get('options',{}))
+            if cid and not options.get('origin_word_ids'):
+                selected=[w for w in words if w['end']>doc['clips'][cid]['start'] and w['start']<doc['clips'][cid]['end']
+                    and (w.get('correction') or w.get('manually_edited') or len(w['word'].split())>1) and not w.get('aligned_words')]
+                options['origin_word_ids']=transcript_correction.source_ids(selected)[:80]
+                if not selected:result={'aligned':0,'attempted':0,'errors':[],'device':'cpu','note':'Tidak ada frasa dalam klip ini yang memerlukan alignment.'}
+            progress(12,'Menyelaraskan frasa yang dikoreksi dengan model CTC lokal pada CPU')
+            response=speech_jobs.run(kind,source,payload,cfg,options) if not result else {'report':result,'patches':[]};result=response['report']
+            alignment_patches=response['patches']
+            updates['speech_reports']={**doc.get('speech_reports',{}),'alignment':result}
         elif kind=='boundary_review':
             reviewed=story.review_candidate(doc['clips'][cid],transcript,cfg,refresh=True)
             result={'review':reviewed}
         elif kind in ('asset_proposals','asset_visual_review'):
+            from . import illustrations
             clip={k:v for k,v in doc['clips'][cid].items() if k!='variants'}
             if cfg.broll_mode=='off':cfg=replace(cfg,broll_mode='local')
             recipe=illustrations.prepare(words,clip,cfg,progress,input_fingerprint=dependency)
@@ -80,6 +117,7 @@ def execute(service,job):
                 variant_updates['settings']={**service.variant(doc,cid,vid).get('settings',{}),'broll_mode':'local'}
             result={'proposals':len(recipe.get('scenes',[])),'notes':recipe.get('notes',[])}
         elif kind in ('preview','render'):
+            from . import pipeline
             clip={k:v for k,v in doc['clips'][cid].items() if k!='variants'};variant=service.variant(doc,cid,vid)
             from .studio_exchange import render_words,records
             words=render_words(transcript,doc,clip,cfg)
@@ -139,12 +177,27 @@ def execute(service,job):
             service.add_candidates(current,candidates)
             current['candidate_set']=analysis_adapter.candidate_set(list(current['clips'].values()),current.get('discovery',{}),
                 source_id=media['source_id'],input_fingerprint=dependency)
-        if kind in ('analyze','correction') and old_take!=current['transcript_id']:
+        if kind in ('analyze','correction','asr_recheck') and old_take!=current['transcript_id']:
             current['transcript_revision']+=1
-            if kind=='correction':
+            if kind in ('correction','asr_recheck'):
                 for group in [current.get('shared_corrections',{}),*current.get('clip_corrections',{}).values()]:
                     for patch in group.values():
                         if patch['transcript_id']==old_take:patch['transcript_id']=current['transcript_id']
+                timing=current.get('alignment_overrides',{})
+                for group in [timing.get('shared',{}),*timing.get('clips',{}).values()]:
+                    for patch in group.values():
+                        if patch['transcript_id']==old_take:patch['transcript_id']=current['transcript_id']
+        if kind in ('analyze','discovery') and current.get('discovery'):
+            current['discovery']['transcript_id']=current['transcript_id']
+            current['discovery']['transcript_revision']=current['transcript_revision']
+        if kind=='alignment':
+            patches=current.setdefault('alignment_overrides',{})
+            group=patches.setdefault('clips',{}).setdefault(cid,{}) if cid else patches.setdefault('shared',{})
+            for patch in alignment_patches:
+                patch['transcript_id']=current['transcript_id'];patch['provenance'].update(source_id=media['source_id'],audio_stream_id=media['payload']['audio_stream_id'])
+                from .stage3 import store_alignment
+                store_alignment(group,patch)
+            if alignment_patches:current['transcript_revision']+=1
         if kind=='analyze':current['source']['requires_analysis']=False
         if cid:
             service.variant(current,cid,vid).update(variant_updates)

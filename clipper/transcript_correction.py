@@ -7,7 +7,7 @@ import copy
 import difflib
 import re
 
-VERSION = '3.4-step1'
+VERSION = '4.0.3'
 PROTECTED = set('tidak bukan jangan belum tanpa kurang lebih kecuali mungkin bisa harus wajib boleh pasti tak nggak gak enggak not no never may must can cannot'.split())
 FINANCE = set('trading trader forex emas gold pair pasar chart candlestick candle lot pip pips broker scalping timeframe bullish bearish support resistance xauusd eurusd gbpusd'.split())
 BUILTINS = {
@@ -47,10 +47,14 @@ def parse_glossary(value):
         for alias in variants:
             if len(alias) > 60 or not 1 <= len(alias.split()) <= 4:
                 raise ValueError('Alias kamus harus 1–4 kata. Pisahkan alias dengan |.')
-            a, b = re.findall(r'\d+(?:[.,]\d+)*', alias), re.findall(r'\d+(?:[.,]\d+)*', canonical)
-            if a != b or {norm(x) for x in alias.split()} & PROTECTED != {norm(x) for x in canonical.split()} & PROTECTED:
-                raise ValueError('Kamus tidak boleh mengubah angka atau kata penyangkalan/kepastian.')
+            from .stage3 import fact_review
+            if fact_review(alias,canonical)['requires_confirmation']:
+                raise ValueError('Kamus tidak boleh mengubah angka, satuan, urutan negasi atau syarat.')
             entries.append((canonical, tuple(norm(x) for x in alias.split()), False))
+    meanings={}
+    for canonical,alias,_ in entries:
+        if alias in meanings and meanings[alias]!=canonical:raise ValueError('Alias kamus ambigu: satu pengucapan menunjuk dua istilah berbeda.')
+        meanings[alias]=canonical
     return entries
 
 
@@ -63,12 +67,22 @@ def prompt(cfg):
     return ', '.join(terms)[:900]
 
 
+def glossary_entries(cfg):
+    from .correction_memory import glossary
+    entries=parse_glossary(glossary(cfg))+parse_glossary(cfg.glossary)
+    meanings={}
+    for canonical,alias,_ in entries:
+        if alias in meanings and meanings[alias]!=canonical:raise ValueError('Alias ambigu antara kamus proyek dan memori istilah: '+' '.join(alias))
+        meanings[alias]=canonical
+    return entries
+
+
 def correct_words(words, cfg):
     if not cfg.transcript_correction:
         return copy.deepcopy(words), []
     from .correction_memory import glossary
     # Explicit project approvals take priority over the built-in vocabulary.
-    entries = parse_glossary(glossary(cfg)) + parse_glossary(cfg.glossary)
+    entries = glossary_entries(cfg)
     entries += [(canonical, tuple(norm(x) for x in alias.split()), True)
                 for canonical, aliases in BUILTINS.items() for alias in aliases]
     entries.sort(key=lambda row: len(row[1]), reverse=True)
@@ -102,6 +116,7 @@ def correct_words(words, cfg):
         replacement = canonical + (suffix.group() if suffix else '')
         new = {**original, 'word': replacement, 'end': span[-1]['end']}
         if text != replacement:
+            new.pop('aligned_words',None);new.pop('alignment_method',None)
             new.update(raw_word=original.get('raw_word', text), correction='context_glossary' if built_in else 'user_glossary',
                        source_word_ids=source_ids(span))
             changes.append({'word_id': original.get('word_id'), 'start': original['start'], 'end': span[-1]['end'],
@@ -126,6 +141,12 @@ def refine(transcript, cfg):
             if covered==ids:
                 base[indices[0]:indices[-1]+1]=[copy.deepcopy(override)]
     result['words'], changes = correct_words(base, cfg)
+    # Timing survives a glossary pass only when both text and source lineage match.
+    aligned={(tuple(source_ids([w])),w['word']):w for w in transcript['words'] if w.get('aligned_words')}
+    for word in result['words']:
+        prior=aligned.get((tuple(source_ids([word])),word['word']))
+        if prior:
+            for key in ('aligned_words','alignment_method','alignment_provenance'):word[key]=copy.deepcopy(prior.get(key))
     result['text'] = ' '.join(w['word'] for w in result['words'])
     from .boundaries import segments_from_words
     result['segments'] = segments_from_words(result['words'])
@@ -213,9 +234,10 @@ def merge_recheck(words, heard):
             continue
         before = ' '.join(w['word'] for w in old_span)
         after = ' '.join(w['word'].strip('.,!?;:') for w in new_span)
-        if re.search(r'\d', before+after) or {norm(s) for s in (before+' '+after).split()} & PROTECTED:
+        from .stage3 import fact_signature
+        if fact_signature(before) or fact_signature(after):
             continue
-        if (difflib.SequenceMatcher(None, norm(before), norm(after)).ratio() < .5
+        if (difflib.SequenceMatcher(None, norm(before), norm(after)).ratio() < .75
                 or abs(old['start']-new['start']) > .45
                 or abs(old_span[-1]['end']-new_span[-1]['end']) > .55
                 or any(y['start']-x['end'] > .6 for x,y in zip(old_span,old_span[1:]))):
@@ -225,7 +247,7 @@ def merge_recheck(words, heard):
         ids = source_ids(old_span)
         replacements[indices[a]] = (len(old_span), {**old, 'end': old_span[-1]['end'],
             'word': replacement, 'raw_word': before, 'correction': 'audio_recheck',
-            'source_word_ids': ids, 'probability': new_p})
+            'source_word_ids': ids, 'probability': new_p, 'aligned_words':None, 'alignment_method':None})
         changes.append({'word_id': old.get('word_id'), 'source_word_ids': ids,
                         'start': old['start'], 'end': old_span[-1]['end'],
                         'before': before, 'after': replacement, 'reason': 'audio_recheck',
