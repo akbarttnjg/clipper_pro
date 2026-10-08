@@ -54,6 +54,17 @@ def build(words, clip, cfg):
                     'start': cursor / fps + left - a, 'end': cursor / fps + right - a,
                     'part': kind})
         cursor += count
+    # A source word may cross two adjacent retained spans. It is still one
+    # utterance on the output timeline, not two displayed repetitions.
+    joined=[]
+    for word in mapped:
+        previous=joined[-1] if joined else None
+        if previous and previous.get('part')==word.get('part') and previous['word']==word['word'] and \
+                previous['source_start']==word['source_start'] and previous['source_end']==word['source_end'] and \
+                previous.get('word_id')==word.get('word_id') and abs(previous['end']-word['start'])<1e-6:
+            previous['end']=word['end']
+        else:joined.append(word)
+    mapped=joined
     if cfg.preview_seconds > 0:
         limit = min(cursor, round(cfg.preview_seconds * fps))
         kept = []

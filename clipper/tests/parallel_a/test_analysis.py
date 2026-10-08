@@ -150,7 +150,7 @@ def test_semantic_comparison_can_detect_paraphrase_but_retains_new_story_type(tm
         def raise_for_status(self):pass
         def json(self):return {'response':json.dumps({'pairs':[{'keep':0,'duplicate':1,'reason':'Keduanya menjelaskan latihan meningkatkan keterampilan.'}]})}
     monkeypatch.setattr(discovery.requests,'post',lambda *a,**kw:calls.append(kw) or Reply())
-    a=dict(start=0,end=30,title='Latihan',story_kind='explanation',main_claim='Latihan rutin meningkatkan kemampuan kerja')
+    a=dict(start=0,end=30,title='Latihan',story_kind='explanation',main_claim='Latihan setiap hari meningkatkan kemampuan kerja')
     b=dict(start=60,end=90,title='Belajar',story_kind='explanation',main_claim='Keterampilan membaik melalui praktik setiap hari')
     removed,report=discovery.semantic_groups([a,b],cfg)
     assert removed=={1} and report[0]['source']=='local_semantic_review' and calls

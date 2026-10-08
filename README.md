@@ -1,6 +1,32 @@
-# clipper
+# Clipper Studio lokal
 
-**Studio 4 — versi uji gabungan A 01–22 + B 23–43.** Mulai dari [panduan pemasangan dan pemakaian](PANDUAN_STUDIO_4.md). Alur baru: Sumber → Pilih cerita → Edit → Hasil. [Status integrasi dan gate yang masih terbuka](docs/handoff/B.md): impor native CapCut/DaVinci dan benchmark mutu pada video acuan belum lulus verifikasi akhir.
+**Versi 4.0.4 Tahap 4** menghubungkan analisis wajah, materi dan ruang subtitle
+ke preview dan render. Kamera dan koreksi area tersimpan terpisah untuk 16:9
+dan 9:16. Lihat [panduan Tahap 4](docs/TAHAP_4_KAMERA_AREA_AMAN.md).
+
+Buka satu klip pada **Edit → Kamera, pembicara & area aman → Analisis visual
+klip**. Bukti sumber dipakai ulang tanpa menjalankan ASR atau pencarian cerita.
+Crop, area materi dan pilihan pembicara manual bertahan saat analisis diulang.
+
+Paket offline menyediakan pemeriksaan checksum, cadangan kode dan rollback.
+Pembuat paket: `tools/build_stage4_release.py`. Installer:
+`tools/stage4_installer.py`. Target yang didukung adalah `main` 2b02a58 atau
+instalasi Tahap 3 yang sesuai pemeriksaan. Data proyek dan lingkungan model
+tidak ditimpa. Paket tidak menjalankan pip atau mengunduh model.
+
+TalkNet, RapidOCR, SmolVLM/Qwen3 VL dan SAM hanya dipakai jika lingkungan,
+bobot dan catatan uji sampel lokalnya siap. Komposisi mempertahankan gambar
+ketika bukti belum cukup. SAM menyediakan mask terpisah; belum layer efek
+video atau proyek editor. Akurasi neural dan impor desktop dari komposisi baru
+masih memerlukan pengujian pada sumber serta versi editor Anda.
+
+Tahap 3 tetap tersedia: [transkrip dan cerita](docs/TAHAP_3_TRANSKRIP_CERITA.md).
+Perubahan ini tidak menjamin FYP atau mutu terbaik dibanding semua editor.
+
+## Dokumentasi proyek asal
+
+Bagian di bawah merupakan dokumentasi Steezy yang diwarisi. Gunakan panduan
+Tahap 4 untuk perilaku dan status verifikasi Clipper Studio yang diperbarui.
 
 **Drop in a long video. Get back scored, captioned, vertical shorts — entirely on your own machine.**
 

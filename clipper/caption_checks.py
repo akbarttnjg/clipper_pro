@@ -46,7 +46,11 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
                 if not (x-.5 <= cx-half_w and cx+half_w <= x+width+.5 and y-.5 <= cy-half_h and cy+half_h <= y+height+.5):
                     issues.append('Animasi subtitle keluar dari area teks.')
             if cfg.caption_position == 'auto' and cfg.safe_placement:
-                from .placement import overlap
+                # Caption validation only needs rectangle arithmetic, not the
+                # OpenCV frame detector used by production placement sampling.
+                def overlap(a,b):
+                    x,y,w,h=a;bx,by,bw,bh=b
+                    return max(0,min(x+w,bx+bw)-max(x,bx))*max(0,min(y+h,by+bh)-max(y,by))
                 for frame in word.get('keyframes', [{'scale': 1, 'dx': 0, 'dy': 0, 'opacity': 1}]):
                     if frame.get('opacity', 1) < .05:
                         continue

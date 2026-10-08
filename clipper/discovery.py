@@ -20,7 +20,7 @@ def history(cfg):
 
 def revision(transcript,cfg):
     return hashlib.sha256(json.dumps([transcript['words'],cfg.model,cfg.audience,cfg.min_clip_s,
-        cfg.max_clip_s,cfg.selection_floor,'discovery-1'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
+        cfg.max_clip_s,cfg.selection_floor,'discovery-4.0.3'],sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
 
 
 def extra_windows(segments, cfg, existing, cues, round_number):
@@ -63,8 +63,15 @@ def coverage(blocks, completed, duration):
             merged[-1][1]=max(b,merged[-1][1])
         else:
             merged.append([a,b])
+    segments={s['id']:s for block in blocks for s in block}
+    reviewed={s['id'] for i in completed for s in blocks[i]}
+    pending=[s for key,s in sorted(segments.items()) if key not in reviewed]
     return {'source_ranges':merged,'source_seconds':round(sum(b-a for a,b in merged),2),
-            'source_duration':duration,'basis':'Jendela transkrip berhasil diperiksa; bukan seluruh frame video'}
+            'source_duration':duration,'basis':'Jendela transkrip berhasil diperiksa; bukan seluruh frame video',
+            'speech_segments':len(segments),'reviewed_segments':len(reviewed),'pending_segments':len(pending),
+            'speech_seconds':round(sum(s['end']-s['start'] for s in segments.values()),2),
+            'pending_ranges':[[s['start'],s['end']] for s in pending[:200]],'pending_ranges_truncated':len(pending)>200,
+            'status':'complete' if segments and not pending else 'partial'}
 
 
 def context(candidate, transcript):
@@ -88,10 +95,11 @@ def semantic_groups(candidates, cfg):
         return set(),[]
     removed, decisions=set(),[]
     # Compare chapters in bounded batches; lexical source dedup handles the rest.
-    for offset in range(0,len(eligible),24):
-        chunk=eligible[offset:offset+24]
+    anchors=[]
+    for offset in range(0,len(eligible),16):
+        chunk=[*anchors,*eligible[offset:offset+16]]
         payload=[{'id':i,'kind':c.get('story_kind'),'quote':c['main_claim'],'ending':c.get('ending_evidence','')} for i,c in chunk]
-        key=hashlib.sha256(json.dumps([payload,cfg.model,'semantic-1'],sort_keys=True).encode()).hexdigest()[:24]
+        key=hashlib.sha256(json.dumps([payload,cfg.model,'semantic-4.0.3'],sort_keys=True).encode()).hexdigest()[:24]
         path=Path(cfg.work_dir)/'semantic-reviews'/(key+'.json')
         data=read_json(path)
         try:
@@ -112,7 +120,8 @@ def semantic_groups(candidates, cfg):
                     continue
                 ca,cb=valid[a],valid[b]
                 # Different story types and quantities are deliberately retained.
-                if ca.get('story_kind')!=cb.get('story_kind') or re.findall(r'\d+(?:[.,]\d+)*',ca['main_claim'])!=re.findall(r'\d+(?:[.,]\d+)*',cb['main_claim']):
+                from .stage3 import fact_signature
+                if ca.get('story_kind')!=cb.get('story_kind') or fact_signature(ca['main_claim']+' '+ca.get('ending_evidence',''))!=fact_signature(cb['main_claim']+' '+cb.get('ending_evidence','')):
                     continue
                 from .transcript_correction import PROTECTED,norm
                 if ({norm(x) for x in ca['main_claim'].split()}&PROTECTED)!=({norm(x) for x in cb['main_claim'].split()}&PROTECTED):
@@ -125,6 +134,9 @@ def semantic_groups(candidates, cfg):
             write_json(path,{'pairs':checked})
         except (requests.RequestException,ValueError,KeyError,TypeError):
             decisions.append({'code':'semantic_review_unavailable','detail':'Perbandingan makna belum berhasil; kandidat dipertahankan.','action':'review'})
+        survivors=[row for row in chunk if row[0] not in removed]
+        # Carry representative claims across batches, including the source ending.
+        anchors=survivors[::max(1,len(survivors)//8)][:8]
     return removed,decisions
 
 

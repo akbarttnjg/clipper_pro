@@ -47,7 +47,8 @@ def create_router(services):
 
     @router.get('/capabilities')
     async def capabilities():
-        return {'schema_version':1,'producer_version':'A-01-22.1','settings':SETTINGS,'dependencies':DEPENDENCIES,
+        from .analysis_adapter import VERSION
+        return {'schema_version':1,'producer_version':VERSION,'settings':SETTINGS,'dependencies':DEPENDENCIES,
                 'mutation_owner':'B revision service','shared_c0_status':'validated_against_f67b032',
                 'production_services_status':'provided_by_host_not_verified_by_module_tests'}
 
@@ -83,12 +84,12 @@ def create_router(services):
     async def stage(data:dict=Body(...)):
         try:
             target=target_ids(data)
-            if data.get('stage_id') not in ('source_evidence','correction','discovery','boundary_review','asset_proposals','asset_visual_review'):
+            if data.get('stage_id') not in ('source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review'):
                 raise ValueError('Tahap analisis tidak dikenal')
             if type(data.get('expected_revision')) is not int or data['expected_revision']<0:
                 raise ValueError('Revisi snapshot harus disertakan')
         except ValueError as exc:raise HTTPException(400,str(exc)) from exc
         # B owns dependency fingerprint, queue, cancellation and artifact commit.
         return await invoke(services['run_stage'],{**target,'stage_id':data['stage_id'],
-                                                'expected_revision':data['expected_revision']})
+                                                'expected_revision':data['expected_revision'],'options':data.get('options')})
     return router

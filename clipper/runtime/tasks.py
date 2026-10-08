@@ -140,7 +140,14 @@ def calibrate(manager,job):
     profiles={name:dict(device='cuda' if cuda_safe else 'cpu',batch_size=1,concurrency=1,
                         sample_resolution=res,use_nvenc=nvenc,recommendation=why,measured_cuda_asr=cuda_safe)
               for name,res,why in [('fast',224,'Uji gambar kecil; satu worker GPU.'),('balanced',336,'Satu worker; CPU sampai uji CUDA ASR sendiri lulus.'),('detail',448,'Resolusi uji lebih besar; komponen berat tetap dijalankan bergantian.') ]}
-    write(manager.root/'profiles.json',profiles);return hardware
+    if cuda_safe:profiles['balanced']['recommendation']='Uji ASR CUDA lulus; satu worker, batch satu.'
+    write(manager.root/'profiles.json',profiles)
+    # A named managed profile follows its renewed calibration. This never
+    # overrides an explicitly selected CPU device in a project's own settings.
+    selected=read(manager.root/'selected-profile.json',{}) or {}
+    name=selected.get('name')
+    if name in profiles:write(manager.root/'selected-profile.json',{'name':name,**profiles[name]})
+    return hardware
 
 
 def execute(manager,job):

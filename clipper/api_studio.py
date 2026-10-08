@@ -53,6 +53,14 @@ def create_router(service):
     @guarded
     def changes(data:dict=Body(...)):return service.changes(data)
 
+    @router.post('/correction-review')
+    @guarded
+    def correction_review(data:dict=Body(...)):return service.correction_review(data)
+
+    @router.get('/projects/{pid}/stage3')
+    @guarded
+    def stage3(pid:str,clip_id:str|None=None,offset:int=0,limit:int=40):return service.stage3_status(pid,clip_id,offset,limit)
+
     @router.get('/projects/{pid}/history')
     @guarded
     def history(pid:str):return service.store.history(pid)

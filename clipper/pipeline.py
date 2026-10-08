@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0'
+RENDER_VERSION = '4.0.4'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -98,6 +98,9 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     from .subtitle_edit import clean
     display, changes, notices = clean(plan['words'], cfg.caption_cleanup, cfg.caption_punctuation, cfg)
     plan['display_words'] = display
+    if cfg.visual_enabled:
+        from .visual4 import caption_envelopes
+        caption_envelopes(plan,cfg)
     plan['subtitle_cleanup'] = {'mode': cfg.caption_cleanup, 'changes': changes, 'review': notices}
     if notices:
         plan['warnings'].append('Ada angka atau waktu kata yang perlu didengarkan kembali; lihat laporan subtitle.')

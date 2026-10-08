@@ -37,7 +37,7 @@ class Config:
     # --- Clip selection ---
     num_clips: int = _env_int("NUM_CLIPS", 0)  # 0 = all verified, distinct stories
     search_depth: str = 'broad'
-    min_clip_s: float = _env_float("MIN_CLIP_S", 30.0)
+    min_clip_s: float = _env_float("MIN_CLIP_S", 20.0)
     max_clip_s: float = _env_float("MAX_CLIP_S", 120.0)
 
     # --- Auto B-roll (Pexels stock video) ---
@@ -90,6 +90,7 @@ class Config:
     glossary: str = ''
     asr_second_pass: bool = True
     asr_recheck_windows: int = 12
+    alignment_model_path: str = os.environ.get('ALIGNMENT_MODEL_PATH','')
     caption_backdrop: bool = True
     safe_placement: bool = True
 
@@ -158,6 +159,19 @@ class Config:
     audio_peak_db: float = -1.5
     join_fade_ms: float = 5.
     cache_limit_gb: float = 0.
+    # Stage 4: sampled source evidence is shared by both aspect variants.
+    visual_enabled: bool = True
+    visual_interval_s: float = .5
+    visual_max_frames: int = 360
+    visual_active_speaker: str = 'auto'
+    visual_talknet_budget_s: float = 60.
+    visual_vlm: str = 'off'
+    visual_backend_timeout: int = 240
+    visual_cache_dir: str = ''
+    visual_runtime_root: str = ''
+    visual_overrides: dict | None = None
+    visual_runtime_signature: list | None = None
+    visual_evidence_signature: str | None = None
 
     @property
     def video_codec(self) -> str:
@@ -174,7 +188,7 @@ CAPTION_STYLES: tuple[str, ...] = ("magazine", "narrative", "pop", "slide", "blu
 LAYOUTS: tuple[str, ...] = ("auto", "fill", "fit", "stream", "split")
 # length preset -> (min_clip_s, max_clip_s)
 LENGTHS: dict[str, tuple[float, float]] = {
-    "auto": (30.0, 120.0),
+    "auto": (20.0, 120.0),
     "60to120": (60.0, 120.0),
     "under30": (8.0, 30.0),
     "30to60": (30.0, 60.0),
@@ -293,6 +307,14 @@ def validate_overrides(form: dict) -> dict:
             if value and (not Path(value).expanduser().is_file() or Path(value).suffix.lower() not in ('.wav','.mp3','.m4a','.aac','.flac','.ogg','.mp4')):raise ValueError('Berkas audio tidak ditemukan atau format tidak didukung')
             out[key]=str(Path(value).expanduser().resolve()) if value else ''
     if form.get('edit_style') in ('balanced','lesson','energetic','podcast'):out['edit_style']=form['edit_style']
+    for key,choices in {'visual_active_speaker':('auto','off'),
+                         'visual_vlm':('off','auto','smolvlm','qwen3-vl')}.items():
+        if key in form:
+            if form[key] not in choices:raise ValueError('Pilihan analisis visual tidak valid')
+            out[key]=form[key]
+    if 'visual_enabled' in form:
+        if type(form['visual_enabled']) is not bool:raise ValueError('Status analisis visual harus boolean')
+        out['visual_enabled']=form['visual_enabled']
     return out
 
 

@@ -12,7 +12,7 @@ from . import transcript_correction, subtitle_edit, typography, caption_checks
 from .analysis_options import configured,checkpoint,DEPENDENCIES
 from . import contracts
 
-VERSION='A-01-22.1'
+VERSION='A-4.0.3'
 
 
 def digest(value):
@@ -53,7 +53,8 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
     if any(i is None for i in identifiers) or len(set(identifiers))!=len(identifiers):
         raise ValueError('ID kata asal harus ada dan unik di transkrip ini')
     heard=[{**w,'source_id':source_id,'transcript_id':transcript_id,'origin_word_ids':[w['word_id']]} for w in heard]
-    display,changes,warnings=subtitle_edit.clean(refined['words'],cfg.caption_cleanup,cfg.caption_punctuation,cfg)
+    from .stage3 import expand_aligned
+    display,changes,warnings=subtitle_edit.clean(expand_aligned(refined['words']),cfg.caption_cleanup,cfg.caption_punctuation,cfg)
     tokens=[];occurrences={}
     for w in display:
         origins=transcript_correction.source_ids([w])
@@ -63,6 +64,7 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
         tokens.append(dict(token_id='tok-'+digest([source_id,transcript_id,origins,ordinal])[:24],
             origin_word_ids=origins,text=w['word'],source_start=w['start'],source_end=w['end'],
             correction_status='manual' if w.get('manually_edited') else w.get('correction','unchanged'),
+            timing_status=w.get('timing_status','asr'),alignment_method=w.get('alignment_method'),
             provenance={'reason':w.get('correction'),'before':w.get('raw_word'),'manual':bool(w.get('manually_edited'))},
             requires_alignment=alignment))
     queue=[]
@@ -134,7 +136,12 @@ def scene_analysis(plan,media_context,*,input_fingerprint):
         scenes.append(dict(scene_id=scene_id,**common,faces=[r for r in rows if r['kind']=='face'],
             text_regions=[r for r in rows if r['kind'] in ('ocr','text')],material_regions=[r for r in rows if r['kind']=='material'],
             composition={'mode':shot['mode'],'rect':shot['rect'],'reason':shot.get('composition_reason')},
-            confidence=None,provenance='A sampled face/text/material analysis'))
+            confidence=shot.get('visual',{}).get('scene',{}).get('confidence'),provenance='Sampled source evidence; optional local models',
+            scene_kind=shot.get('visual',{}).get('scene',{}).get('kind','unknown'),
+            face_tracks=shot.get('visual',{}).get('speaker',{}).get('tracks',[]),
+            active_speaker=shot.get('visual',{}).get('speaker',{}).get('method','unavailable'),
+            frame_times=shot.get('visual',{}).get('frame_times',[]),
+            visual_model=shot.get('visual',{}).get('vlm',{})))
     return envelope('SceneAnalysis',media_context['source_id'],input_fingerprint,'ready' if scenes else 'empty',scenes=scenes)
 
 
