@@ -43,7 +43,7 @@ def make_asset(text,word_ids,cfg):
     from .typography import font
     from PIL import Image,ImageDraw
     lines,size=lines_for(text,cfg);face_path=Path(cfg.fonts_dir)/FONTS[cfg.font_main]['file']
-    key=hashlib.sha256(json.dumps([text,word_ids,face_path.read_bytes().hex(),'explanation5'],ensure_ascii=False).encode()).hexdigest()[:24]
+    key=hashlib.sha256(json.dumps([text,word_ids,face_path.read_bytes().hex(),'explanation5-request-root-v2'],ensure_ascii=False).encode()).hexdigest()[:24]
     folder=Path(cfg.work_dir)/'explanations'/key;folder.mkdir(parents=True,exist_ok=True)
     runtime=motion_runtime(cfg)
     # The editable project is retained even when the optional renderer is absent.
@@ -55,7 +55,7 @@ def make_asset(text,word_ids,cfg):
             target=project/source.relative_to(template);target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
     data={'quote':text,'source_word_ids':word_ids,'lines':lines,'font_size':size,'duration':3.,'fps':25,
           'font_url':'data:font/ttf;base64,'+base64.b64encode(face_path.read_bytes()).decode('ascii')}
-    (project/'src/request.json').write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
+    (project/'request.json').write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
     target=folder/'explanation.mp4';engine='pillow_ffmpeg';motion={'status':'unavailable','reason':'Motion Canvas memerlukan komponen lokal, browser, dan adapter frame.'}
     if runtime:
         frames=folder/'motion-frames';request=folder/'motion-request.json'

@@ -82,8 +82,16 @@ class JobQueue:
 
     def list(self,project_id=None):
         with self.store.connect() as db:
-            rows=db.execute('SELECT id FROM jobs '+('WHERE project_id=? ' if project_id else '')+'ORDER BY created DESC LIMIT 100',([project_id] if project_id else [])).fetchall()
+            where='WHERE project_id=? AND ' if project_id else 'WHERE '
+            args=[project_id] if project_id else []
+            active=db.execute('SELECT id,created,status FROM jobs '+where+"status IN ('queued','running','cancel_requested')",args).fetchall()
+            history=db.execute('SELECT id,created,status FROM jobs '+where+"status NOT IN ('queued','running','cancel_requested') ORDER BY created DESC LIMIT 100",args).fetchall()
+            rows=sorted(active,key=lambda row:(row['status']=='queued',row['created']))+history
         return [self.get(r['id']) for r in rows]
+
+    def has_queued(self):
+        with self.store.connect() as db:
+            return db.execute("SELECT 1 FROM jobs WHERE status='queued' LIMIT 1").fetchone() is not None
 
     def enqueue(self,project_id,kind,target,request):
         request={**request,'queue_key':fingerprint([project_id,kind,target,request])}
@@ -134,7 +142,7 @@ class JobQueue:
     def run(self):
         maintenance_at=0
         while not self.stop_event.is_set():
-            if not any(j['status']=='queued' for j in self.list()):
+            if not self.has_queued():
                 if self.on_idle and time.monotonic()>=maintenance_at:
                     try:self.on_idle()
                     except (ValueError,OSError):pass

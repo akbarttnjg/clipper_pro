@@ -272,16 +272,26 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
                                "x": round(cx + measured / 2, 2), "y": round(baseline - size * .36, 2),
                                "baseline": round(baseline, 2), **font_info(families[flat]),
                                "ass_size": sum(font(cfg.fonts_dir, size, families[flat]).getmetrics()),
-                               "size": size, "width": measured, "emphasis": flat in emph})
+                                "size": size, "width": measured, "emphasis": flat in emph,
+                                "color":cfg.accent_hex if flat in emph else cfg.base_hex})
                 cx += measured + space
                 flat += 1
             cy += rh
+        dur_ms=max(1,int((end-start)*1000));enter=min(120,max(1,dur_ms//3));fade=min(65,dur_ms//4)
+        for word in placed:
+            word.update(initial_color=cfg.base_hex if cfg.caption_style=='editorial' else word['color'],
+                        fade_seconds=fade/1000,phrase_duration=end-start)
+            if cfg.caption_style=='editorial':
+                word['color_transition']={'start':max(0,round((word['start']-start)*1000))/1000,'duration':enter/1000}
         plans.append({"start": start, "end": end, "position": pos,
                       "panel": [x, y, width, height], "alignment": alignment(cfg, pos),
                       "placement_source": 'auto' if cfg.caption_position == 'auto' else 'manual',
                       "protected": anchor.get('protected', []) if anchor and cfg.caption_position == 'auto' else [], "words": placed})
     return {"version": 2, "timebase": "output_seconds", "width": cfg.target_w,
-            "height": cfg.target_h, "font": "DejaVu Sans", "phrases": plans}
+            "height": cfg.target_h, "font": "DejaVu Sans", "font_main":cfg.font_main,
+            "font_accent":cfg.font_accent,"template":cfg.caption_style,"contrast":cfg.caption_backdrop,
+            "contrast_style":{"outline":2.,"shadow":2.5,"outline_color":"#101010","outline_opacity":175/255,
+                              "shadow_color":"#000000","shadow_opacity":143/255},"phrases": plans}
 
 
 def display_units(words):

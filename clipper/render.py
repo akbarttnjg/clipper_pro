@@ -76,7 +76,12 @@ def audio_stems(source, plan, cfg, folder):
     return str(master)
 
 
-def video(source, plan, cfg, ass, target, mix, on_progress=None):
+def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'):
+    if mode not in ('final','source_only'):
+        raise ValueError('Mode render tidak dikenal.')
+    if mode=='source_only':
+        plan={**plan,'broll':[],'caption_renderer':{},'warnings':list(plan.get('warnings',[]))}
+        ass=None
     W, H, fps = plan['width'], plan['height'], plan['fps']
     seek = min(s['source_start'] for s in plan['shots'])
     end = max(s['source_end'] for s in plan['shots'])

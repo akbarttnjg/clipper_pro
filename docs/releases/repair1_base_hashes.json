@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "base_commit": "71453b7cbe00c7b77ced73431d9405067f5af3d4",
+  "base_version": "4.0.6",
+  "payload_paths": [
+    "README.md",
+    "clipper/caption_renderer.py",
+    "clipper/captions_pro.py",
+    "clipper/dependency_cache.py",
+    "clipper/explanation5.py",
+    "clipper/job_queue.py",
+    "clipper/projects.py",
+    "clipper/render.py",
+    "clipper/runtime/templates/remotion5/caption_math.mjs",
+    "clipper/runtime/templates/remotion5/index.jsx",
+    "clipper/speech_jobs.py",
+    "clipper/studio_worker.py",
+    "clipper/tests/repair1_ui.cjs",
+    "clipper/tests/test_repair1.py",
+    "clipper/tests/test_repair1_installer.py",
+    "clipper/trim.py",
+    "clipper/typography.py",
+    "docs/PEMBENAHAN_1_STABILITAS.md",
+    "docs/releases/repair1_base_hashes.json",
+    "docs/verification/HASIL_QA_PEMBENAHAN_1.md",
+    "static/features/transcript3.js",
+    "static/index.html",
+    "static/studio4.js",
+    "tools/build_repair1_release.py",
+    "tools/repair1_installer.py"
+  ],
+  "guard_paths": [
+    "app.py",
+    "clipper/config.py",
+    "clipper/studio_service.py",
+    "clipper/project_store.py",
+    "clipper/stage3.py",
+    "clipper/runtime/templates/motion5/src/scene.tsx",
+    "clipper/runtime/templates/motion5/src/bridge.ts"
+  ],
+  "allowed_hashes": {
+    "app.py": [
+      "ab581c9982821f247ac31bd33a49d6c1923d346d5a5d28af974a1109cd8e0758"
+    ],
+    "clipper/caption_renderer.py": [
+      "89987f57bed7c133ed6c58377c234cd26b3866f2f630ae48752b146537bb3727"
+    ],
+    "clipper/captions_pro.py": [
+      "a305e9fe4934a0c3a9920205c452867ea5fa5a41298ffdad03965aff7f8141ec"
+    ],
+    "clipper/config.py": [
+      "9ca548554533c20f9133485066433f63aa5fa13c9c8f362339690742e8023521"
+    ],
+    "clipper/dependency_cache.py": [
+      "f520025187b0197df1efe0a309393d7913a0fb427bf67432933ce8fa5f32bdfd"
+    ],
+    "clipper/explanation5.py": [
+      "00e45dd4a1c3f6a3a9ba1b66107482164be8afa60a26a61eb8369d0723c1fe83"
+    ],
+    "clipper/job_queue.py": [
+      "55e3450e6ea9b57e96d32ff33ae6e4fb994df01f5b59c804f80a1660d54993bf"
+    ],
+    "clipper/project_store.py": [
+      "29118c2c58b483dfd67a0b82be2967da4d036927676b143c0ed2333bc9f59028"
+    ],
+    "clipper/projects.py": [
+      "80c01a844ab5faceb3c5e9bbf90d41694cc831ee45b78b5de6e8772393d22c6d"
+    ],
+    "clipper/render.py": [
+      "f5f2eb9b29d2890aa2dad5e54509652041c59bdf9ce7b035c63daf9e8b10df30"
+    ],
+    "clipper/runtime/templates/motion5/src/bridge.ts": [
+      "74415abff42e70843a14b988c5baa063805d9be23d3d5adbbd48256861ef6103"
+    ],
+    "clipper/runtime/templates/motion5/src/scene.tsx": [
+      "deb240976cd3bd1c10f4ff1fcc7cdcb2a1f0b5fa57755fc962bac1865071f24f"
+    ],
+    "clipper/runtime/templates/remotion5/caption_math.mjs": [
+      "bd33f2e3d85bb293d455fb59f7f000de206f4adf7fa21d45bfa58a4c32ab80ea"
+    ],
+    "clipper/runtime/templates/remotion5/index.jsx": [
+      "9ff7489d801dcbe1b597c461fa0a5acf595b8b7eac1f7acb0eda0990c3fd34bf"
+    ],
+    "clipper/speech_jobs.py": [
+      "d9927aa54e423ec8b3da843493d51dc2678db2f1cda71b73915924afa2e77f91"
+    ],
+    "clipper/stage3.py": [
+      "b8577bd522e3749e8f8e38e46f4b9c433b33e351aa629c4e35424685f3d75162"
+    ],
+    "clipper/studio_service.py": [
+      "1486acbadac15479b61c674b60ec07c88373f15318386ad2e2731b1c382ffea9"
+    ],
+    "clipper/studio_worker.py": [
+      "5e45a790c9ba775d688c4bb0edbe00b5c5f13858aa4de195b1c7dd9e786e22f3"
+    ],
+    "clipper/tests/repair1_ui.cjs": [],
+    "clipper/tests/test_repair1.py": [],
+    "clipper/tests/test_repair1_installer.py": [],
+    "clipper/trim.py": [
+      "320b19440341059dd2131648f7429c76ebf596b5beeceffcca8e4fc64d02d3ff"
+    ],
+    "clipper/typography.py": [
+      "d2dad3e85889d53cd7fba0d56a07f9bf9d7c1ca97e6eccd967fdd6b3f2873286"
+    ],
+    "docs/PEMBENAHAN_1_STABILITAS.md": [],
+    "docs/releases/repair1_base_hashes.json": [],
+    "static/features/transcript3.js": [
+      "cf84435bb8a0352537e5690aec16bb96096113f05b034cad2fa7dd6019903688"
+    ],
+    "static/index.html": [
+      "af7975d827a3e8537d293b3523bf7e268f0e69b2a9e5be67561bf192b004fc8d"
+    ],
+    "static/studio4.js": [
+      "54352400d72b59714a438f3cf81a84679918be5680551302f05ba21c8533c394"
+    ],
+    "tools/build_repair1_release.py": [],
+    "tools/repair1_installer.py": [],
+    "README.md": [
+      "a8abeb31a8018728dae6fbce54fe6c5aff36bb1ed55de4e46aaa6e8d4bd4cb42"
+    ],
+    "docs/verification/HASIL_QA_PEMBENAHAN_1.md": []
+  }
+}

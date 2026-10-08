@@ -14,7 +14,8 @@ def keep_spans(words: list[dict], start: float, end: float, cfg: Config) -> list
 
     Empty/gapless input collapses to a single [start, end] span (a no-op cut).
     """
-    inside = [w for w in words if w["end"] > start and w["start"] < end]
+    inside = sorted((w for w in words if w["end"] > start and w["start"] < end),
+                    key=lambda w: (w["start"], w["end"]))
     if not inside:
         return [(start, end)]
     pad = cfg.silence_keep
@@ -25,7 +26,7 @@ def keep_spans(words: list[dict], start: float, end: float, cfg: Config) -> list
         if w["start"] - prev_end > cfg.silence_max:
             spans.append([seg_start, min(end, prev_end + pad)])
             seg_start = max(start, w["start"] - pad)
-        prev_end = w["end"]
+        prev_end = max(prev_end, w["end"])
     spans.append([seg_start, min(end, prev_end + pad)])
     # merge spans that touch/overlap after padding
     merged = [spans[0]]

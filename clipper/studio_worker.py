@@ -16,6 +16,28 @@ from .dependency_cache import content_id, render_key, asset_id
 class StaleJob(ValueError):pass
 
 
+def save_analysis_take(service,pid,media,transcript,cfg):
+    """Keep immutable ASR evidence separate from glossary-dependent display text."""
+    from .transcript_correction import VERSION
+    transcript=copy.deepcopy(transcript)
+    raw=copy.deepcopy(transcript.get('raw_words',transcript['words']))
+    for i,word in enumerate(raw):word.setdefault('word_id',i)
+    raw_take='asr-raw-'+fingerprint([pid,media['source_id'],media['payload']['audio_stream_id'],
+        raw,transcript.get('language'),transcript.get('duration')])[:32]
+    evidence={**transcript,'words':raw,'raw_words':raw,'heard_words':raw}
+    evidence.pop('correction_report',None);evidence.pop('asr_corrections',None)
+    try:service.store.transcript(raw_take)
+    except KeyError:service.store.save_transcript(pid,evidence,raw_take)
+    processing={key:getattr(cfg,key) for key in ('glossary','approved_aliases','audience','transcript_correction')}
+    transcript.update(raw_words=raw,raw_take_id=raw_take,
+        display_processing={'version':VERSION,'settings':processing})
+    take='display-'+fingerprint([raw_take,VERSION,processing,transcript['words'],
+        transcript.get('heard_words'),transcript.get('segments')])[:32]
+    try:service.store.transcript(take)
+    except KeyError:service.store.save_transcript(pid,transcript,take)
+    return take
+
+
 def execute(service,job):
     if job['kind']=='evaluation':return evaluation_job(service,job)
     from . import media_context, evidence, transcript_correction, story, analysis_adapter, editorial
@@ -45,10 +67,7 @@ def execute(service,job):
     if kind=='analyze':
         from . import pipeline
         transcript,candidates=pipeline.analyze(source,cfg,progress)
-        # Stable immutable take IDs: cache reuse does not invalidate approved patches.
-        take='asr-'+fingerprint([pid,media['source_id'],media['payload']['audio_stream_id'],transcript.get('raw_words',transcript['words'])])[:32]
-        try:service.store.transcript(take)
-        except KeyError:service.store.save_transcript(pid,transcript,take)
+        take=save_analysis_take(service,pid,media,transcript,cfg)
         updates.update(transcript_id=take,discovery=read_json(work/'selection-report.json',{}))
         result={'candidates':len(candidates),'transcript_id':take,'timings':transcript.get('timings')}
     elif kind=='source_evidence':
@@ -99,7 +118,7 @@ def execute(service,job):
                 selected=[w for w in words if w['end']>doc['clips'][cid]['start'] and w['start']<doc['clips'][cid]['end']
                     and (w.get('correction') or w.get('manually_edited') or len(w['word'].split())>1) and not w.get('aligned_words')]
                 options['origin_word_ids']=transcript_correction.source_ids(selected)[:80]
-                if not selected:result={'aligned':0,'attempted':0,'errors':[],'device':'cpu','note':'Tidak ada frasa dalam klip ini yang memerlukan alignment.'}
+                if not selected:result={'aligned':0,'attempted':0,'status':'skipped','errors':[],'device':'cpu','note':'Tidak ada frasa dalam klip ini yang memerlukan alignment.'}
             progress(12,'Menyelaraskan frasa yang dikoreksi dengan model CTC lokal pada CPU')
             response=speech_jobs.run(kind,source,payload,cfg,options) if not result else {'report':result,'patches':[]};result=response['report']
             alignment_patches=response['patches']
@@ -221,7 +240,15 @@ def execute(service,job):
                 source_id=media['source_id'],input_fingerprint=dependency)
         if kind in ('analyze','correction','asr_recheck') and old_take!=current['transcript_id']:
             current['transcript_revision']+=1
-            if kind in ('correction','asr_recheck'):
+            compatible=kind in ('correction','asr_recheck')
+            if kind=='analyze' and old_take and old_source==media['source_id'] and old_audio==media['payload']['audio_stream_id']:
+                before=service.store.transcript(old_take)
+                after=service.store.transcript(current['transcript_id'])
+                compatible=before.get('raw_words',before['words'])==after.get('raw_words',after['words'])
+            if kind=='analyze':
+                current['transcript_lineage']={'from':old_take,'to':current['transcript_id'],
+                    'manual_patches_preserved':compatible,'basis':'identical_source_audio_and_raw_words' if compatible else 'new_asr_evidence'}
+            if compatible:
                 for group in [current.get('shared_corrections',{}),*current.get('clip_corrections',{}).values()]:
                     for patch in group.values():
                         if patch['transcript_id']==old_take:patch['transcript_id']=current['transcript_id']
@@ -253,7 +280,14 @@ def execute(service,job):
         except Conflict:
             if attempt==4:raise
     editorial.release(cfg)
-    service.queue.update(job['id'],status='completed',progress=100,message='Selesai dan tersimpan pada revisi '+str(saved['revision']),result=result)
+    message='Selesai dan tersimpan pada revisi '+str(saved['revision'])
+    if kind=='alignment':
+        if result.get('errors'):
+            message=f"Alignment perlu diperiksa: {result.get('aligned',0)} frasa berhasil, {len(result['errors'])} ditolak. Buka Alignment terakhir."
+        elif not result.get('aligned'):
+            message='Tidak ada koreksi baru yang perlu diselaraskan. Model belum menjalankan pengukuran.'
+        else:message=f"Alignment berhasil: {result['aligned']} frasa diselaraskan pada CPU; tersimpan pada revisi {saved['revision']}."
+    service.queue.update(job['id'],status='completed',progress=100,message=message,result=result)
     return result
 
 

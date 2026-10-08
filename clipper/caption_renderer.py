@@ -42,9 +42,9 @@ def readiness(cfg):
 
 
 def signature(cfg):
-    if cfg.caption_renderer=='ass':return ['ass','4.0.5']
+    if cfg.caption_renderer=='ass':return ['ass','4.0.7']
     status=readiness(cfg)
-    return [cfg.caption_renderer,status['status'],status.get('generation'),status.get('browser')]
+    return [cfg.caption_renderer,'4.0.7',status['status'],status.get('generation'),status.get('browser')]
 
 
 def render(plan,cfg,folder,duration):

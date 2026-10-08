@@ -417,16 +417,17 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
         clean = Path(result['plan_path']).parent / 'video-clean.mp4'
         cache = clean.with_suffix('.cache.json')
         fingerprint = {k:p.get(k) for k in ('shots','source','width','height','fps','duration','render_config')}
-        fingerprint['version'] = '2.4-source-only'
+        fingerprint['version'] = '4.0.7-source-only'
+        fingerprint['render_mode'] = 'source_only'
         from .dependency_cache import content_id
         fingerprint['media_content_id'] = content_id(p['source']['path'],fresh=True)
         fingerprint['mix_content_id'] = content_id(p['audio']['mix'],fresh=True)
         key = hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
         if mode=='hybrid' and (not clean.exists() or read_json(cache,{}).get('key') != key):
             progress(round(5+30*i/max(1,len(results))), f'Menyiapkan video tanpa teks {i+1}/{len(results)}')
-            render.video(p['source']['path'], {**p, 'broll': []}, clean_cfg, None, clean, p['audio']['mix'],
+            render.video(p['source']['path'], p, clean_cfg, None, clean, p['audio']['mix'],
                 lambda fraction: progress(round(5+30*(i+fraction)/max(1,len(results))),
-                    f'Video tanpa teks {i+1}/{len(results)}'))
+                    f'Video tanpa teks {i+1}/{len(results)}'),mode='source_only')
         if mode=='hybrid':
             qc.inspect(clean, clean_cfg, p['duration'])
             write_json(cache, {'key':key})

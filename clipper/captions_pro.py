@@ -26,6 +26,8 @@ def write_ass(words, path, cfg, hook="", keywords=(), position="bottom", anchors
 
 def write_plan(plan,path,cfg):
     """Execute the frozen plan used by the preview, final render and exporters."""
+    contrast=bool(plan.get('contrast',cfg.caption_backdrop))
+    template=plan.get('template',cfg.caption_style)
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {cfg.target_w}
@@ -35,7 +37,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Editorial,DejaVu Sans,60,&H00FFFFFF,&H00FFFFFF,&H50101010,&H70000000,-1,0,0,0,100,100,0,0,1,2.0,2.5,5,0,0,0,1
+Style: Editorial,DejaVu Sans,60,&H00FFFFFF,&H00FFFFFF,&H50101010,&H70000000,-1,0,0,0,100,100,0,0,1,{2.0 if contrast else 0:.1f},{2.5 if contrast else 0:.1f},5,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -60,8 +62,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     tags = (f"\\an5\\pos({w['x']+a['dx']:.3f},{w['y']+a['dy']:.3f})"
                         f"\\fn{family}\\fs{w['ass_size']}\\b{bold}\\i{int(w.get('italic',False))}"
                         f"\\c{paint}\\alpha&H{alpha:02X}&\\fscx{scale:.3f}\\fscy{scale:.3f}"
-                        f"\\3c&H15110D&\\4c&H000000&\\bord{min(cfg.target_w,cfg.target_h)/1080*1.8 if cfg.caption_backdrop else 0:.2f}"
-                        f"\\shad{min(cfg.target_w,cfg.target_h)/1080*3 if cfg.caption_backdrop else 0:.2f}\\blur{a['blur']:.3f}")
+                        f"\\3c&H15110D&\\4c&H000000&\\bord{min(cfg.target_w,cfg.target_h)/1080*1.8 if contrast else 0:.2f}"
+                        f"\\shad{min(cfg.target_w,cfg.target_h)/1080*3 if contrast else 0:.2f}\\blur{a['blur']:.3f}")
                     events.append(f"Dialogue: 0,{ts(left)},{ts(right)},Editorial,,0,0,0,,{{{tags}}}{safe(w['text'])}")
                 continue
             dur_ms = max(1, int((end - start) * 1000))
@@ -71,9 +73,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             active = max(0, round((w['start'] - start) * 1000))
             # Entire phrase is readable from the beginning; emphasis changes at spoken time.
             anim = (f"\\fscx100\\fscy100\\t({active},{active + enter},\\c{paint})"
-                    if cfg.caption_style == "editorial" else "")
+                    if template == "editorial" else "")
             family = w['family']
-            initial = color(cfg.base_hex) if cfg.caption_style == 'editorial' else paint
+            initial = color(w.get('initial_color',cfg.base_hex)) if template == 'editorial' else paint
             tags = f"\\an5\\pos({w['x']},{w['y']})\\fn{family}\\b{int(w.get('bold',False))}\\i{int(w.get('italic',False))}\\fs{w['ass_size']}\\c{initial}\\fad({fade},{fade}){anim}"
             events.append(f"Dialogue: 0,{ts(start)},{ts(end)},Editorial,,0,0,0,,{{{tags}}}{safe(w['text'])}")
     # Ignore legacy title_card/hook settings: titles remain clip metadata.

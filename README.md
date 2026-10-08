@@ -1,6 +1,10 @@
 # Clipper Studio lokal
 
-**Versi 4.0.6 — Tahap 6** melengkapi alur **Sumber → Pilih klip → Tata gaya → Periksa / ekspor**, brand kit lintas proyek, alternatif seed dan undo, inventaris/cache terlindungi, tiga mode ekspor, serta evaluasi dan preferensi dari peninjauan hasil.
+**Versi 4.0.7 — Pembenahan 1** memperbaiki tujuh bug audit: integritas transkrip saat kamus berubah, video dasar ekspor yang bebas caption, kontrak caption legacy, input Motion Canvas, antrean, dan pemangkasan overlap. Adapter alignment menormalkan angka NumPy/Pandas sebelum validasi ketat; status menunjukkan keberhasilan, hasil sebagian, atau tanpa kandidat.
+
+Gunakan [panduan Pembenahan 1](docs/PEMBENAHAN_1_STABILITAS.md) dan paket offline yang dibangun oleh tools/build_repair1_release.py. Pemasang tools/repair1_installer.py ditujukan untuk dasar 4.0.6 yang diaudit, dengan cadangan kode dan database serta rollback kode. Pengujian Windows/model/browser/native dilakukan di perangkat sasaran. Framing, cerita, tipografi, efek, integrasi dan performa mengikuti tujuh tahap dalam panduan.
+
+**Fondasi versi 4.0.6 — Tahap 6** melengkapi alur **Sumber → Pilih klip → Tata gaya → Periksa / ekspor**, brand kit lintas proyek, alternatif seed dan undo, inventaris/cache terlindungi, tiga mode ekspor, serta evaluasi dan preferensi dari peninjauan hasil.
 
 Buka **Tata gaya → Brand kit & alternatif** untuk menyimpan gaya aktif. Kit menjaga pengaturan manual pada setiap rasio. Tombol **Evaluasi & bukti impor** di header membandingkan dua hasil tersimpan, mencatat mutu dan sumber daya, serta menyimpan bukti yang dilaporkan pengguna dari editor.
 

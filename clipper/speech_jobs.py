@@ -8,6 +8,7 @@ import importlib.util
 import inspect
 import json
 import math
+from numbers import Real
 import os
 import subprocess
 import sys
@@ -59,6 +60,9 @@ def available_asr_models():
     return result[:40]
 
 
+VERSION='4.0.7'
+
+
 def alignment_options(value):
     if set(value) - {'limit', 'origin_word_ids', 'model_path'}: raise ValueError('Opsi alignment tidak dikenal.')
     result = _options(value); path = value.get('model_path', '')
@@ -67,6 +71,10 @@ def alignment_options(value):
 
 
 def local_alignment_model(path):
+    # Windows' Copy as path adds surrounding quotes; they are not part of a path.
+    if isinstance(path,str):
+        path=path.strip()
+        if len(path)>=2 and path[0]==path[-1] and path[0] in ('"',"'"):path=path[1:-1].strip()
     if not path: raise ValueError('Pilih folder model alignment lokal Wav2Vec2 CTC untuk bahasa sumber. Model ASR Whisper berbeda dari model alignment.')
     root = Path(path).expanduser().resolve()
     if not root.is_dir() or not (root/'config.json').is_file(): raise ValueError('Folder model alignment harus berisi config.json.')
@@ -168,6 +176,37 @@ def _recheck(source, transcript, cfg, options):
         warnings.append('ASR beralih ke CPU: '+str(exc)[:200]); return attempt('cpu', 'int8')
 
 
+def alignment_rows(rows,offset):
+    """Normalize measured NumPy/Pandas scalars at the backend boundary.
+
+    The strict timeline validator still rejects missing, nonfinite, overlapping
+    or unscored measurements. Strings and booleans are never numeric evidence.
+    """
+    converted=[]
+    for source in rows:
+        row=dict(source)
+        for key in ('start','end','score'):
+            value=row.get(key,math.nan)
+            if isinstance(value,bool) or not isinstance(value,Real):
+                raise ValueError('Backend alignment mengembalikan '+key+' yang bukan angka terukur.')
+            row[key]=float(value)+(offset if key in ('start','end') else 0.)
+        converted.append(row)
+    return converted
+
+
+def alignment_diagnostic(rows,start,end):
+    def number(value):
+        return float(value) if not isinstance(value,bool) and isinstance(value,Real) and math.isfinite(value) else None
+    returned=[]
+    for row in rows[:80]:
+        a,b=number(row.get('start')),number(row.get('end'))
+        returned.append({'word':str(row.get('word',''))[:120], 'relative_start':a,'relative_end':b,
+            'start':a+start if a is not None else None,'end':b+start if b is not None else None,
+            'score':number(row.get('score')),
+            'numeric_types':{key:type(row.get(key)).__name__ for key in ('start','end','score')}})
+    return {'audio_start':start,'audio_end':end,'returned_words':returned}
+
+
 def _alignment(source, transcript, cfg, options):
     import nltk
     # WhisperX otherwise downloads punkt_tab silently. An offline job must fail clearly.
@@ -177,7 +216,8 @@ def _alignment(source, transcript, cfg, options):
     model_path = local_alignment_model(options['model_path']); selected = options['origin_word_ids']
     words = [w for w in transcript['words'] if (set(correction.source_ids([w])) & set(selected) if selected else
              (w.get('correction') or w.get('manually_edited') or len(w['word'].split()) > 1)) and not w.get('aligned_words')][:options['limit']]
-    if not words: return {'patches': [], 'report': {'aligned': 0, 'errors': [], 'device': 'cpu'}}
+    if not words: return {'patches': [], 'report': {'aligned': 0,'attempted':0,'status':'skipped',
+        'errors': [], 'device': 'cpu','note':'Tidak ada koreksi baru yang memerlukan alignment; model belum menjalankan pengukuran.'}}
     language = transcript.get('language') or cfg.language
     if language == 'auto': raise ValueError('Bahasa transkrip belum diketahui. Pilih bahasa sebelum alignment.')
     kwargs={'language_code':language,'device':'cpu','model_name':model_path}
@@ -189,20 +229,24 @@ def _alignment(source, transcript, cfg, options):
     with tempfile.TemporaryDirectory(prefix='clipper-align-') as tmp:
         for word in words:
             a, b = stage3.alignment_window(word,transcript['words'],transcript['duration'])
+            returned=[]
             try:
+                if not a<b:raise ValueError('Rentang alignment kosong atau bertumpang tindih dengan kata tetangga; periksa timing sumber.')
                 if b-a > 20: raise ValueError('Frasa terlalu panjang untuk alignment terarah. Pecah atau beri timing manual.')
                 audio = Path(tmp)/'excerpt.wav'; _excerpt(source, a, b, audio)
                 data = whisperx.align([{'start': 0., 'end': b-a, 'text': word['word']}], model, metadata,
                                      str(audio), device='cpu', interpolate_method='ignore', return_char_alignments=False)
-                aligned = [{**w, 'start': w.get('start', math.nan)+a, 'end': w.get('end', math.nan)+a} for w in data.get('word_segments', [])]
+                returned=data.get('word_segments',[])
+                aligned=alignment_rows(returned,a)
                 aligned = stage3.validate_alignment(word['word'], aligned, a, b, method='whisperx')
                 patches.append({'origin_word_ids': correction.source_ids([word]), 'text': word['word'], 'words': aligned,
                     'audio_start': a, 'audio_end': b, 'method': 'whisperx', 'provenance': {'kind': 'local_forced_alignment',
                     'model_path': model_path, 'device': 'cpu', 'language': language}})
             except (ValueError, RuntimeError, KeyError, TypeError) as exc:
-                errors.append({'origin_word_ids': correction.source_ids([word]), 'message': str(exc)[:350]})
+                errors.append({'origin_word_ids': correction.source_ids([word]), 'message': str(exc)[:350],
+                    'diagnostic':alignment_diagnostic(returned,a,b)})
     return {'patches': patches, 'report': {'aligned': len(patches), 'attempted': len(words), 'errors': errors,
-        'status':'partial' if errors else 'aligned',
+        'status':('partial' if patches else 'failed') if errors else 'aligned',
         'device': 'cpu', 'model_path': model_path, 'basis': 'Measured CTC word alignment; missing/interpolated word scores rejected.'}}
 
 
@@ -226,7 +270,7 @@ def run(kind, source, transcript, cfg, options):
             capture_output=True, env=environment, cwd=str(Path(__file__).resolve().parent.parent), text=True, encoding='utf-8', errors='replace')
         if process.returncode or not result.is_file(): raise ValueError('Proses ucapan gagal. '+process.stderr[-2000:])
         data=json.loads(result.read_text(encoding='utf-8'))
-        data['report'].update(producer_version=stage3.VERSION,model_used=options['model_path'] if kind=='alignment' else cfg.whisper_model,
+        data['report'].update(producer_version=VERSION,model_used=options['model_path'] if kind=='alignment' else cfg.whisper_model,
             runtime_generation=(runtime.get('generation') or runtime.get('id','core')) if runtime else 'core')
         return data
 

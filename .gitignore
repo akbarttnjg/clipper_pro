@@ -23,3 +23,8 @@ brand.json
 FINDINGS.md
 PLAN.md
 .stock-settings.json
+
+/ClipperModels/
+/steezy_backups/
+__pycache__/
+*.py[cod]
