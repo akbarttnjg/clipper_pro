@@ -81,6 +81,16 @@ class Config:
     font_name: str = os.environ.get("FONT_NAME", "Arial")
     font_size: int = _env_int("FONT_SIZE", 120)
     caption_style: str = os.environ.get("CAPTION_STYLE", "narrative")
+    # Existing projects retain their manually selected typography.
+    style_preset: str = 'legacy'
+    caption_seed: int = 2026
+    caption_renderer: str = 'ass'
+    semantic_emphasis: bool = True
+    illustration_mode: str = 'off'
+    broll_ranker: str = 'auto'
+    sfx_mode: str = 'sparse'
+    sfx_gap_s: float = 10.
+    sfx_max: int = 6
     motion_intensity: str = "balanced"
     font_main: str = 'dm_sans'
     font_accent: str = 'dm_serif_italic'
@@ -199,6 +209,27 @@ LENGTHS: dict[str, tuple[float, float]] = {
 def validate_overrides(form: dict) -> dict:
     """Whitelist + clamp UI form fields into Config overrides. Bad values are dropped."""
     out: dict = {}
+    for key, choices in {'style_preset':('legacy','rapi','ekspresif','adaptif'),
+                         'caption_renderer':('ass','auto','remotion'),
+                         'illustration_mode':('off','labels'),
+                         'broll_ranker':('off','auto','siglip2'),
+                         'sfx_mode':('off','sparse')}.items():
+        if key in form:
+            if form[key] not in choices:raise ValueError(key+' tidak valid')
+            out[key]=form[key]
+    for key,lo,hi in [('caption_seed',0,2147483647),('sfx_max',0,6)]:
+        if key in form:
+            if isinstance(form[key],bool):raise ValueError(key+' harus bilangan bulat')
+            value=int(form[key])
+            if str(form[key]).strip()!=str(value) or not lo<=value<=hi:raise ValueError(key+' di luar batas')
+            out[key]=value
+    if 'sfx_gap_s' in form:
+        value=float(form['sfx_gap_s'])
+        if not __import__('math').isfinite(value) or not 8<=value<=60:raise ValueError('Jeda SFX di luar batas')
+        out['sfx_gap_s']=value
+    if 'semantic_emphasis' in form:
+        if type(form['semantic_emphasis']) is not bool:raise ValueError('Penekanan makna harus boolean')
+        out['semantic_emphasis']=form['semantic_emphasis']
     for key, values in {'source_kind': ('auto','speaker','board','podcast'),
                         'search_depth': ('balanced','broad'),
                         'workflow': ('review','automatic'),

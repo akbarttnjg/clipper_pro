@@ -27,6 +27,29 @@ def frame_at(source,time):
 
 def run(request):
     key=request['component'];directory=Path(request['directory']);weights=directory/'weights';folder=Path(request['output_dir']);folder.mkdir(parents=True,exist_ok=True)
+    if key=='siglip2':
+        import io
+        import torch
+        from PIL import Image
+        from transformers import AutoModel,AutoProcessor
+        torch.set_num_threads(4)
+        model=AutoModel.from_pretrained(str(weights),local_files_only=True,trust_remote_code=False).eval()
+        processor=AutoProcessor.from_pretrained(str(weights),local_files_only=True,trust_remote_code=False)
+        ranking=[]
+        for asset in request['assets'][:4]:
+            frames=[];duration=float(asset.get('duration',3))
+            for fraction in (.25,.65):
+                t=max(0,min(duration-.05,duration*fraction))
+                decoded=subprocess.run(['ffmpeg','-nostdin','-v','error','-ss',str(t),'-i',asset['path'],'-frames:v','1',
+                    '-vf','scale=640:640:force_original_aspect_ratio=decrease','-f','image2pipe','-vcodec','png','-'],capture_output=True,timeout=45)
+                if decoded.returncode:raise ValueError('Frame kandidat SigLIP2 tidak terbaca')
+                frames.append(Image.open(io.BytesIO(decoded.stdout)).convert('RGB'))
+            inputs=processor(text=[request['text']],images=frames,padding='max_length',truncation=True,return_tensors='pt')
+            with torch.inference_mode():scores=model(**inputs).logits_per_image.sigmoid().flatten()
+            score=float(scores.mean())
+            if not math.isfinite(score):raise ValueError('Skor SigLIP2 tidak valid')
+            ranking.append({'id':asset['id'],'score':round(score,6),'sample_count':len(frames)})
+        return {'status':'ready','ranking':ranking,'device':'cpu'}
     if key=='rapidocr':
         from rapidocr_onnxruntime import RapidOCR
         import cv2

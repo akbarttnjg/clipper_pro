@@ -106,7 +106,7 @@ def execute(service,job):
         elif kind=='boundary_review':
             reviewed=story.review_candidate(doc['clips'][cid],transcript,cfg,refresh=True)
             result={'review':reviewed}
-        elif kind=='visual_review':
+        elif kind in ('visual_review','style_review'):
             from . import composition,editplan,ffmpeg_util,visual4
             from .studio_exchange import render_words
             clip={k:v for k,v in doc['clips'][cid].items() if k!='variants'};variant=service.variant(doc,cid,vid)
@@ -115,8 +115,22 @@ def execute(service,job):
             plan=editplan.build(display,clip,cfg)
             progress(10,'Memeriksa wajah, materi dan ruang teks sepanjang klip')
             composition.analyze(source,plan,cfg,ffmpeg_util.probe(source))
-            result=visual4.report(plan,source,cfg)
-            variant_updates.update(visual_report=result,visual_dependency=dependency)
+            if kind=='style_review':
+                from .typography import make_plan
+                from .placement import caption_anchors
+                from .subtitle_edit import clean
+                from .style5 import readability
+                cleaned,_,_=clean(plan['words'],cfg.caption_cleanup,cfg.caption_punctuation,cfg)
+                plan['display_words']=cleaned
+                captions=make_plan(cleaned,cfg,clip.get('keywords',[]),anchors=caption_anchors(plan,cfg))
+                result=readability(captions,cfg)
+                for phrase in result['phrases']:
+                    span=next((s for s in plan['spans'] if s['start']<=phrase['start']<s['end']),None)
+                    if span:phrase['source_start']=span['source_start']+phrase['start']-span['start']
+                variant_updates.update(style_report=result,style_dependency=dependency)
+            else:
+                result=visual4.report(plan,source,cfg)
+                variant_updates.update(visual_report=result,visual_dependency=dependency)
         elif kind in ('asset_proposals','asset_visual_review'):
             from . import illustrations
             clip={k:v for k,v in doc['clips'][cid].items() if k!='variants'}
@@ -168,7 +182,8 @@ def execute(service,job):
             variant_updates.update({('preview' if kind=='preview' else 'result'):result,'schedule':plan.get('broll_schedule',[]),'schedule_dependency':dependency,
                 'timeline_summary':{k:plan.get(k) for k in ('spans','duration','fps','width','height','warnings','audio_quality')},
                 'shot_summary':[{k:s.get(k) for k in ('start','end','source_start','source_end','mode','has_material','composition_reason')} for s in plan.get('shots',[])],
-                'visual_report':visual_report,'visual_dependency':dependency})
+                'visual_report':visual_report,'visual_dependency':dependency,
+                'style_report':plan.get('style_report',{}),'style_dependency':dependency})
             service.store.artifact(pid,cid,vid,kind,key,result)
         elif kind=='export':
             from . import projects

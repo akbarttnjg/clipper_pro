@@ -21,6 +21,11 @@ def color(hexval):
 
 def write_ass(words, path, cfg, hook="", keywords=(), position="bottom", anchors=None):
     plan = make_plan(words, cfg, keywords, position, anchors)
+    return write_plan(plan,path,cfg)
+
+
+def write_plan(plan,path,cfg):
+    """Execute the frozen plan used by the preview, final render and exporters."""
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {cfg.target_w}
@@ -42,7 +47,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             end = phrase["end"]
             if end - start < .02:
                 continue
-            paint = color(cfg.accent_hex if w["emphasis"] else cfg.base_hex)
+            paint = color(w.get('color',cfg.accent_hex if w["emphasis"] else cfg.base_hex))
             if w.get('keyframes'):
                 family = w['family']
                 bold = int(w.get('bold', False))

@@ -46,15 +46,16 @@ def audio_stems(source, plan, cfg, folder):
                    '-filter_complex', graph, '-map', '[out]', '-t', duration], music, folder / 'audio.log')
         stems['music'] = str(music.resolve())
     events = []
-    if cfg.sfx_path:
+    if cfg.sfx_path and getattr(cfg,'sfx_mode','sparse')!='off':
         events = [s['start'] + s['zoom_at'] for s in plan['shots'] if s['zoom_at'] is not None]
+        events += [p['start'] for p in plan.get('captions',{}).get('phrases',[]) if any(w.get('emphasis') for w in p.get('words',[]))]
         if plan['spans'][0]['kind'] == 'cold_open':
             events.insert(0, plan['spans'][0]['end'])
         sparse = []
         for t in sorted(events):
-            if not sparse or t - sparse[-1] >= 10:
+            if .25<t<duration-.8 and (not sparse or t - sparse[-1] >= getattr(cfg,'sfx_gap_s',10.)):
                 sparse.append(t)
-        events = sparse[:6]
+        events = sparse[:getattr(cfg,'sfx_max',6)]
         if events:
             sfx = folder / 'effects.wav'
             graph = []
@@ -124,6 +125,12 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None):
         graph.append(f"[{i+2}:v]trim=start={event.get('asset_start',0):.8f}:duration={event['duration']:.8f},setpts=PTS-STARTPTS+{event['start']:.8f}/TB,fps={fps},{layout},setsar=1[br{i}]")
         graph.append(f"[{previous}][br{i}]overlay=0:0:eof_action=pass:repeatlast=0:enable='gte(t,{event['start']:.8f})*lt(t,{event['end']:.8f})'[layer{i}]")
         previous=f'layer{i}'
+    captions=plan.get('caption_renderer',{})
+    if captions.get('engine')=='remotion' and captions.get('path'):
+        idx=2+len(plan.get('broll',[]))
+        extra_inputs.extend(['-c:v','libvpx-vp9','-i',captions['path']])
+        graph.append(f'[{previous}][{idx}:v]overlay=0:0:eof_action=pass:repeatlast=0[captioned]')
+        previous='captioned';ass=None
     graph.append(f'[{previous}]'+(ass_filter(ass,cfg) if ass else 'null')+'[out]')
     target = Path(target)
     pending = target.with_name(target.stem + '.rendering.mp4')

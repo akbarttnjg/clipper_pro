@@ -6,7 +6,7 @@ from pathlib import Path
 from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
-VERSION='studio4-content-v4-visual4'
+VERSION='studio4-content-v5-style5'
 
 
 def active_recipe(recipe, cfg):
@@ -52,7 +52,8 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     for scene in recipe.get('scenes',[]):assets.append(asset_id(scene.get('asset',{}).get('path'),fresh=fresh))
     # Runtime metadata and result paths do not affect rendered pixels.
     candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe')}
-    return fingerprint([VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe])
+    from .caption_renderer import signature
+    return fingerprint([VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe,signature(cfg)])
 
 
 def settings_impact(changes):

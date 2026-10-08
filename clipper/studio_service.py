@@ -100,10 +100,9 @@ class StudioService:
             fonts_dir=self.base.fonts_dir,
             approved_aliases=doc.get('aliases',[]),source_content_id=doc.get('source',{}).get('source_id',''),
             audio_stream_id=media.get('audio_stream_id',''),preview_seconds=0.,title_card=False)
-        from .visual4 import runtime_signature
-        from .runtime.state import runtime_root
+        from .runtime.state import runtime_root,signatures
         visual_runtime=runtime_root(self.root,self.work)
-        values.update(visual_cache_dir=str(self.work/doc['project_id']/'visual4'),visual_runtime_root=str(visual_runtime),visual_runtime_signature=runtime_signature(visual_runtime))
+        values.update(visual_cache_dir=str(self.work/doc['project_id']/'visual4'),visual_runtime_root=str(visual_runtime),visual_runtime_signature=signatures(visual_runtime))
         evidence_path=self.work/doc['project_id']/'source-evidence.json'
         values['visual_evidence_signature']=content_id(evidence_path) if evidence_path.is_file() else None
         return Config(**{k:v for k,v in values.items() if k in CONFIG_FIELDS})
@@ -162,6 +161,10 @@ class StudioService:
                         result['stale']=result.get('dependency')!=dependency
                 variant['export_readiness']=self.export_readiness(doc,cid,vid,dependency=dependency)
                 report=variant.get('visual_report')
+                if variant.get('style_report'):
+                    variant['style_report']['stale']=variant.get('style_dependency')!=dependency
+                    for asset in variant['style_report'].get('explanations',[]):
+                        if asset.get('preview_path'):asset['preview_url']=self.register_file(project_id,asset['preview_path'])
                 if report:
                     report['stale']=variant.get('visual_dependency')!=dependency
                     for shot in report.get('shots',[]):
@@ -227,7 +230,8 @@ class StudioService:
         assets += [asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
         fonts=[asset_id(p,fresh=fresh) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
         candidate={k:v for k,v in clip.items() if k not in ('variants','revision','result','preview')}
-        return fingerprint(base+[candidate,settings,recipe,assets,fonts,doc.get('clip_corrections',{}).get(clip_id),doc.get('alignment_overrides',{}).get('clips',{}).get(clip_id),variant.get('timeline',{})])
+        from .caption_renderer import signature
+        return fingerprint(base+[candidate,settings,recipe,assets,fonts,doc.get('clip_corrections',{}).get(clip_id),doc.get('alignment_overrides',{}).get('clips',{}).get(clip_id),variant.get('timeline',{}),signature(cfg)])
 
     def _correction_target(self,doc,clip_id,op):
         if op.get('transcript_id')!=doc.get('transcript_id'):raise ValueError('Transkrip telah diganti; draf tidak diterapkan pada ucapan lain')
@@ -410,10 +414,10 @@ class StudioService:
     def enqueue(self,project_id,kind,clip_id=None,variant_id='portrait',expected_revision=None,options=None):
         doc=self.store.get(project_id)
         if expected_revision is not None and expected_revision!=doc['revision']:raise Conflict(doc['revision'])
-        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','preview','render','export','waveform'):raise ValueError('Tahap tidak dikenal')
+        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform'):raise ValueError('Tahap tidak dikenal')
         if kind in ('analyze','source_evidence','correction','discovery','waveform'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
-        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review') and not clip_id:raise ValueError('Pilih klip dahulu')
+        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review') and not clip_id:raise ValueError('Pilih klip dahulu')
         if kind not in ('analyze','source_evidence','waveform') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
         if kind=='asr_recheck':
             from .speech_jobs import recheck_options

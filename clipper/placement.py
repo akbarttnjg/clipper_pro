@@ -215,4 +215,5 @@ def caption_anchors(plan, cfg=None):
                 for shot in touching: reserve_band(shot,cfg)
     return [{'time':(s['start']+s['end'])/2,'start':s['start'],'end':s['end'],
              'position':s['position'],'panel':s.get('caption_panel'),
-             'protected':s.get('protected_output',[])} for s in plan['shots']]
+             'protected':s.get('protected_output',[]),'has_material':s.get('has_material',False),
+             'mode':s.get('mode')} for s in plan['shots']]

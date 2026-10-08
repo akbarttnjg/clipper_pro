@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.4'
+RENDER_VERSION = '4.0.5'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -89,9 +89,16 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     if not plan['shots']:
         raise ValueError('Tidak ada frame yang dapat dirender. Periksa batas clip.')
     from . import illustrations
+    recipe={'scenes':[],'notes':[]}
     if cfg.broll_mode != 'off':
         recipe = clip.get('_broll_recipe') or illustrations.prepare(words, clip, cfg, lambda p,m: on_progress(7+p//8,m))
-        illustrations.attach(plan, recipe, cfg)
+    if cfg.illustration_mode!='off':
+        from . import explanation5
+        explanation=explanation5.prepare(words,clip,cfg)
+        recipe={**recipe,'scenes':[*recipe.get('scenes',[]),*explanation['scenes']],'notes':[*recipe.get('notes',[]),*explanation['notes']]}
+        plan['explanation_assets']=[s['asset'] for s in explanation['scenes']]
+    if recipe.get('scenes') or recipe.get('notes'):
+        illustrations.attach(plan, recipe, replace(cfg,broll_mode='local') if cfg.illustration_mode!='off' and cfg.broll_mode=='off' else cfg)
         placement.protect_broll(plan, cfg)
     write_json(report_base.with_suffix('.credits.json'), illustrations.credits(plan))
     report_base.with_suffix('.credits.txt').write_text('\n'.join(c['credit'] for c in illustrations.credits(plan)), encoding='utf-8')
@@ -105,16 +112,38 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     if notices:
         plan['warnings'].append('Ada angka atau waktu kata yang perlu didengarkan kembali; lihat laporan subtitle.')
     write_json(report_base.with_suffix('.subtitle-review.json'), plan['subtitle_cleanup'])
+    from .typography import make_plan
+    anchors=placement.caption_anchors(plan,cfg)
+    plan['captions']=make_plan(display,cfg,clip.get('keywords',[]),anchors=anchors)
+    on_progress(20,'Menyiapkan suara dan memeriksa penekanan ucapan')
+    mix=render.audio_stems(media_path,plan,cfg,work)
+    from .style5 import annotate_prosody,readability
+    display=annotate_prosody(display,plan['audio']['stems']['voice'])
+    plan['display_words']=display
     ass = captions_pro.write_ass(display, work / 'captions.ass', cfg,
         keywords=clip.get('keywords', []),
         anchors=placement.caption_anchors(plan, cfg))
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
+    plan['style_report']=readability(plan['captions'],cfg)
+    write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
+    if plan['style_report']['issue_count']:plan['warnings'].append('Keterbacaan perlu ditinjau; lihat masalah per frasa di panel Gaya Tahap 5.')
+    from . import caption_renderer
+    plan['caption_renderer']=caption_renderer.render(plan['captions'],cfg,work,plan['duration'])
+    plan['style_report']['renderer']={k:plan['caption_renderer'].get(k) for k in ('engine','status','reason','generation')}
+    plan['style_report']['explanations']=[{'quote':a['origin']['quote'],'renderer':a['renderer'],
+        'motion_canvas':a['motion_canvas'],'preview_path':a['path']} for a in plan.get('explanation_assets',[])]
+    for phrase in plan['style_report']['phrases']:
+        span=next((s for s in plan['spans'] if s['start']<=phrase['start']<s['end']),None)
+        if span:phrase['source_start']=span['source_start']+phrase['start']-span['start']
+    write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
+    if plan['caption_renderer'].get('status')=='fallback':plan['warnings'].append(plan['caption_renderer']['reason'])
     plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg, expected_words=display)
     for event in plan.get('broll', []):
         event['image_height'] = min(s.get('image_height') or cfg.target_h for s in plan['shots']
             if s['start'] < event['end'] and s['end'] > event['start'])
     render.broll_plates(plan, cfg, work)
     plan['style'] = {'accent': cfg.accent_hex, 'base': cfg.base_hex, 'caption_style': cfg.caption_style,
+                     'preset':cfg.style_preset,'seed':cfg.caption_seed,'renderer':plan['caption_renderer']['engine'],
                      'motion_intensity': cfg.motion_intensity, 'font_main': cfg.font_main,
                      'font_accent': cfg.font_accent, 'contrast': cfg.caption_backdrop, 'caption_position': cfg.caption_position,
                      'caption_align': cfg.caption_align, 'safe_placement': cfg.safe_placement}
@@ -127,7 +156,6 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     from .projects import write_srt
     write_srt(plan, text_base.with_suffix('.srt'))
     on_progress(25, 'Menyiapkan suara dan musik')
-    mix = render.audio_stems(media_path, plan, cfg, work)
     from . import audio_quality
     plan['audio_quality'] = audio_quality.inspect(mix, cfg)
     plan['warnings'].extend(plan['audio_quality'].get('issues', []))

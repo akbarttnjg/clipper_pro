@@ -136,8 +136,8 @@ def plan(manager,job,directory):
             extra['prefix']=prefix;result['extra_models'].append(extra)
     result['model_choice']=options.get('model','small') if item['id']=='faster-whisper' else None
     if item['kind']=='node':
-        result['node_packages']=(['remotion@4.0.533','@remotion/cli@4.0.533','react@18.3.1','react-dom@18.3.1'] if item['id']=='remotion' else
-                                 ['@motion-canvas/core@3.17.2','@motion-canvas/2d@3.17.2','@motion-canvas/ui@3.17.2','@motion-canvas/vite-plugin@3.17.2','vite@5.4.14','typescript@5.7.3'])
+        result['node_packages']=(['remotion@4.0.533','@remotion/cli@4.0.533','@remotion/renderer@4.0.533','@remotion/bundler@4.0.533','react@18.3.1','react-dom@18.3.1'] if item['id']=='remotion' else
+                                 ['@motion-canvas/core@3.17.2','@motion-canvas/2d@3.17.2','@motion-canvas/ui@3.17.2','@motion-canvas/vite-plugin@3.17.2','playwright-core@1.51.1','vite@5.4.14','typescript@5.7.3'])
     write(directory/'plan.json',result);return result
 
 

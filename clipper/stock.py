@@ -331,6 +331,15 @@ def find(query,local_query,provider='auto',online=True,portrait=False,excluded=(
     matches=[a for a in local_assets() if a['id'] not in excluded and terms(a['title']+' '+a['tags']) & wanted]
     matches.sort(key=lambda a:len(terms(a['title']+' '+a['tags'])&wanted),reverse=True)
     notes=[]
+    def ranked(candidates):
+        if cfg is None or cfg.broll_ranker=='off':return candidates
+        from .asset_rank import rerank
+        decoded=[]
+        for item in candidates[:cfg.broll_visual_candidates]:
+            try:decoded.append(download(item))
+            except (ValueError,OSError,subprocess.SubprocessError) as exc:notes.append(str(exc)[:180])
+        ordered,why=rerank(decoded,query,context,cfg);notes.extend(why)
+        return ordered
     def inspect_asset(item):
         asset=download(item)
         if cfg is not None:
@@ -344,7 +353,7 @@ def find(query,local_query,provider='auto',online=True,portrait=False,excluded=(
     if matches:
         if cfg is None:
             return matches[0],[]
-        remaining=matches[:6]
+        remaining=ranked(matches[:6])
         for _ in range(min(len(remaining),cfg.broll_visual_candidates)):
             item, why = choose(remaining, query, context, cfg)
             notes.extend(why)
@@ -371,7 +380,7 @@ def find(query,local_query,provider='auto',online=True,portrait=False,excluded=(
             candidates.sort(key=lambda a:(len(terms(a.get('title','')+' '+str(a.get('tags','')))&wanted),
                 (a.get('height',0)>a.get('width',0))==portrait),reverse=True)
             if cfg is not None:
-                remaining=candidates[:6]
+                remaining=ranked(candidates[:6])
                 for _ in range(min(len(remaining),cfg.broll_visual_candidates)):
                     item,why=choose(remaining,query,context,cfg);notes.extend(why)
                     if not item:break

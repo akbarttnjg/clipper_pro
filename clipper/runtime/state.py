@@ -22,6 +22,19 @@ def read(path, default=None):
     except FileNotFoundError:return default
 
 
+def signatures(root,keys=('yunet','rapidocr','talknet','smolvlm','qwen3-vl','sam2','remotion','motion-canvas','siglip2')):
+    """Hash local generation receipts without importing model/video libraries."""
+    root=Path(root);items=[]
+    for key in keys:
+        path=root/'components'/key/'active.json'
+        if not path.is_file():continue
+        try:
+            active=read(path,{}) or {};folder=safe_path(root/'generations',active['generation']);receipt=folder/'receipt.json'
+            items.append([key,active['generation'],'sha256:'+hashlib.sha256(receipt.read_bytes()).hexdigest() if receipt.is_file() else None])
+        except (KeyError,ValueError,TypeError,OSError):items.append([key,'invalid_metadata','sha256:'+hashlib.sha256(path.read_bytes()).hexdigest()])
+    return items
+
+
 def safe_path(root, name):
     relative=PurePosixPath(name)
     if not name or relative.is_absolute() or '..' in relative.parts or '\\' in name or ':' in name:

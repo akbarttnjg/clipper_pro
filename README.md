@@ -1,32 +1,41 @@
 # Clipper Studio lokal
 
-**Versi 4.0.4 Tahap 4** menghubungkan analisis wajah, materi dan ruang subtitle
-ke preview dan render. Kamera dan koreksi area tersimpan terpisah untuk 16:9
-dan 9:16. Lihat [panduan Tahap 4](docs/TAHAP_4_KAMERA_AREA_AMAN.md).
+**Versi 4.0.5 Tahap 5** menambahkan preset **Rapi, Ekspresif, Adaptif**,
+desain yang konsisten dengan seed tersimpan, pemeriksaan keterbacaan per frasa,
+kartu kutipan sumber, ranking aset lokal SigLIP2, serta kontrol SFX terbatas.
 
-Buka satu klip pada **Edit → Kamera, pembicara & area aman → Analisis visual
-klip**. Bukti sumber dipakai ulang tanpa menjalankan ASR atau pencarian cerita.
-Crop, area materi dan pilihan pembicara manual bertahan saat analisis diulang.
+Buka **Edit → Gaya Tahap 5 & keterbacaan**, pilih preset dan klik **Simpan gaya
+Tahap 5**. Klik **Periksa keterbacaan klip**, lalu buat preview pada setiap rasio.
+Proyek lama mempertahankan gaya manual sampai preset dipilih. 16:9 dan 9:16
+mempunyai tata letak sendiri. Lihat [panduan Tahap 5](docs/TAHAP_5_GAYA_ILUSTRASI_AUDIO.md).
 
-Paket offline menyediakan pemeriksaan checksum, cadangan kode dan rollback.
-Pembuat paket: `tools/build_stage4_release.py`. Installer:
-`tools/stage4_installer.py`. Target yang didukung adalah `main` 2b02a58 atau
-instalasi Tahap 3 yang sesuai pemeriksaan. Data proyek dan lingkungan model
-tidak ditimpa. Paket tidak menjalankan pip atau mengunduh model.
+Pemasang offline memperbarui instalasi 4.0.4 yang sesuai commit `a1a6e3a`.
+Pembuat paket: `tools/build_stage5_release.py`; pemasang:
+`tools/stage5_installer.py`. Checksum, cadangan dan rollback melindungi kode.
+Data proyek, musik, video, kredensial dan lingkungan model tetap tersedia.
+Paket tidak menjalankan pip, npm, atau unduhan model.
 
-TalkNet, RapidOCR, SmolVLM/Qwen3 VL dan SAM hanya dipakai jika lingkungan,
-bobot dan catatan uji sampel lokalnya siap. Komposisi mempertahankan gambar
-ketika bukti belum cukup. SAM menyediakan mask terpisah; belum layer efek
-video atau proyek editor. Akurasi neural dan impor desktop dari komposisi baru
-masih memerlukan pengujian pada sumber serta versi editor Anda.
+Renderer subtitle lokal adalah bawaan. Remotion memakai CaptionPlan dan font
+yang sama bila komponen, browser lokal dan uji sampelnya siap. Mode otomatis
+mencatat alasan fallback; mode wajib menghentikan render bila komponen gagal.
+Motion Canvas memiliki adapter frame dan proyek kutipan yang dapat diedit.
+Jika belum siap, kartu dirender lokal dan status tersebut tampil di laporan.
+SigLIP2 mengurutkan kandidat berdasarkan frame; skornya bukan pengesahan isi.
 
-Tahap 3 tetap tersedia: [transkrip dan cerita](docs/TAHAP_3_TRANSKRIP_CERITA.md).
-Perubahan ini tidak menjamin FYP atau mutu terbaik dibanding semua editor.
+Uji yang sudah dijalankan: logika gaya, layanan SQLite/antrean, kontrol UI dengan
+adapter DOM, video sintetis nyata FFmpeg CPU dalam kedua rasio, loudness, seed
+ulang, pemasangan dan rollback. Remotion/Motion Canvas di browser nyata,
+SigLIP2 dengan bobot asli, Windows/RTX 3050, kejernihan ucapan manusia dan
+impor CapCut/Resolve masih memerlukan uji di mesin Anda. Detail bukti ada di
+panduan. QC teknis tidak menjamin estetika terbaik atau FYP.
+
+Tahap sebelumnya: [transkrip & cerita](docs/TAHAP_3_TRANSKRIP_CERITA.md) dan
+[kamera & area aman](docs/TAHAP_4_KAMERA_AREA_AMAN.md).
 
 ## Dokumentasi proyek asal
 
 Bagian di bawah merupakan dokumentasi Steezy yang diwarisi. Gunakan panduan
-Tahap 4 untuk perilaku dan status verifikasi Clipper Studio yang diperbarui.
+Tahap 5 untuk perilaku dan status verifikasi Clipper Studio yang diperbarui.
 
 **Drop in a long video. Get back scored, captioned, vertical shorts — entirely on your own machine.**
 

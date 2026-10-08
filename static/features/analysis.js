@@ -101,6 +101,7 @@ export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen
    }else if(proposal.poster_url){const image=node('img');image.src=proposal.poster_url;image.alt=proposal.visual_intent;card.append(image)}
    const metadata=proposal.metadata_status==='ready'?'Keterangan cocok':'Keterangan belum lengkap';const visualStatus=proposal.visual_status==='ready'?'Gambar sudah diperiksa':proposal.visual_status==='blocked'?'Gambar tidak cocok':'Gambar belum diverifikasi';const usage=proposal.usage_status==='not_scheduled'?'Belum dipasang':proposal.usage_status==='scheduled'?'Sudah dijadwalkan':'Status pemakaian perlu diperiksa';card.append(node('p',`${metadata} · ${visualStatus} · ${usage}`));
    const visual=proposal.visual_evidence||{};if(visual.reason)card.append(node('p',`${visual.reason} · ${visual.sample_count} sampel · ${visual.seconds}s${visual.cached?' · cache':''}`));
+   if(proposal.visual_rank)card.append(node('p',`SigLIP2 · ${proposal.visual_rank.sample_count} sampel · skor relatif ${proposal.visual_rank.score}. Peringkat ini perlu pemeriksaan visual.`));
    card.append(node('p',proposal.rights?.attribution||'Asal/izin belum dilengkapi.'));
    const enabled=input(card,'Izinkan usulan ini',proposal.enabled,'checkbox');enabled.disabled=!caps.asset_changes;enabled.onchange=()=>commit([{op:'asset_enabled',proposal_id:proposal.proposal_id,enabled:enabled.checked}]).catch(e=>notice(e.message));
    if(proposal.editable_url){const a=node('a','Unduh SVG editable');a.href=proposal.editable_url;a.download='diagram.svg';card.append(a)}

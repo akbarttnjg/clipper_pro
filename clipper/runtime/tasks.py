@@ -95,6 +95,8 @@ def node_probe(manager,job,directory,*,sample):
             info=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_streams','-of','json',str(out/'sample.mp4')],text=True,timeout=20))
             if not any(s.get('width')==320 and s.get('height')==180 for s in info['streams']):raise ValueError('Render Remotion bukan ukuran sampel')
             result.update(level='sample',detail='Preview PNG dan render MP4 24 frame berhasil',artifacts=['node/output/preview.png','node/output/sample.mp4'])
+            from ..caption_renderer import browser_path
+            result['browser_executable']=browser_path(directory,receipt)
         else:
             run([node,folder/'node_modules/vite/bin/vite.js','build'],manager,jid,cwd=folder,env=environment,timeout=180)
             if not list((folder/'dist').rglob('*.js')):raise ValueError('Build Motion Canvas tidak menghasilkan JavaScript')

@@ -190,7 +190,7 @@ def asset_proposal_set(recipe,*,source_id,input_fingerprint,cfg,cancellation_tok
                 'permission_status':'user_supplied' if asset['provider']=='local' else 'source_owner' if asset['provider']=='source' else 'generated' if asset['provider']=='diagram' else 'provider_terms'},
             metadata_status='ready' if metadata else 'empty',metadata_evidence=metadata,
             visual_status='ready' if visual.get('visual_verified') and visual.get('accept') else 'blocked' if visual.get('status')=='rejected' else 'unavailable',
-            visual_evidence=visual,usage_status='not_scheduled'))
+            visual_evidence=visual,visual_rank=asset.get('visual_rank'),usage_status='not_scheduled'))
     status='ready' if proposals else 'blocked' if recipe.get('status')=='unavailable' else 'empty'
     return envelope('AssetProposalSet',source_id,input_fingerprint,status,proposals=proposals,notes=recipe.get('notes',[]))
 

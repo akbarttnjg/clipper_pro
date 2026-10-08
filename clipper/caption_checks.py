@@ -17,6 +17,8 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
         align = cfg.caption_align
         if align == 'auto':
             align = phrase['position'] if phrase['position'] in ('left', 'right') else 'center'
+            if plan.get('version')==5 and phrase.get('design',{}).get('alignment') in ('left','center','right'):
+                align=phrase['design']['alignment']
         if phrase.get('alignment') != align:
             issues.append('Perataan subtitle berbeda dari pengaturan.')
         x, y, width, height = phrase['panel']

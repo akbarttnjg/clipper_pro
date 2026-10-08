@@ -14,7 +14,8 @@ def recipe_path(words,clip,cfg,*,input_fingerprint=None):
     selected=[w for w in words if clip['start']<=w['start']<clip['end']]
     key=hashlib.sha256(json.dumps([selected,clip['start'],clip['end'],cfg.audience,cfg.source_kind,
         cfg.broll_mode,cfg.broll_provider,cfg.broll_max,cfg.target_h>cfg.target_w,cfg.model,
-        clip.get('intelligence',{}),cfg.vision_model,cfg.vision_policy,cfg.broll_query_limit,cfg.broll_visual_candidates,input_fingerprint,'broll-3.4-A1'],
+        clip.get('intelligence',{}),cfg.vision_model,cfg.vision_policy,cfg.broll_query_limit,cfg.broll_visual_candidates,
+        __import__('clipper.asset_rank',fromlist=['signature']).signature(cfg),input_fingerprint,'broll-4.0.5'],
         sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:24]
     return Path(cfg.work_dir)/'broll-plans'/(key+'.json')
 

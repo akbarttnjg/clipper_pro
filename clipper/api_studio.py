@@ -22,6 +22,10 @@ def create_router(service):
     router=APIRouter(prefix='/api/studio',tags=['studio4'])
     from .api_runtime import router as runtime_router
     router.include_router(runtime_router(service))
+    @router.get('/style-presets')
+    def style_presets():
+        from .style5 import PRESETS,VERSION
+        return {'version':VERSION,'presets':PRESETS}
     @router.get('/projects')
     def projects():return service.store.list()
 

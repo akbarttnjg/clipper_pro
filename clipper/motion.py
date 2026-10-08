@@ -23,7 +23,7 @@ def frames(style, duration, reveal, index, emphasis, cfg, position='bottom'):
     last = max(1, math.ceil(duration * fps))
     first = min(last - 1, max(0, round(reveal * fps)))
     strength = {'calm': .65, 'balanced': 1., 'dynamic': 1.35}.get(cfg.motion_intensity, 1.)
-    direction = position if position in ('left','right') else 'up'
+    direction = getattr(cfg,'_motion_direction',position if position in ('left','right') else 'up')
     kind = {'magazine': 'pop' if emphasis else 'up', 'narrative': 'pop' if emphasis else 'blur',
             'pop': 'pop', 'slide': direction,
             'blur': 'blur', 'impact': 'pop'}.get(style, 'up')

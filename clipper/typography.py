@@ -214,6 +214,9 @@ def phrase_anchor(phrase, anchors, cfg):
 
 
 def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
+    if getattr(cfg,'style_preset','legacy') != 'legacy':
+        from .style5 import caption_plan
+        return caption_plan(words,cfg,keywords,position,anchors)
     from .motion import IDS
     if cfg.caption_style in IDS:
         return kinetic_plan(words, cfg, keywords, position, anchors)
@@ -290,8 +293,8 @@ def display_units(words):
     units = []
     suffixes = {'juta','miliar','milyar','triliun','ribu','persen','%','rupiah','tahun','bulan','kali'}
     for original in valid_words(words):
-        w = {**original, 'word_ids':original.get('source_word_ids',[original.get('word_id')]),
-             'token_ids':[original.get('token_id',original.get('word_id'))]}
+        w = {**original, 'word_ids':list(original.get('word_ids',original.get('source_word_ids',[original.get('word_id')]))),
+             'token_ids':list(original.get('token_ids',[original.get('token_id',original.get('word_id'))]))}
         if units:
             prior = units[-1]; a, b = prior['word'], w['word']
             close = w['start'] - prior['end'] <= .65 and w.get('part') == prior.get('part')
@@ -310,9 +313,9 @@ def display_units(words):
     return units
 
 
-def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None):
+def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _phrases=None):
     from .motion import frames
-    phrases = scene_groups(words, cfg, anchors)
+    phrases = scene_groups(words, cfg, anchors) if _phrases is None else _phrases
     W, H = cfg.target_w, cfg.target_h
     plans = []
     for idx, phrase in enumerate(phrases):
