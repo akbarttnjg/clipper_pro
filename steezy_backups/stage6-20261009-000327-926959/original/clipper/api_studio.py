@@ -101,44 +101,6 @@ def create_router(service):
         from .edit_styles import STYLES
         return STYLES
 
-    @router.get('/brand-kits')
-    @guarded
-    def brand_kits():return {'kits':service.workspace.kits(),'preference':service.workspace.preference()}
-
-    @router.post('/brand-kits')
-    @guarded
-    def save_brand_kit(data:dict=Body(...)):return service.workspace.save_kit(data)
-
-    @router.get('/projects/{pid}/workspace')
-    @guarded
-    def workspace(pid:str):return service.workspace.summary(pid)
-
-    @router.get('/projects/{pid}/manifest')
-    @guarded
-    def project_manifest(pid:str):
-        from .storage import write_json
-        path=service.work/pid/'project-manifest.json'
-        write_json(path,service.workspace.manifest(pid))
-        return {'url':service.register_file(pid,path)}
-
-    @router.get('/projects/{pid}/quality')
-    @guarded
-    def quality(pid:str):
-        from .evaluation6 import quality_summary
-        return quality_summary(service,pid)
-
-    @router.post('/projects/{pid}/feedback')
-    @guarded
-    def feedback(pid:str,data:dict=Body(...)):return service.workspace.feedback(pid,data)
-
-    @router.post('/projects/{pid}/preferences')
-    @guarded
-    def preferences(pid:str,data:dict=Body(...)):return service.workspace.promote(pid,data)
-
-    @router.post('/projects/{pid}/native-evidence')
-    @guarded
-    def native_evidence(pid:str,data:dict=Body(...)):return service.workspace.native_evidence(pid,data)
-
     @router.get('/storage')
     @guarded
     def storage():return studio_storage.inventory(service)

@@ -6,7 +6,7 @@ from pathlib import Path
 from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
-VERSION='studio4-content-v6-workflow'
+VERSION='studio4-content-v5-style5'
 
 
 def active_recipe(recipe, cfg):

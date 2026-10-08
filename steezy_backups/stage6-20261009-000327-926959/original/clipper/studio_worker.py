@@ -10,14 +10,13 @@ from .config import Config
 from .project_store import Conflict
 from .storage import read_json, write_json
 from .contracts import fingerprint
-from .dependency_cache import content_id, render_key, asset_id
+from .dependency_cache import content_id, render_key
 
 
 class StaleJob(ValueError):pass
 
 
 def execute(service,job):
-    if job['kind']=='evaluation':return evaluation_job(service,job)
     from . import media_context, evidence, transcript_correction, story, analysis_adapter, editorial
     pid=job['project_id'];target=job['target'];cid=target.get('clip_id');vid=target.get('variant_id','portrait');kind=job['kind']
     doc=service.store.get(pid);dependency=job['request']['dependency'];cfg=service.config(doc,cid,vid)
@@ -162,7 +161,7 @@ def execute(service,job):
             # A full-content manifest is checked on every reuse, including the output itself.
             cached=read_json(Path(cfg.work_dir)/'render-cache'/f'{key}.json',{})
             path=Path(cached.get('absolute_file',''))
-            if path.is_file() and cached.get('output_content_id')==content_id(path,fresh=True) and cached.get('plan_content_id') and cached['plan_content_id']==asset_id(cached.get('plan_path'),fresh=True):result=cached
+            if path.is_file() and cached.get('output_content_id')==content_id(path,fresh=True):result=cached
             else:
                 name=f'{cid}-{vid}-{key[:12]}'
                 result=pipeline.render_clip(source,words,clip,name,cfg,progress,context_words=transcript['words'])
@@ -173,7 +172,6 @@ def execute(service,job):
                     original=Path(cfg.out_dir)/(result[field].removeprefix('/clips/'))
                     result[field]=service.register_file(pid,original)
                 result['url']=service.register_file(pid,path)
-                result['plan_content_id']=content_id(result['plan_path'],fresh=True)
                 write_json(Path(cfg.work_dir)/'render-cache'/f'{key}.json',result)
             plan=read_json(result['plan_path'],{})
             from . import visual4
@@ -186,26 +184,15 @@ def execute(service,job):
                 'shot_summary':[{k:s.get(k) for k in ('start','end','source_start','source_end','mode','has_material','composition_reason')} for s in plan.get('shots',[])],
                 'visual_report':visual_report,'visual_dependency':dependency,
                 'style_report':plan.get('style_report',{}),'style_dependency':dependency})
-            result['evaluation_context']={'source_id':media['source_id'],'audio_stream_id':media['payload']['audio_stream_id'],
-                'transcript_id':doc['transcript_id'],'word_fingerprint':fingerprint(words),
-                'source_spans':[[s['source_start'],s['source_end']] for s in plan['spans']],
-                'variant_id':vid,'width':cfg.target_w,'height':cfg.target_h,'fps':plan['fps'],
-                'duration':plan['duration'],'quality':result.get('quality'),
-                'audio_mix_content_id':content_id(plan['audio']['mix'],fresh=True)}
-            from .workflow6 import BRAND_FIELDS
-            result['evaluation_settings']={k:v for k,v in asdict(cfg).items() if k in BRAND_FIELDS}
             service.store.artifact(pid,cid,vid,kind,key,result)
         elif kind=='export':
             from . import projects
             final=service.variant(doc,cid,vid).get('result')
             if not final or final.get('dependency')!=dependency:raise ValueError('Render final revisi aktif dahulu sebelum ekspor editor')
             if not Path(final['absolute_file']).is_file() or content_id(final['absolute_file'],fresh=True)!=final['output_content_id']:raise ValueError('Berkas final berubah atau hilang; render ulang')
-            if final.get('plan_content_id') and content_id(final['plan_path'],fresh=True)!=final['plan_content_id']:raise ValueError('Rencana final berubah; render ulang')
-            result=projects.export_bundle([final],cfg,progress,mode=job['request'].get('options',{}).get('mode','hybrid'))
+            result=projects.export_bundle([final],cfg,progress)
             result['url']=service.register_file(pid,result['zip']);result['clip_id']=cid;result['variant_id']=vid
             result.update(dependency=dependency,input_revision=doc['revision'])
-            result['package_content_id']=content_id(result['zip'],fresh=True)
-            result['reference']={k:final.get(k) for k in ('width','height','length','output_content_id','input_revision')}
     check()
     def publish(current):
         old_take=current.get('transcript_id');old_source=current['source']['source_id']
@@ -254,31 +241,6 @@ def execute(service,job):
             if attempt==4:raise
     editorial.release(cfg)
     service.queue.update(job['id'],status='completed',progress=100,message='Selesai dan tersimpan pada revisi '+str(saved['revision']),result=result)
-    return result
-
-
-def evaluation_job(service,job):
-    """CPU comparison path avoids loading any ASR/CV/model or canonical decoder."""
-    from .evaluation6 import evaluate_artifacts
-    pid=job['project_id'];cid=job['target']['clip_id'];vid=job['target']['variant_id'];dependency=job['request']['dependency']
-    def check():
-        doc=service.store.get(pid)
-        if service.queue.get(job['id'])['status'] in ('cancel_requested','canceled'):raise StaleJob('Evaluasi dibatalkan.')
-        if dependency!=service.dependency(doc,cid,vid,fresh=True):raise StaleJob('Revisi masukan berubah; jalankan evaluasi ulang.')
-        if content_id(doc['source']['path'],fresh=True)!=doc['source']['source_id']:raise StaleJob('Sumber berubah.')
-        return doc
-    def progress(value,message):service.queue.update(job['id'],progress=int(value),message=message)
-    check();value=evaluate_artifacts(service,pid,job['request'].get('options',{}),progress);check()
-    result=service.workspace.append('evaluations6',pid,value)
-    for attempt in range(5):
-        current=check()
-        try:
-            service.store.mutate(pid,current['revision'],job['id']+'-publish',{'evaluation_id':result['id']},
-                lambda d: service.variant(d,cid,vid).update(evaluation_report=result),'Evaluasi dua hasil tersimpan')
-            break
-        except Conflict:
-            if attempt==4:raise
-    service.queue.update(job['id'],status='completed',progress=100,result=result,message='Perbedaan piksel diukur; penilaian manusia dapat diisi.')
     return result
 
 

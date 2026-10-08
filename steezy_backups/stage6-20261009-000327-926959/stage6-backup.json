@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "version": "4.0.6",
+  "source_commit": "96f501869618d7161394115654f41d24ae9c7d59",
+  "target": "C:\\AI\\clipper",
+  "status": "installed",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "a8abeb31a8018728dae6fbce54fe6c5aff36bb1ed55de4e46aaa6e8d4bd4cb42",
+      "text_sha256": "a8abeb31a8018728dae6fbce54fe6c5aff36bb1ed55de4e46aaa6e8d4bd4cb42",
+      "allowed_text_sha256": [
+        "2283e6c2902d2f4ed9ee5e8cc977f2088e7cf7dc34cfdba30ea69a529d2f2415",
+        "a8abeb31a8018728dae6fbce54fe6c5aff36bb1ed55de4e46aaa6e8d4bd4cb42"
+      ],
+      "existed": true,
+      "original_sha256": "2283e6c2902d2f4ed9ee5e8cc977f2088e7cf7dc34cfdba30ea69a529d2f2415"
+    },
+    {
+      "path": "clipper/api_studio.py",
+      "sha256": "1b9c3877eedbed6c76a42b63b86209abe5d9c529fafd10ac1c2b5652da210b93",
+      "text_sha256": "1b9c3877eedbed6c76a42b63b86209abe5d9c529fafd10ac1c2b5652da210b93",
+      "allowed_text_sha256": [
+        "1b9c3877eedbed6c76a42b63b86209abe5d9c529fafd10ac1c2b5652da210b93",
+        "3aef37d21c8e681cdc8c833f7dd8e7c1dd14b0831b0748d5fcd3382e9eaa04c2"
+      ],
+      "existed": true,
+      "original_sha256": "3aef37d21c8e681cdc8c833f7dd8e7c1dd14b0831b0748d5fcd3382e9eaa04c2"
+    },
+    {
+      "path": "clipper/config.py",
+      "sha256": "9ca548554533c20f9133485066433f63aa5fa13c9c8f362339690742e8023521",
+      "text_sha256": "9ca548554533c20f9133485066433f63aa5fa13c9c8f362339690742e8023521",
+      "allowed_text_sha256": [
+        "7c4e3d9c9c37611ceea38b110d8f9518bd208b20fb850d0cd8924e6f0ab753f5",
+        "9ca548554533c20f9133485066433f63aa5fa13c9c8f362339690742e8023521"
+      ],
+      "existed": true,
+      "original_sha256": "7c4e3d9c9c37611ceea38b110d8f9518bd208b20fb850d0cd8924e6f0ab753f5"
+    },
+    {
+      "path": "clipper/dependency_cache.py",
+      "sha256": "f520025187b0197df1efe0a309393d7913a0fb427bf67432933ce8fa5f32bdfd",
+      "text_sha256": "f520025187b0197df1efe0a309393d7913a0fb427bf67432933ce8fa5f32bdfd",
+      "allowed_text_sha256": [
+        "2d327c98cfbcc03e5ac1155ab7f3e5ab232352f83c2a8e0f14348dc7c144f34a",
+        "f520025187b0197df1efe0a309393d7913a0fb427bf67432933ce8fa5f32bdfd"
+      ],
+      "existed": true,
+      "original_sha256": "2d327c98cfbcc03e5ac1155ab7f3e5ab232352f83c2a8e0f14348dc7c144f34a"
+    },
+    {
+      "path": "clipper/evaluation6.py",
+      "sha256": "26aedb0692caaed042b40297ae759fc9889c89fa9f95a890fde901d64a74524d",
+      "text_sha256": "26aedb0692caaed042b40297ae759fc9889c89fa9f95a890fde901d64a74524d",
+      "allowed_text_sha256": [
+        "26aedb0692caaed042b40297ae759fc9889c89fa9f95a890fde901d64a74524d"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/export6.py",
+      "sha256": "6289a8d62cb477ccfa6c65c06c53b448f176868ef9ef7c2ccda4eece687bd466",
+      "text_sha256": "6289a8d62cb477ccfa6c65c06c53b448f176868ef9ef7c2ccda4eece687bd466",
+      "allowed_text_sha256": [
+        "6289a8d62cb477ccfa6c65c06c53b448f176868ef9ef7c2ccda4eece687bd466"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/export_verify.py",
+      "sha256": "c915585d3c2561b44c7f71758f59fb40dcefa16a166f664ce8953e1dd51a314b",
+      "text_sha256": "c915585d3c2561b44c7f71758f59fb40dcefa16a166f664ce8953e1dd51a314b",
+      "allowed_text_sha256": [
+        "b24ab8ab218ae777667189c54018b75739160a8fccbbee947b367a8afe84197a",
+        "c915585d3c2561b44c7f71758f59fb40dcefa16a166f664ce8953e1dd51a314b"
+      ],
+      "existed": true,
+      "original_sha256": "b24ab8ab218ae777667189c54018b75739160a8fccbbee947b367a8afe84197a"
+    },
+    {
+      "path": "clipper/job_queue.py",
+      "sha256": "55e3450e6ea9b57e96d32ff33ae6e4fb994df01f5b59c804f80a1660d54993bf",
+      "text_sha256": "55e3450e6ea9b57e96d32ff33ae6e4fb994df01f5b59c804f80a1660d54993bf",
+      "allowed_text_sha256": [
+        "55e3450e6ea9b57e96d32ff33ae6e4fb994df01f5b59c804f80a1660d54993bf",
+        "7135e1e27697abf1d2bdd053c01411456ae8d66e44bb0c83e92019a6b0e628f7"
+      ],
+      "existed": true,
+      "original_sha256": "7135e1e27697abf1d2bdd053c01411456ae8d66e44bb0c83e92019a6b0e628f7"
+    },
+    {
+      "path": "clipper/metrics6.py",
+      "sha256": "869c8b4e3977de6d689345ebc5b97d0df9f88b23ef86626f01a1f405aa203946",
+      "text_sha256": "869c8b4e3977de6d689345ebc5b97d0df9f88b23ef86626f01a1f405aa203946",
+      "allowed_text_sha256": [
+        "869c8b4e3977de6d689345ebc5b97d0df9f88b23ef86626f01a1f405aa203946"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/pipeline.py",
+      "sha256": "039476212edd35eb37623d35a22375c088c9d720a2cba2db72871923078fac48",
+      "text_sha256": "039476212edd35eb37623d35a22375c088c9d720a2cba2db72871923078fac48",
+      "allowed_text_sha256": [
+        "039476212edd35eb37623d35a22375c088c9d720a2cba2db72871923078fac48",
+        "a211b4930cd589877b7f919450c37f6a7ba08410cf4a608db54358dd04cd77ac"
+      ],
+      "existed": true,
+      "original_sha256": "a211b4930cd589877b7f919450c37f6a7ba08410cf4a608db54358dd04cd77ac"
+    },
+    {
+      "path": "clipper/projects.py",
+      "sha256": "80c01a844ab5faceb3c5e9bbf90d41694cc831ee45b78b5de6e8772393d22c6d",
+      "text_sha256": "80c01a844ab5faceb3c5e9bbf90d41694cc831ee45b78b5de6e8772393d22c6d",
+      "allowed_text_sha256": [
+        "620878147f42c299dda440ff1b72c5aad9c12fc4586f03851e43490b06a47f1e",
+        "80c01a844ab5faceb3c5e9bbf90d41694cc831ee45b78b5de6e8772393d22c6d"
+      ],
+      "existed": true,
+      "original_sha256": "620878147f42c299dda440ff1b72c5aad9c12fc4586f03851e43490b06a47f1e"
+    },
+    {
+      "path": "clipper/studio_service.py",
+      "sha256": "1486acbadac15479b61c674b60ec07c88373f15318386ad2e2731b1c382ffea9",
+      "text_sha256": "1486acbadac15479b61c674b60ec07c88373f15318386ad2e2731b1c382ffea9",
+      "allowed_text_sha256": [
+        "05c52457c43a12585aff3082a9be16b9f77e1981e52b913bccb421bfec4a9ff7",
+        "1486acbadac15479b61c674b60ec07c88373f15318386ad2e2731b1c382ffea9"
+      ],
+      "existed": true,
+      "original_sha256": "05c52457c43a12585aff3082a9be16b9f77e1981e52b913bccb421bfec4a9ff7"
+    },
+    {
+      "path": "clipper/studio_storage.py",
+      "sha256": "f824b39a0907e19e0efe182041fb9a2b0b202b6dd1a3e2892174e792f5d2d337",
+      "text_sha256": "f824b39a0907e19e0efe182041fb9a2b0b202b6dd1a3e2892174e792f5d2d337",
+      "allowed_text_sha256": [
+        "43ebb8963506ffe6adc07629c15c166c74e8b63a60cc6dedfe0f26cd6959917d",
+        "f824b39a0907e19e0efe182041fb9a2b0b202b6dd1a3e2892174e792f5d2d337"
+      ],
+      "existed": true,
+      "original_sha256": "43ebb8963506ffe6adc07629c15c166c74e8b63a60cc6dedfe0f26cd6959917d"
+    },
+    {
+      "path": "clipper/studio_worker.py",
+      "sha256": "5e45a790c9ba775d688c4bb0edbe00b5c5f13858aa4de195b1c7dd9e786e22f3",
+      "text_sha256": "5e45a790c9ba775d688c4bb0edbe00b5c5f13858aa4de195b1c7dd9e786e22f3",
+      "allowed_text_sha256": [
+        "5e45a790c9ba775d688c4bb0edbe00b5c5f13858aa4de195b1c7dd9e786e22f3",
+        "d9f5a67342f0e1da44be79da9e523d110bc59dc6c41ef37314420555024f4817"
+      ],
+      "existed": true,
+      "original_sha256": "d9f5a67342f0e1da44be79da9e523d110bc59dc6c41ef37314420555024f4817"
+    },
+    {
+      "path": "clipper/tests/test_stage6_installer.py",
+      "sha256": "21f472c5d561176af3a8b6850b02333491fb4bf3ba1f0df0d993b1a642becbdd",
+      "text_sha256": "21f472c5d561176af3a8b6850b02333491fb4bf3ba1f0df0d993b1a642becbdd",
+      "allowed_text_sha256": [
+        "21f472c5d561176af3a8b6850b02333491fb4bf3ba1f0df0d993b1a642becbdd"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/tests/test_stage6_release.py",
+      "sha256": "3878fb246a2944989dc5a69d6e0d1cb24f5619e7ac0e149194d82337dc62b5cd",
+      "text_sha256": "3878fb246a2944989dc5a69d6e0d1cb24f5619e7ac0e149194d82337dc62b5cd",
+      "allowed_text_sha256": [
+        "3878fb246a2944989dc5a69d6e0d1cb24f5619e7ac0e149194d82337dc62b5cd"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/tests/test_workflow6.py",
+      "sha256": "b39e783b3086d700385c8d884b2e2e578537db6b48b3e78070dce720582c34ec",
+      "text_sha256": "b39e783b3086d700385c8d884b2e2e578537db6b48b3e78070dce720582c34ec",
+      "allowed_text_sha256": [
+        "b39e783b3086d700385c8d884b2e2e578537db6b48b3e78070dce720582c34ec"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/tests/workspace6_ui.cjs",
+      "sha256": "f257e391383d6100f95e464ba5ec926dc37af7af392425fe77d50187bfcee87e",
+      "text_sha256": "f257e391383d6100f95e464ba5ec926dc37af7af392425fe77d50187bfcee87e",
+      "allowed_text_sha256": [
+        "f257e391383d6100f95e464ba5ec926dc37af7af392425fe77d50187bfcee87e"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "clipper/workflow6.py",
+      "sha256": "a401796296e6f839f1345c34e4788bcd1a7c1b7cf3e6e7a02c010adf732911c4",
+      "text_sha256": "a401796296e6f839f1345c34e4788bcd1a7c1b7cf3e6e7a02c010adf732911c4",
+      "allowed_text_sha256": [
+        "a401796296e6f839f1345c34e4788bcd1a7c1b7cf3e6e7a02c010adf732911c4"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "docs/TAHAP_6_WORKSPACE_EKSPOR_EVALUASI.md",
+      "sha256": "fe88fc3d19a0a4708711506026e2a5885b52afa47bdb3cc40ff14ad23c600dbf",
+      "text_sha256": "fe88fc3d19a0a4708711506026e2a5885b52afa47bdb3cc40ff14ad23c600dbf",
+      "allowed_text_sha256": [
+        "fe88fc3d19a0a4708711506026e2a5885b52afa47bdb3cc40ff14ad23c600dbf"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "docs/releases/stage6_base_hashes.json",
+      "sha256": "c2de63d9626c41fe802d16e4de0166da3eb37f3aedc815b24e1c56845a44c90c",
+      "text_sha256": "c2de63d9626c41fe802d16e4de0166da3eb37f3aedc815b24e1c56845a44c90c",
+      "allowed_text_sha256": [
+        "c2de63d9626c41fe802d16e4de0166da3eb37f3aedc815b24e1c56845a44c90c"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/features/workspace6.js",
+      "sha256": "2bdd07d8f5dc429623148968c4095803a48ac9c976de2b72ec94bb27df16a1fa",
+      "text_sha256": "2bdd07d8f5dc429623148968c4095803a48ac9c976de2b72ec94bb27df16a1fa",
+      "allowed_text_sha256": [
+        "2bdd07d8f5dc429623148968c4095803a48ac9c976de2b72ec94bb27df16a1fa"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "static/index.html",
+      "sha256": "af7975d827a3e8537d293b3523bf7e268f0e69b2a9e5be67561bf192b004fc8d",
+      "text_sha256": "af7975d827a3e8537d293b3523bf7e268f0e69b2a9e5be67561bf192b004fc8d",
+      "allowed_text_sha256": [
+        "af7975d827a3e8537d293b3523bf7e268f0e69b2a9e5be67561bf192b004fc8d",
+        "ff4442d04d37a4b58ceb40b49e7c22a519407af633c466b6a41e4b8a68f07caf"
+      ],
+      "existed": true,
+      "original_sha256": "ff4442d04d37a4b58ceb40b49e7c22a519407af633c466b6a41e4b8a68f07caf"
+    },
+    {
+      "path": "static/studio4.css",
+      "sha256": "160922372f3b80df67b4d430cb6b4a8229e2fd9a2efbec382951b578baf511da",
+      "text_sha256": "160922372f3b80df67b4d430cb6b4a8229e2fd9a2efbec382951b578baf511da",
+      "allowed_text_sha256": [
+        "160922372f3b80df67b4d430cb6b4a8229e2fd9a2efbec382951b578baf511da",
+        "7b97ce144f1065fa59ed286ed8d3c42262d0adafd9b3ec4cba652998a3fe8114"
+      ],
+      "existed": true,
+      "original_sha256": "7b97ce144f1065fa59ed286ed8d3c42262d0adafd9b3ec4cba652998a3fe8114"
+    },
+    {
+      "path": "static/studio4.js",
+      "sha256": "54352400d72b59714a438f3cf81a84679918be5680551302f05ba21c8533c394",
+      "text_sha256": "54352400d72b59714a438f3cf81a84679918be5680551302f05ba21c8533c394",
+      "allowed_text_sha256": [
+        "54352400d72b59714a438f3cf81a84679918be5680551302f05ba21c8533c394",
+        "643c6fc5ff6d5882701309acb2b3c70ba064a1945a6ef9ae278ad3e613c52395"
+      ],
+      "existed": true,
+      "original_sha256": "643c6fc5ff6d5882701309acb2b3c70ba064a1945a6ef9ae278ad3e613c52395"
+    },
+    {
+      "path": "tools/build_stage6_release.py",
+      "sha256": "ae819ebaae40296a93487f92d6c57c0d8bc7c435c84c97b59df52497c7e2aa80",
+      "text_sha256": "ae819ebaae40296a93487f92d6c57c0d8bc7c435c84c97b59df52497c7e2aa80",
+      "allowed_text_sha256": [
+        "ae819ebaae40296a93487f92d6c57c0d8bc7c435c84c97b59df52497c7e2aa80"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "tools/stage6_installer.py",
+      "sha256": "cbd394a5dbbb1e5dbe775cf3337449571cd5b1468bc405f84a606fa43de15bd1",
+      "text_sha256": "cbd394a5dbbb1e5dbe775cf3337449571cd5b1468bc405f84a606fa43de15bd1",
+      "allowed_text_sha256": [
+        "cbd394a5dbbb1e5dbe775cf3337449571cd5b1468bc405f84a606fa43de15bd1"
+      ],
+      "existed": false,
+      "original_sha256": null
+    },
+    {
+      "path": "tools/verify_stage5_media.py",
+      "sha256": "cffcc30cf02ee3baffe3c43a9ef910a46650d0602aec6a4e364e694ba7803b39",
+      "text_sha256": "cffcc30cf02ee3baffe3c43a9ef910a46650d0602aec6a4e364e694ba7803b39",
+      "allowed_text_sha256": [
+        "8f0a229832e35e03aae347b63fbe900a04497654b211c5f4e2e97de4479760c6",
+        "cffcc30cf02ee3baffe3c43a9ef910a46650d0602aec6a4e364e694ba7803b39"
+      ],
+      "existed": true,
+      "original_sha256": "8f0a229832e35e03aae347b63fbe900a04497654b211c5f4e2e97de4479760c6"
+    },
+    {
+      "path": "tools/verify_stage6_media.py",
+      "sha256": "b658531a418a2d569af166c9056c365ed8cd8144de22c4ee3136174fcd981db6",
+      "text_sha256": "b658531a418a2d569af166c9056c365ed8cd8144de22c4ee3136174fcd981db6",
+      "allowed_text_sha256": [
+        "b658531a418a2d569af166c9056c365ed8cd8144de22c4ee3136174fcd981db6"
+      ],
+      "existed": false,
+      "original_sha256": null
+    }
+  ]
+}

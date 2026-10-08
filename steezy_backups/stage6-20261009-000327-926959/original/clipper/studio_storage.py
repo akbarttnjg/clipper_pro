@@ -14,35 +14,13 @@ from .job_queue import ACTIVE
 
 
 def inventory(service):
-    entries=[];seen=set();protected=set();references_by_project={};documents=[service.store.get(p['project_id']) for p in service.store.list()]
+    entries=[];seen=set();protected=set();documents=[service.store.get(p['project_id']) for p in service.store.list()]
     for doc in documents:
         paths=[doc['source'].get('path'),doc['source'].get('media_context',{}).get('payload',{}).get('working_path')]
         for c in doc['clips'].values():
             for v in c['variants'].values():paths.extend(s.get('asset',{}).get('path') for s in v.get('recipe',{}).get('scenes',[]))
-        for settings in [doc['settings'],*[v.get('settings',{}) for c in doc['clips'].values() for v in c['variants'].values()]]:
-            paths.extend(settings.get(k) for k in ('music_path','sfx_path'))
-        def references(value):
-            if isinstance(value,dict):
-                for item in value.values():references(item)
-            elif isinstance(value,list):
-                for item in value:references(item)
-            elif isinstance(value,str):
-                try:
-                    p=Path(value)
-                    if p.is_absolute() and p.is_file():paths.append(value)
-                except (OSError,ValueError):pass
-        for c in doc['clips'].values():
-            for v in c['variants'].values():
-                final=v.get('result',{});references(final)
-                if final.get('plan_path'):
-                    from .storage import read_json
-                    references(read_json(final['plan_path'],{}))
-        references(doc.get('exports',[]))
-        # A saved evaluation intentionally keeps its two videos available for review.
-        for row in service.workspace.rows('evaluations6',doc['project_id']):references(row)
-        for row in service.workspace.rows('native_evidence6',doc['project_id']):references(row)
-        references_by_project[doc['project_id']]={str(Path(p).resolve()) for p in paths if p}
-        protected.update(references_by_project[doc['project_id']])
+        paths.extend(doc['settings'].get(k) for k in ('music_path','sfx_path'))
+        protected.update(str(Path(p).resolve()) for p in paths if p)
     # Only preview subtrees and their temporary renders can be deleted here.
     for project in documents:
         pid=project['project_id'];work=service.work/pid;roots=[('preview',work/'cache'/'previews',True),
@@ -56,16 +34,10 @@ def inventory(service):
                     'category':category,'name':str(path.relative_to(root)),'bytes':stat.st_size,'modified':stat.st_mtime,
                     'last_used':stat.st_atime,'deletable':deletable and str(path.resolve()) not in protected,'path':str(path.resolve()),'project_name':project['name']})
         source=Path(project['source']['path'])
-        if source.is_file() and not any(e['project_id']==pid and e['path']==str(source.resolve()) for e in entries):
+        if source.is_file() and source not in seen:
             seen.add(source);stat=source.stat();entries.append({'id':fingerprint([str(source.resolve()),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns]),
                 'project_id':pid,'project_name':project['name'],'category':'source','name':source.name,'bytes':stat.st_size,
                 'modified':stat.st_mtime,'deletable':False,'path':str(source.resolve())})
-        for item in sorted(references_by_project[pid]):
-            path=Path(item)
-            if not path.is_file() or any(e['project_id']==pid and e['path']==item for e in entries):continue
-            stat=path.stat();entries.append({'id':fingerprint([pid,item,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns]),
-                'project_id':pid,'project_name':project['name'],'category':'referenced_asset','name':path.name,
-                'bytes':stat.st_size,'modified':stat.st_mtime,'deletable':False,'path':item})
     # Recognizable 2.x/3.x preview files are also owned cache, including orphan sessions.
     from .library_paths import disposable_files
     for path in disposable_files(service.work,service.base.out_dir):
@@ -73,27 +45,20 @@ def inventory(service):
         stat=path.stat();entries.append({'id':fingerprint([str(path.resolve()),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns]),
             'project_id':'legacy','project_name':'Preview sesi lama','category':'preview','name':path.name,'bytes':stat.st_size,
             'modified':stat.st_mtime,'deletable':True,'path':str(path.resolve())})
-    return {'entries':entries,'bytes':sum({e['path']:e['bytes'] for e in entries}.values()),'cache_bytes':sum(e['bytes'] for e in entries if e['deletable']),
-        'etag':fingerprint([(e['id'],e['bytes'],e['project_id'],e['deletable']) for e in entries]),'protection':'Sumber, transkrip, koreksi, hasil final, proyek editor, model, aset terpakai dan video evaluasi tersimpan dilindungi.'}
+    return {'entries':entries,'bytes':sum(e['bytes'] for e in entries),'cache_bytes':sum(e['bytes'] for e in entries if e['deletable']),
+        'etag':fingerprint([(e['id'],e['bytes']) for e in entries]),'protection':'Sumber, transkrip, koreksi, hasil final, proyek editor, dan model tidak termasuk cache yang dihapus.'}
 
 
 def cleanup(service,ids,etag):
     if any(j['status'] in ACTIVE for j in service.queue.list()):raise ValueError('Tunggu atau batalkan antrean sebelum membersihkan cache')
     if not service.queue.lock.acquire(blocking=False):raise ValueError('Sumber daya sedang digunakan')
     try:
-        service.workspace  # initialize tables before taking the write transaction
-        with service.store.connect() as db:
-            db.execute('BEGIN IMMEDIATE')
-            try:
-                # New references cannot be committed while this selection is checked/deleted.
-                listing=inventory(service)
-                if listing['etag']!=etag:raise Conflict(0,'Daftar atau perlindungan berkas berubah; periksa daftar baru sebelum menghapus cache')
-                selected=set(ids);matches=[e for e in listing['entries'] if e['id'] in selected]
-                if len(matches)!=len(selected) or any(not e['deletable'] for e in matches):raise ValueError('Pilihan berkas bukan cache preview milik aplikasi')
-                if any(j['status'] in ACTIVE for j in service.queue.list()):raise ValueError('Antrean baru masuk; tunggu sebelum membersihkan cache')
-                for entry in matches:Path(entry['path']).unlink(missing_ok=True)
-                db.commit();return {'deleted':len(matches),'bytes':sum(e['bytes'] for e in matches)}
-            except BaseException:db.rollback();raise
+        listing=inventory(service)
+        if listing['etag']!=etag:raise Conflict(0,'Daftar berkas berubah; periksa daftar baru sebelum menghapus cache')
+        selected=set(ids);matches=[e for e in listing['entries'] if e['id'] in selected]
+        if len(matches)!=len(selected) or any(not e['deletable'] for e in matches):raise ValueError('Pilihan berkas bukan cache preview milik aplikasi')
+        for entry in matches:Path(entry['path']).unlink(missing_ok=True)
+        return {'deleted':len(matches),'bytes':sum(e['bytes'] for e in matches)}
     finally:service.queue.lock.release()
 
 

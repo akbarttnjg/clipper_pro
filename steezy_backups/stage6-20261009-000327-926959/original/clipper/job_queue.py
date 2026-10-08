@@ -150,11 +150,8 @@ class JobQueue:
                         proc=subprocess.Popen([sys.executable,'-m','clipper.studio_worker','--db',str(self.store.path),'--job',job['id']],
                             cwd=Path(__file__).resolve().parent.parent,stdout=log,stderr=log,**options)
                         birth=process_birth(proc.pid);self.update(job['id'],pid=proc.pid,pid_birth=birth)
-                        from .metrics6 import ResourceMeter
-                        meter=ResourceMeter(proc.pid)
                         cancel_time=None
                         while proc.poll() is None:
-                            meter.sample()
                             current=self.get(job['id'])
                             if current['status']=='cancel_requested' or self.stop_event.is_set() and current['status']=='running':
                                 if cancel_time is None:
@@ -164,7 +161,6 @@ class JobQueue:
                                     else:terminate_owned(proc.pid,birth)
                             self.stop_event.wait(.2)
                         current=self.get(job['id'])
-                        self.update(job['id'],result={**(current.get('result') or {}),'resource_metrics':meter.report()})
                         if cancel_time is not None and current['status'] not in ('completed','failed','stale'):
                             self.update(job['id'],status='canceled',message='Proses dihentikan. Hasil sah sebelumnya tetap ada.')
                             try:

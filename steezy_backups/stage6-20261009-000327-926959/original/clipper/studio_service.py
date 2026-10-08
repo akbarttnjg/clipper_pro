@@ -51,11 +51,6 @@ def apply_corrections(words,document,clip_id=None):
 
 class StudioService:
     @cached_property
-    def workspace(self):
-        from .workflow6 import Workspace
-        return Workspace(self)
-
-    @cached_property
     def runtime(self):
         from .runtime.manager import RuntimeManager
         from .runtime.state import runtime_root
@@ -123,7 +118,7 @@ class StudioService:
         if not path.is_file():raise ValueError('Sumber video tidak ditemukan')
         info=inspect(path)
         if not info['audio_tracks']:raise ValueError('Video harus mempunyai track suara')
-        settings={**self.workspace.preference().get('settings',{}),**validate_overrides(settings or {})}
+        settings=validate_overrides(settings or {})
         document={'name':str(name or path.stem)[:160],'settings':{**{k:v for k,v in asdict(self.base).items() if k not in PRIVATE},**settings},
             'source':{'path':str(path),'source_id':content_id(path,fresh=True),'info':info},
             'clips':{},'aliases':[],'shared_corrections':{},'clip_corrections':{},'transcript_revision':0,'exports':[]}
@@ -165,8 +160,6 @@ class StudioService:
                         result['url']=self.register_file(project_id,result.get('absolute_file'))
                         result['stale']=result.get('dependency')!=dependency
                 variant['export_readiness']=self.export_readiness(doc,cid,vid,dependency=dependency)
-                from .workflow6 import export_options
-                variant['export_options']=export_options(variant)
                 report=variant.get('visual_report')
                 if variant.get('style_report'):
                     variant['style_report']['stale']=variant.get('style_dependency')!=dependency
@@ -190,8 +183,6 @@ class StudioService:
         if result.get('dependency')!=dependency:
             return {'status':'stale','action':'render','message':'Pengaturan atau bahan klip berubah. Render final revisi aktif dahulu, lalu buat paket editor.',
                 'input_revision':result.get('input_revision')}
-        if result.get('plan_content_id') and result['plan_content_id']!=asset_id(result.get('plan_path'),fresh=fresh):
-            return {'status':'changed','action':'render','message':'Rencana edit final berubah atau hilang. Render ulang sebelum ekspor.'}
         if fresh and result.get('output_content_id')!=content_id(path,fresh=True):
             return {'status':'changed','action':'render','message':'Isi berkas final berubah. Render ulang sebelum ekspor.'}
         return {'status':'ready','action':'export','message':'Final sesuai bahan dan pengaturan aktif. Paket editor dapat dibuat.',
@@ -230,17 +221,7 @@ class StudioService:
     def dependency(self,doc,clip_id=None,variant_id=None,*,fresh=False,kind='render'):
         source=doc['source'];source_hash=asset_id(source['path'],fresh=fresh)
         base=[DEPENDENCY_VERSION,source_hash,source['source_id'],doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections'),doc.get('alignment_overrides',{}).get('shared')]
-        if not clip_id:
-            from .workflow6 import SOURCE_FIELDS,SOURCE_ONLY
-            if kind in ('analyze','correction','discovery','source_evidence','waveform'):
-                settings=asdict(self.config(doc));keys=SOURCE_ONLY.get(kind,SOURCE_FIELDS)
-                scoped={k:settings.get(k) for k in sorted(keys)}
-                source_base=[DEPENDENCY_VERSION,source_hash,source['source_id']]
-                if kind in ('correction','discovery'):
-                    source_base+=[doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections'),doc.get('alignment_overrides',{}).get('shared')]
-                elif kind=='analyze':source_base+=[doc.get('aliases')]
-                return fingerprint(source_base+[scoped,kind])
-            return fingerprint(base+[doc['settings'],kind])
+        if not clip_id:return fingerprint(base+[doc['settings'],kind])
         variant=self.variant(doc,clip_id,variant_id);clip=doc['clips'][clip_id]
         cfg=self.config(doc,clip_id,variant_id);settings=asdict(cfg)
         for key in ('out_dir','work_dir','pexels_key','variant_id','cache_limit_gb'):settings.pop(key,None)
@@ -340,18 +321,6 @@ class StudioService:
                         c,v=target['clip_id'],target['variant_id'];variant=self.variant(doc,c,v)
                         keep=set(variant.get('override_keys',[])) if not op.get('replace_manual',False) else set()
                         variant['settings'].update({k:value for k,value in values.items() if k not in keep});touched.add((c,v))
-                elif kind=='brand_apply':
-                    touched.update(self.workspace.apply_brand(doc,op,cid,vid))
-                elif kind=='design_alternative':
-                    variant=self.variant(doc,cid,vid)
-                    # Regenerate only seeded phrase decisions; retain all other edits.
-                    seed=op.get('seed',self.config(doc,cid,vid).caption_seed+1)
-                    values=validate_overrides({'caption_seed':seed})
-                    if self.config(doc,cid,vid).style_preset=='legacy':
-                        raise ValueError('Pilih preset Rapi, Ekspresif atau Adaptif sebelum membuat alternatif.')
-                    variant['settings'].update(values)
-                    variant['override_keys']=sorted(set(variant.get('override_keys',[]))|{'caption_seed'})
-                    touched.add((cid,vid))
                 elif kind=='visual_controls':
                     from .visual4 import validate_controls
                     variant=self.variant(doc,cid,vid)
@@ -445,10 +414,10 @@ class StudioService:
     def enqueue(self,project_id,kind,clip_id=None,variant_id='portrait',expected_revision=None,options=None):
         doc=self.store.get(project_id)
         if expected_revision is not None and expected_revision!=doc['revision']:raise Conflict(doc['revision'])
-        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation'):raise ValueError('Tahap tidak dikenal')
+        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform'):raise ValueError('Tahap tidak dikenal')
         if kind in ('analyze','source_evidence','correction','discovery','waveform'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
-        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation') and not clip_id:raise ValueError('Pilih klip dahulu')
+        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review') and not clip_id:raise ValueError('Pilih klip dahulu')
         if kind not in ('analyze','source_evidence','waveform') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
         if kind=='asr_recheck':
             from .speech_jobs import recheck_options
@@ -465,16 +434,6 @@ class StudioService:
         if kind=='export':
             readiness=self.export_readiness(doc,clip_id,variant_id,dependency=request['dependency'],fresh=True)
             if readiness['status']!='ready':raise ValueError(readiness['message'])
-            from .workflow6 import EXPORT_MODES,export_options
-            mode=(options or {}).get('mode','hybrid')
-            if mode not in EXPORT_MODES:raise ValueError('Mode ekspor tidak valid.')
-            choice=next(r for r in export_options(self.variant(doc,clip_id,variant_id)) if r['id']==mode)
-            if not choice['available']:raise ValueError(' '.join(choice['reasons']))
-        if kind=='evaluation':
-            from .evaluation6 import artifact_pair,CATEGORIES
-            pair,_=artifact_pair(self,project_id,options or {})
-            if (options or {}).get('category') not in CATEGORIES:raise ValueError('Pilih kategori evaluasi.')
-            if any(p[0]['clip_id']!=clip_id or p[0]['variant_id']!=variant_id for p in pair):raise ValueError('Hasil pembanding harus dari klip dan rasio aktif.')
         return self.queue.enqueue(project_id,kind,target,request)
 
     def analysis_snapshot(self,target,document=None):

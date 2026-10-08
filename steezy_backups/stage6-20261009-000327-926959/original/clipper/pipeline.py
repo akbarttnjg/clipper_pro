@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.6'
+RENDER_VERSION = '4.0.5'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):

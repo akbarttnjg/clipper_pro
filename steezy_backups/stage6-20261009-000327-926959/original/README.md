@@ -1,16 +1,36 @@
 # Clipper Studio lokal
 
-**Versi 4.0.6 — Tahap 6** melengkapi alur **Sumber → Pilih klip → Tata gaya → Periksa / ekspor**, brand kit lintas proyek, alternatif seed dan undo, inventaris/cache terlindungi, tiga mode ekspor, serta evaluasi dan preferensi dari peninjauan hasil.
+**Versi 4.0.5 Tahap 5** menambahkan preset **Rapi, Ekspresif, Adaptif**,
+desain yang konsisten dengan seed tersimpan, pemeriksaan keterbacaan per frasa,
+kartu kutipan sumber, ranking aset lokal SigLIP2, serta kontrol SFX terbatas.
 
-Buka **Tata gaya → Brand kit & alternatif** untuk menyimpan gaya aktif. Kit menjaga pengaturan manual pada setiap rasio. Tombol **Evaluasi & bukti impor** di header membandingkan dua hasil tersimpan, mencatat mutu dan sumber daya, serta menyimpan bukti yang dilaporkan pengguna dari editor.
+Buka **Edit → Gaya Tahap 5 & keterbacaan**, pilih preset dan klik **Simpan gaya
+Tahap 5**. Klik **Periksa keterbacaan klip**, lalu buat preview pada setiap rasio.
+Proyek lama mempertahankan gaya manual sampai preset dipilih. 16:9 dan 9:16
+mempunyai tata letak sendiri. Lihat [panduan Tahap 5](docs/TAHAP_5_GAYA_ILUSTRASI_AUDIO.md).
 
-Ekspor menawarkan **Tampilan terjaga**, **Hibrida**, dan **Native dasar**. UI menjelaskan layer/batasnya. Native dasar hanya tersedia untuk shot crop tunggal tanpa zoom animasi atau tinggi fit khusus. Pembuatan dan struktur paket dibedakan dari keberhasilan impor native.
+Pemasang offline memperbarui instalasi 4.0.4 yang sesuai commit `a1a6e3a`.
+Pembuat paket: `tools/build_stage5_release.py`; pemasang:
+`tools/stage5_installer.py`. Checksum, cadangan dan rollback melindungi kode.
+Data proyek, musik, video, kredensial dan lingkungan model tetap tersedia.
+Paket tidak menjalankan pip, npm, atau unduhan model.
 
-Pemasang offline memperbarui instalasi 4.0.5 yang sesuai commit GitHub `04213e284c744a16d722f6f9aafb15395396d33c`. Pembuat paket: `tools/build_stage6_release.py`; pemasang: `tools/stage6_installer.py`. Gunakan pemeriksaan sebelum upgrade dan installer paket lengkap. Checksum, cadangan dan rollback melindungi kode; proyek, media dan lingkungan model tetap dipakai.
+Renderer subtitle lokal adalah bawaan. Remotion memakai CaptionPlan dan font
+yang sama bila komponen, browser lokal dan uji sampelnya siap. Mode otomatis
+mencatat alasan fallback; mode wajib menghentikan render bila komponen gagal.
+Motion Canvas memiliki adapter frame dan proyek kutipan yang dapat diedit.
+Jika belum siap, kartu dirender lokal dan status tersebut tampil di laporan.
+SigLIP2 mengurutkan kandidat berdasarkan frame; skornya bukan pengesahan isi.
 
-Lihat [panduan Tahap 6](docs/TAHAP_6_WORKSPACE_EKSPOR_EVALUASI.md) untuk pemasangan, penggunaan, bukti dan status backlog 51–60. [Panduan Tahap 5](docs/TAHAP_5_GAYA_ILUSTRASI_AUDIO.md) tetap menjelaskan preset, renderer, ilustrasi dan audio.
+Uji yang sudah dijalankan: logika gaya, layanan SQLite/antrean, kontrol UI dengan
+adapter DOM, video sintetis nyata FFmpeg CPU dalam kedua rasio, loudness, seed
+ulang, pemasangan dan rollback. Remotion/Motion Canvas di browser nyata,
+SigLIP2 dengan bobot asli, Windows/RTX 3050, kejernihan ucapan manusia dan
+impor CapCut/Resolve masih memerlukan uji di mesin Anda. Detail bukti ada di
+panduan. QC teknis tidak menjamin estetika terbaik atau FYP.
 
-Verifikasi mencakup SQLite/FFmpeg, UI dengan DOM adapter, sepuluh pasangan video sintetis dua rasio dengan piksel identik terhadap Tahap 5, checksum MP4 terjaga, struktur XML/Fusion Resolve dan operasi installer/rollback. Ini belum membuktikan mutu ASR/visual pada sumber manusia, impor CapCut 9.5.0/Resolve 21, perilaku browser/Windows, atau pengukuran RTX 3050. Uji tersebut masih perlu dilakukan pada perangkat dan aplikasi sasaran.
+Tahap sebelumnya: [transkrip & cerita](docs/TAHAP_3_TRANSKRIP_CERITA.md) dan
+[kamera & area aman](docs/TAHAP_4_KAMERA_AREA_AMAN.md).
 
 ## Dokumentasi proyek asal
 

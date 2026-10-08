@@ -199,8 +199,7 @@ def validate_bundle(root, results):
             for e in editors.values()],
         'comparison': 'Bandingkan ekspor editor dengan Reference/*.mp4 pada pembuka, tengah, pergantian B-roll dan penutup. Catat versi editor dan perbedaan nyata.',
         'limitations': ['Pemeriksaan struktur tidak membuktikan keberhasilan impor native.',
-            'Blur/fade CapCut belum setara dengan ASS.',
-            'Crop sumber native memerlukan pemeriksaan di editor.' if manifest.get('export_mode')=='native' else 'Framing sumber menyatu pada V1.']}
+            'Blur/fade CapCut belum setara dengan ASS. Framing sumber menyatu pada V1.']}
 
 
 def validate_capcut(path, plan, required, issues):

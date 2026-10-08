@@ -298,9 +298,6 @@ def validate_overrides(form: dict) -> dict:
                 pass
     if form.get("accent_hex") and _HEX.match(str(form["accent_hex"])):
         out["accent_hex"] = form["accent_hex"]
-    if 'base_hex' in form:
-        if not isinstance(form['base_hex'],str) or not _HEX.fullmatch(form['base_hex']):raise ValueError('Warna teks tidak valid')
-        out['base_hex']=form['base_hex']
     for key in ('material_rect', 'speaker_rect'):
         if key in form:
             value = str(form[key]).strip()

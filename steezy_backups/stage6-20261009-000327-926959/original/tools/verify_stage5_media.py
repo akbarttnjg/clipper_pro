@@ -3,6 +3,9 @@ import sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+# This workspace has pip's real vendored requests; application files are unchanged.
+from pip._vendor import requests
+sys.modules['requests']=requests
 import copy,hashlib,json,subprocess
 from dataclasses import replace
 from PIL import Image,ImageDraw

@@ -379,20 +379,7 @@ def update_capcut_meta(folder, data, name, timelines):
     write_json(folder / 'draft_meta_info.json', meta)
 
 
-def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
-    from .workflow6 import EXPORT_MODES,native_reasons
-    if mode not in EXPORT_MODES:raise ValueError('Mode ekspor tidak valid.')
-    from .dependency_cache import content_id
-    for result in results:
-        if result.get('plan_content_id') and content_id(result['plan_path'],fresh=True)!=result['plan_content_id']:
-            raise ValueError('Rencana edit berubah sejak final dibuat; render ulang.')
-    if mode=='preserved':
-        from .export6 import preserved
-        return preserved(results,cfg,progress)
-    if mode=='native':
-        for result in results:
-            reasons=native_reasons(read_json(result.get('plan_path',''),{}))
-            if reasons:raise ValueError(' '.join(reasons))
+def export_bundle(results, cfg, progress=lambda p,m: None):
     from .library_paths import project_root
     root = project_root(cfg) / 'projects' / f'project-{cfg.job_id}-{time.time_ns()}'
     root.mkdir(parents=True, exist_ok=False)
@@ -422,19 +409,15 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
         fingerprint['media_content_id'] = content_id(p['source']['path'],fresh=True)
         fingerprint['mix_content_id'] = content_id(p['audio']['mix'],fresh=True)
         key = hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
-        if mode=='hybrid' and (not clean.exists() or read_json(cache,{}).get('key') != key):
+        if not clean.exists() or read_json(cache,{}).get('key') != key:
             progress(round(5+30*i/max(1,len(results))), f'Menyiapkan video tanpa teks {i+1}/{len(results)}')
             render.video(p['source']['path'], {**p, 'broll': []}, clean_cfg, None, clean, p['audio']['mix'],
                 lambda fraction: progress(round(5+30*(i+fraction)/max(1,len(results))),
                     f'Video tanpa teks {i+1}/{len(results)}'))
-        if mode=='hybrid':
-            qc.inspect(clean, clean_cfg, p['duration'])
-            write_json(cache, {'key':key})
-            packed_clean = root / 'Media' / f'{i+1:02}-video-clean.mp4'
-            shutil.copy2(clean, packed_clean)
-        else:
-            packed_clean=root/'Media'/f'{i+1:02}-source{Path(p["source"]["path"]).suffix.lower()}'
-            shutil.copy2(p['source']['path'],packed_clean)
+        qc.inspect(clean, clean_cfg, p['duration'])
+        write_json(cache, {'key':key})
+        packed_clean = root / 'Media' / f'{i+1:02}-video-clean.mp4'
+        shutil.copy2(clean, packed_clean)
         from .illustrations import credits
         credit_rows=credits(p)
         write_json(root/'Media'/f'{i+1:02}-credits.json',credit_rows)
@@ -450,13 +433,11 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
         write_json(root / f'original-edit-plan-{i+1:02}.json', original)
         # Framing and zoom are baked into V1; typography and audio remain separate.
         # This preserves the material/speaker split exactly in both editors.
-        if mode=='hybrid':
-            p['source'] = {**p['source'], 'path': str(packed_clean.resolve()), 'fps': p['fps'],
-                           'width': p['width'], 'height': p['height'], 'duration': p['duration']}
-            p['shots'] = [{**s, 'source_start': s['start'], 'source_end': s['end'],
-                           'rect': [0,0,p['width'],p['height']], 'mode': 'fill',
-                           'face_rect': None, 'zoom_at': None} for s in p['shots']]
-        else:p['source']={**p['source'],'path':str(packed_clean.resolve())}
+        p['source'] = {**p['source'], 'path': str(packed_clean.resolve()), 'fps': p['fps'],
+                       'width': p['width'], 'height': p['height'], 'duration': p['duration']}
+        p['shots'] = [{**s, 'source_start': s['start'], 'source_end': s['end'],
+                       'rect': [0,0,p['width'],p['height']], 'mode': 'fill',
+                       'face_rect': None, 'zoom_at': None} for s in p['shots']]
         for kind, source in list(p['audio']['stems'].items()):
             target = root / 'Media' / f'{i+1:02}-{kind}.wav'
             shutil.copy2(source, target)
@@ -479,18 +460,14 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
         'source_files': sorted({p['plan']['source']['path'] for p in items}),
         'capcut_status': 'experimental-generated' if capcut_error is None else 'failed', 'capcut_error': capcut_error,
         'resolve_status': 'generated-unverified-in-editor' if resolve_error is None else 'failed', 'resolve_error': resolve_error,
-        'export_mode': mode, 'editable_layers': EXPORT_MODES[mode]['editable_layers'],
-        'baked_layers': EXPORT_MODES[mode]['baked_layers'], 'native_editor_status': 'not_tested',
+        'export_mode': 'hybrid', 'editable_layers': ['text', 'audio', 'broll'],
+        'baked_layers': ['source_framing', 'source_zoom'], 'native_editor_status': 'not_tested',
         'broll_layer': 'separate silent video track', 'limitations': [
             'B-roll ada pada track terpisah; credits.txt berisi sumber untuk deskripsi publikasi.',
             'Video tanpa teks, WAV, font, ASS master dan SRT ada di paket. Framing/zoom sudah menyatu di video.',
             'DaVinci: Fusion Text+ dengan kurva posisi, ukuran, opacity dan blur; perlu verifikasi tampilan di editor.',
             'CapCut: teks editable dengan gerak posisi/ukuran. Blur dan fade native belum dipetakan; MP4/ASS memuat efek lengkap.',
             'CapCut multi-timeline memakai format draft tidak resmi; perlu uji 9.5. Fallback draft per clip disediakan.']}
-    manifest['limitations']=EXPORT_MODES[mode]['limitations']+manifest['limitations']
-    if mode=='native':
-        manifest['limitations']=[v for v in manifest['limitations'] if 'Framing/zoom' not in v]
-        manifest['source_scope']='whole_source_file'
     write_json(root / 'manifest.json', manifest)
     shutil.copy2(Path(__file__).parent / 'project_install.py', root / 'PASANG_PROYEK.py')
     (root / 'PASANG_CAPCUT.cmd').write_text('@echo off\r\ncd /d "%~dp0"\r\npy -3 PASANG_PROYEK.py --capcut\r\nif errorlevel 1 echo Baca pesan di atas. Tidak ada proyek lama yang ditimpa.\r\npause\r\n', encoding='utf-8')
@@ -531,7 +508,7 @@ Jangan hapus folder paket setelah impor karena aset direferensikan dari sini.
 
 BATAS VERIFIKASI
 Status pembuatan dan kelengkapan tiap editor tersedia di verification.json.
-Impor di Resolve 21 / CapCut 9.5.0
+Impor di Resolve Free 21.0.4 / CapCut 9.5
 belum dijalankan dalam lingkungan pengembangan. Periksa satu clip dahulu.
 Perbedaan yang diketahui: blur dan fade teks CapCut belum dipetakan; ukuran font dan
 baseline kedua editor dapat berbeda. Semua efek penuh ada pada MP4 dan master ASS.
@@ -542,11 +519,6 @@ per clip, yang disimpan untuk dipakai kembali selama revisi tidak berubah.
     for editor, error in (('CAPCUT', capcut_error), ('DAVINCI', resolve_error)):
         if error:
             guide += '\nEKSPOR ' + editor + ' GAGAL: ' + error + '\nPeriksa verification.json; perbaiki penyebab tersebut lalu ekspor ulang.\n'
-    if mode=='native':
-        guide='MODE NATIVE DASAR\nVideo sumber utuh disertakan; potongan dan crop statis dapat diedit.\n'+guide.replace('Komposisi materi/pembicara serta zoom menyatu dalam video agar hasilnya konsisten.',
-            'Mode ini memakai sumber asli. Framing native perlu dibandingkan dengan MP4 rujukan.').replace(
-            'Komposisi kamera sudah menyatu di video tanpa teks. Ubah framing di aplikasi lalu',
-            'Crop native tersedia untuk shot tunggal. Periksa framing di editor; Anda juga dapat')
     (root / 'BACA_DULU.txt').write_text(guide, encoding='utf-8')
     from .export_verify import validate_bundle
     verification = validate_bundle(root, results)
@@ -558,7 +530,6 @@ per clip, yang disimpan untuk dipakai kembali selama revisi tidak berubah.
     return {'zip': zip_path, 'folder': str(root), 'timelines': len(items),
             'capcut_error': capcut_error, 'resolve_error': resolve_error,
             'structural_status': verification['structural_status'], 'editors': verification['editors'],
-            'native_editor_status': 'not_tested', 'export_mode': mode,
-            'editable_layers':manifest['editable_layers'],'baked_layers':manifest['baked_layers'],'limitations':manifest['limitations'],
+            'native_editor_status': 'not_tested', 'export_mode': 'hybrid',
             'note': ('Paket perlu diperiksa. ' if verification['issues'] else 'Struktur paket lolos pemeriksaan. ')
                     + 'Impor native perlu verifikasi di editor. Baca BACA_DULU.txt.'}
