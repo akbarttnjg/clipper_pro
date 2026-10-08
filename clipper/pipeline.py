@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.6'
+RENDER_VERSION = '4.0.8'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -63,6 +63,19 @@ def clip_name(clip, i):
     return f'{i+1:02d}-{slug}'
 
 
+def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
+    """Use the same evidence and pause policy for review, preview and final."""
+    words=intelligence.annotate_words(words,clip,cfg,context_words=context_words)
+    preserve=cfg.source_kind in ('board','screen','chart','graphic') and cfg.preserve_material_pauses
+    plan=editplan.build(words,clip,replace(cfg,trim_silence=False) if preserve else cfg)
+    composition.analyze(media_path,plan,cfg,info)
+    if cfg.source_kind=='auto' and cfg.trim_silence and cfg.preserve_material_pauses and any(s.get('has_material') for s in plan['shots']):
+        plan=editplan.build(words,clip,replace(cfg,trim_silence=False))
+        composition.analyze(media_path,plan,cfg,info)
+        plan['warnings'].append('Jeda materi dipertahankan; waktu menulis tidak dipangkas otomatis.')
+    return words,plan
+
+
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
     started = time.monotonic()
     name = name + f"-r{clip.get('revision', 0)}-v40"
@@ -78,14 +91,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         raise ValueError('Sumber tidak mempunyai track audio.')
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
-    words = intelligence.annotate_words(words, clip, cfg, context_words=context_words)
-    edit_cfg = replace(cfg, trim_silence=False) if cfg.source_kind == 'board' and cfg.preserve_material_pauses else cfg
-    plan = editplan.build(words, clip, edit_cfg)
-    composition.analyze(media_path, plan, cfg, info)
-    if cfg.source_kind == 'auto' and cfg.trim_silence and cfg.preserve_material_pauses and any(s.get('has_material') for s in plan['shots']):
-        plan = editplan.build(words, clip, replace(cfg, trim_silence=False))
-        composition.analyze(media_path, plan, cfg, info)
-        plan['warnings'].append('Jeda materi dipertahankan; waktu menulis tidak dipangkas otomatis.')
+    words,plan=source_plan(media_path,words,clip,cfg,info,context_words=context_words)
     if not plan['shots']:
         raise ValueError('Tidak ada frame yang dapat dirender. Periksa batas clip.')
     from . import illustrations
@@ -114,16 +120,17 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     write_json(report_base.with_suffix('.subtitle-review.json'), plan['subtitle_cleanup'])
     from .typography import make_plan
     anchors=placement.caption_anchors(plan,cfg)
-    plan['captions']=make_plan(display,cfg,clip.get('keywords',[]),anchors=anchors)
     on_progress(20,'Menyiapkan suara dan memeriksa penekanan ucapan')
-    mix=render.audio_stems(media_path,plan,cfg,work)
+    voice=render.voice_stem(media_path,plan,cfg,work)
     from .style5 import annotate_prosody,readability
-    display=annotate_prosody(display,plan['audio']['stems']['voice'])
+    display=annotate_prosody(display,voice)
     plan['display_words']=display
     ass = captions_pro.write_ass(display, work / 'captions.ass', cfg,
         keywords=clip.get('keywords', []),
         anchors=placement.caption_anchors(plan, cfg))
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
+    # SFX cues now follow the final acoustic/semantic caption decisions.
+    mix=render.audio_stems(media_path,plan,cfg,work)
     plan['style_report']=readability(plan['captions'],cfg)
     write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
     if plan['style_report']['issue_count']:plan['warnings'].append('Keterbacaan perlu ditinjau; lihat masalah per frasa di panel Gaya Tahap 5.')

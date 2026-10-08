@@ -19,9 +19,23 @@ def run_audio(args, target, log):
         pending.unlink(missing_ok=True)
 
 
-def audio_stems(source, plan, cfg, folder):
+def voice_stem(source, plan, cfg, folder):
+    """Reuse measured speech across aspect/style renders with identical edits."""
+    from .contracts import fingerprint
+    from .dependency_cache import content_id
+    from .storage import read_json,write_json
+    signature={'version':'4.0.8-voice','source':content_id(source),
+        'spans':[[s['source_start'],s['source_end'],s.get('duration_frames',round((s['source_end']-s['source_start'])*plan.get('fps',cfg.output_fps)))] for s in plan['spans']],
+        'duration':plan['duration'],'fps':plan.get('fps',cfg.output_fps),'normalize':cfg.audio_normalize,
+        'target_lufs':cfg.audio_target_lufs,'peak_db':cfg.audio_peak_db,'join_fade_ms':cfg.join_fade_ms}
+    key=fingerprint(signature)
+    folder=Path(cfg.audio_cache_dir or cfg.work_dir)/'audio-stems'/key
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
+    voice=folder/'voice.wav';receipt=folder/'voice-cache.json'
+    cached=read_json(receipt,{}) or {}
+    if isinstance(cached,dict) and cached.get('key')==key and voice.is_file() and cached.get('content_id')==content_id(voice,fresh=True):
+        plan['voice_cache']={'key':key,'reused':True};return str(voice)
     duration = plan['duration']
     seek = min(s['source_start'] for s in plan['spans'])
     end = max(s['source_end'] for s in plan['spans'])
@@ -33,9 +47,20 @@ def audio_stems(source, plan, cfg, folder):
     norm = (f',apad=pad_dur=3,loudnorm=I={cfg.audio_target_lufs}:TP={cfg.audio_peak_db}:LRA=11,aresample=48000,atrim=duration={duration:.8f}'
             if cfg.audio_normalize else '')
     parts.append(''.join(f'[a{i}]' for i in range(len(plan['spans']))) + f"concat=n={len(plan['spans'])}:v=0:a=1{norm}[voice]")
-    voice = folder / 'voice.wav'
     run_audio(['-ss', seek, '-t', end - seek, '-i', source, '-filter_complex_threads', '2',
                '-filter_complex', ';'.join(parts), '-map', '[voice]', '-t', duration], voice, folder / 'audio.log')
+    write_json(receipt,{'key':key,'content_id':content_id(voice,fresh=True),'settings':signature})
+    plan['voice_cache']={'key':key,'reused':False}
+    return str(voice)
+
+
+def audio_stems(source, plan, cfg, folder):
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    duration=plan['duration']
+    prior_cache=plan.get('voice_cache')
+    voice=Path(voice_stem(source,plan,cfg,folder))
+    if prior_cache and prior_cache.get('key')==plan['voice_cache']['key']:
+        plan['voice_cache']={**prior_cache,'reused_in_mix':True}
     stems = {'voice': str(voice.resolve())}
     if cfg.music_path:
         music = folder / 'music-ducked.wav'
@@ -109,7 +134,9 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'
             graph.append(f'[mat{i}][face{i}]vstack=inputs=2,pad={W}:{H}:0:0:color=0x11151b' + suffix)
         else:
             if shot['mode'] == 'fill':
-                prefix += f',scale={W}:{H}:flags=bicubic'
+                image_h=shot.get('image_height') or H
+                prefix += f',scale={W}:{image_h}:flags=bicubic'
+                if image_h!=H:prefix += f',pad={W}:{H}:0:0:color=0x11151b'
             elif shot.get('image_height'):
                 top = shot['image_height']
                 prefix += f',scale={W}:{top}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:({top}-ih)/2:color=0x11151b'

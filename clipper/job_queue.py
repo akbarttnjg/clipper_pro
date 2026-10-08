@@ -112,6 +112,26 @@ class JobQueue:
             if self.thread and self.thread.is_alive():return
             self.stop_event.clear();self.thread=threading.Thread(target=self.run,daemon=True,name='clipper-resource-queue');self.thread.start()
 
+    def enqueue_many(self,project_id,entries,expected_revision):
+        """Validate the snapshot and add a whole batch in one SQLite transaction."""
+        from .project_store import Conflict
+        ids=[]
+        with self.store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT revision FROM projects WHERE id=?',(project_id,)).fetchone()
+            if row is None:raise KeyError('Proyek tidak ditemukan')
+            if row['revision']!=expected_revision:raise Conflict(row['revision'])
+            for kind,target,request in entries:
+                request={**request,'queue_key':fingerprint([project_id,kind,target,request])}
+                existing=next((r['id'] for r in db.execute("SELECT id,request FROM jobs WHERE project_id=? AND kind=? AND status IN ('queued','running')",(project_id,kind)) if json.loads(r['request'])['queue_key']==request['queue_key']),None)
+                if existing:ids.append(existing);continue
+                ident='job-'+uuid.uuid4().hex;now=time.time()
+                db.execute('INSERT INTO jobs(id,project_id,kind,target,status,request,created,updated,message) VALUES(?,?,?,?,?,?,?,?,?)',
+                    (ident,project_id,kind,dumps(target),'queued',dumps(request),now,now,'Batch dua rasio · menunggu giliran.'))
+                ids.append(ident)
+            db.commit()
+        self.start();return [self.get(i) for i in ids]
+
     def update(self,ident,**values):
         allowed={'status','progress','message','error','result','pid','pid_birth','owner'}
         if set(values)-allowed:raise ValueError('Field proses tidak valid')

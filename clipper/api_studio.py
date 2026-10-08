@@ -83,6 +83,11 @@ def create_router(service):
     @guarded
     def cancel(jid:str):return service.queue.cancel(jid)
 
+    @router.post('/projects/{pid}/batch-render')
+    @guarded
+    def batch_render(pid:str,data:dict=Body(...)):
+        return service.enqueue_batch(pid,data.get('expected_revision'))
+
     @router.post('/jobs/{jid}/resume')
     @guarded
     def resume(jid:str):

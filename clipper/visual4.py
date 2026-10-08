@@ -17,7 +17,8 @@ from .dependency_cache import content_id
 from .storage import read_json, write_json
 from . import placement
 
-VERSION = '4.0.4-visual2'
+VERSION = '4.0.8'
+OBSERVATION_VERSION = '4.0.4-visual2'
 KINDS = ('speaker', 'podcast', 'board', 'screen', 'chart', 'graphic', 'unknown')
 
 
@@ -175,7 +176,7 @@ def classify(group):
     text_count=sum(len(r.get('texts',[])) for r in group)/max(1,len(group))
     if panels>=.6:return {'kind':'board','confidence':.78,'reason':'Panel materi konsisten sepanjang sampel; geometri tidak memastikan tulisan tangan'}
     if face_count>=2:return {'kind':'podcast','confidence':.85,'reason':'Dua atau lebih wajah terdeteksi; pembicara aktif memerlukan audio tersinkron'}
-    if face_count==1 and text_count<4:return {'kind':'speaker','confidence':.82,'reason':'Satu lintasan wajah tanpa panel materi dominan'}
+    if face_count==1:return {'kind':'speaker','confidence':.82,'reason':'Satu lintasan wajah tanpa panel materi dominan; tekstur geometri saja bukan bukti layar'}
     if text_count>=4:return {'kind':'screen','confidence':.62,'reason':'Tulisan sumber rapat; layar aplikasi atau chart perlu konfirmasi visual'}
     return {'kind':'unknown','confidence':.35,'reason':'Bukti wajah dan materi terbatas; gambar utuh dipertahankan'}
 
@@ -225,7 +226,7 @@ def collect(media,plan,cfg,info,sampler):
     source_id=content_id(media)
     evidence=Path(cfg.work_dir)/'source-evidence.json'
     evidence_id=cfg.visual_evidence_signature or (content_id(evidence) if evidence.is_file() else None)
-    key=fingerprint([VERSION,source_id,intervals,cfg.visual_interval_s,cfg.visual_max_frames,cfg.ocr_enabled,info['width'],info['height'],cfg.visual_runtime_signature or runtime_signature(cfg.visual_runtime_root or None),evidence_id])
+    key=fingerprint([OBSERVATION_VERSION,source_id,intervals,cfg.visual_interval_s,cfg.visual_max_frames,cfg.ocr_enabled,info['width'],info['height'],cfg.visual_runtime_signature or runtime_signature(cfg.visual_runtime_root or None),evidence_id])
     path=folder/('observations-'+key+'.json');cached=read_json(path,{}) or {}
     if cached.get('key')==key:
         rows=cached['rows']
@@ -344,7 +345,9 @@ def describe(media,group,cfg,info,active,allow_vlm=True,source_bounds=None,obser
     for r in ocr:
         if r['id'] in edits:r.update(text=edits[r['id']],manually_edited=True)
     vlm={'status':'not_needed'}
-    if cfg.visual_vlm!='off' and kind['confidence']<.75 and allow_vlm:
+    if cfg.source_kind in KINDS and cfg.source_kind not in ('auto','unknown'):
+        kind={'kind':cfg.source_kind,'confidence':1.,'reason':'Jenis sumber dipilih pengguna: '+cfg.source_kind,'basis':'manual'}
+    if cfg.visual_vlm!='off' and kind.get('basis')!='manual' and kind['confidence']<.75 and allow_vlm:
         key=cfg.visual_vlm if cfg.visual_vlm!='auto' else ('smolvlm' if component_runtime('smolvlm',cfg) else 'qwen3-vl')
         vlm=backend(key,{'source':str(media),'source_content_id':content_id(media),'time':group[len(group)//2]['t']},cfg,analysis_folder(cfg))
         answer=vlm.get('decision',{})

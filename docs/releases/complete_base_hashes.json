@@ -1,0 +1,193 @@
+{
+  "base_commit": "9e0677c60605be0d16a6f19eebf8cb12094a3531",
+  "payload_paths": [
+    ".gitignore",
+    "CEK_PEMBENAHAN.cmd",
+    "README.md",
+    "clipper/api_studio.py",
+    "clipper/batch7.py",
+    "clipper/boundaries.py",
+    "clipper/capcut_worker7.py",
+    "clipper/composition.py",
+    "clipper/config.py",
+    "clipper/dependency_cache.py",
+    "clipper/explanation5.py",
+    "clipper/export6.py",
+    "clipper/export_verify.py",
+    "clipper/framing.py",
+    "clipper/job_queue.py",
+    "clipper/pipeline.py",
+    "clipper/placement.py",
+    "clipper/projects.py",
+    "clipper/render.py",
+    "clipper/runtime/templates/motion5/src/scene.tsx",
+    "clipper/story.py",
+    "clipper/studio_service.py",
+    "clipper/studio_worker.py",
+    "clipper/style5.py",
+    "clipper/tests/batch7_ui.cjs",
+    "clipper/tests/test_batch7.py",
+    "clipper/tests/test_complete_installer.py",
+    "clipper/tests/test_complete_repairs.py",
+    "clipper/typography.py",
+    "clipper/visual4.py",
+    "clipper/workflow6.py",
+    "docs/PEMBENAHAN_LENGKAP.md",
+    "docs/releases/complete_base_hashes.json",
+    "docs/verification/BASELINE_GITHUB_4_0_7.json",
+    "docs/verification/HASIL_QA_LENGKAP.md",
+    "static/features/batch7.js",
+    "static/features/style5.js",
+    "static/index.html",
+    "static/studio4.js",
+    "tools/build_complete_release.py",
+    "tools/complete_installer.py",
+    "tools/qa_capcut_serializer.py",
+    "tools/qa_complete_render.py",
+    "tools/verify_complete.py"
+  ],
+  "guard_paths": [
+    "app.py",
+    "requirements.txt",
+    "requirements-pro.txt",
+    "clipper/stage3.py",
+    "clipper/speech_jobs.py",
+    "clipper/visual_worker.py",
+    "clipper/font_catalog.py",
+    "clipper/editplan.py",
+    "clipper/subtitle_edit.py",
+    "clipper/caption_checks.py",
+    "clipper/project_store.py"
+  ],
+  "allowed_hashes": {
+    ".gitignore": [
+      "1df28b93aae4adcf38c49326359b2088807e363dc651208f60cf1e737701650a"
+    ],
+    "CEK_PEMBENAHAN.cmd": [],
+    "README.md": [
+      "7f748a6669fd5c0098463781f245714d289472e23cc7ca37e4a52626061374ff"
+    ],
+    "app.py": [
+      "ab581c9982821f247ac31bd33a49d6c1923d346d5a5d28af974a1109cd8e0758"
+    ],
+    "clipper/api_studio.py": [
+      "1b9c3877eedbed6c76a42b63b86209abe5d9c529fafd10ac1c2b5652da210b93"
+    ],
+    "clipper/batch7.py": [],
+    "clipper/boundaries.py": [
+      "2e598f2d265e5d9f9fc89396c203049ecc34002c713dd2b4e843b2d0f1264266"
+    ],
+    "clipper/capcut_worker7.py": [],
+    "clipper/caption_checks.py": [
+      "6986c634cd45bfdbd4030e6122bcc57835f32a75e5f5027a4e2cb7de78e34838"
+    ],
+    "clipper/composition.py": [
+      "3baa7314f60b4e1c632a74c167e57a09cb535fb8734a40493d1aa2136ca94d06"
+    ],
+    "clipper/config.py": [
+      "9ca548554533c20f9133485066433f63aa5fa13c9c8f362339690742e8023521"
+    ],
+    "clipper/dependency_cache.py": [
+      "3ae7583fe6a8e71ae76be3ce305fa91183a59cc082215b6153120aa4f12c09eb"
+    ],
+    "clipper/editplan.py": [
+      "1abdef5b8ae2553d6a713bcd2528a6ae8d7b341173f4fa96a35ab45aceeb2674"
+    ],
+    "clipper/explanation5.py": [
+      "532d92b8b21125157891fb41a3cbe02fb2a4d8df364b4ed7f3edcde980fa3400"
+    ],
+    "clipper/export6.py": [
+      "6289a8d62cb477ccfa6c65c06c53b448f176868ef9ef7c2ccda4eece687bd466"
+    ],
+    "clipper/export_verify.py": [
+      "c915585d3c2561b44c7f71758f59fb40dcefa16a166f664ce8953e1dd51a314b"
+    ],
+    "clipper/font_catalog.py": [
+      "642d14e8cae95f16610127a1647e477b55a7701fe8794870704d643f82a96c6f"
+    ],
+    "clipper/framing.py": [],
+    "clipper/job_queue.py": [
+      "b37d2ee30236ae24286ab11f912f864bd7aaf057fc39420915353d7b8b371e3e"
+    ],
+    "clipper/pipeline.py": [
+      "039476212edd35eb37623d35a22375c088c9d720a2cba2db72871923078fac48"
+    ],
+    "clipper/placement.py": [
+      "3d160d64a013edb794d432f9e8f3ac61dd46aa2d9d26006cf40c9bd2566a7a23"
+    ],
+    "clipper/project_store.py": [
+      "29118c2c58b483dfd67a0b82be2967da4d036927676b143c0ed2333bc9f59028"
+    ],
+    "clipper/projects.py": [
+      "2ee621ef5d9c2273662f545a050dd7a7c13c5346a6ad030bf3000ee189f72bd9"
+    ],
+    "clipper/render.py": [
+      "abab212227fc7425a17eb1d0f19830b988a0e84fee7dddad625c83f60314bcb9"
+    ],
+    "clipper/runtime/templates/motion5/src/scene.tsx": [
+      "deb240976cd3bd1c10f4ff1fcc7cdcb2a1f0b5fa57755fc962bac1865071f24f"
+    ],
+    "clipper/speech_jobs.py": [
+      "f5d127492a7761a9dd56f070c42a77597957dec82f262c8c9dda64b17f973377"
+    ],
+    "clipper/stage3.py": [
+      "b8577bd522e3749e8f8e38e46f4b9c433b33e351aa629c4e35424685f3d75162"
+    ],
+    "clipper/story.py": [
+      "9553b9d88947b283d350b8537e1807920cd010e2cbea8118af779a0c2451d17b"
+    ],
+    "clipper/studio_service.py": [
+      "1486acbadac15479b61c674b60ec07c88373f15318386ad2e2731b1c382ffea9"
+    ],
+    "clipper/studio_worker.py": [
+      "f9a0b139202f636a67eccaa9a68e2a2032d1d99b9bf4efb12db304abcb0a3a5b"
+    ],
+    "clipper/style5.py": [
+      "e66f152fc9266e31b021d050e0ab7c481c5c23c40f0f738e3e245c549caff991"
+    ],
+    "clipper/subtitle_edit.py": [
+      "efffbd4e7f9c5457cd23f3707d92e6d7c3170f9aae23cd16b02993ebdb85830e"
+    ],
+    "clipper/tests/batch7_ui.cjs": [],
+    "clipper/tests/test_batch7.py": [],
+    "clipper/tests/test_complete_installer.py": [],
+    "clipper/tests/test_complete_repairs.py": [],
+    "clipper/typography.py": [
+      "ae260c84a9581e4263b4d416b1eada82c8bf2efb7980fd339268e8a4cbb4eef4"
+    ],
+    "clipper/visual4.py": [
+      "bc477b5a1def9b8601eb0f49eb87b88c5bf731ee97f75d06a74896236244e977"
+    ],
+    "clipper/visual_worker.py": [
+      "aea5ccd4cc4c6b3754184dd9f4369af7b08a5c935387531e155410dc2251aa0a"
+    ],
+    "clipper/workflow6.py": [
+      "a401796296e6f839f1345c34e4788bcd1a7c1b7cf3e6e7a02c010adf732911c4"
+    ],
+    "docs/PEMBENAHAN_LENGKAP.md": [],
+    "docs/releases/complete_base_hashes.json": [],
+    "docs/verification/BASELINE_GITHUB_4_0_7.json": [],
+    "docs/verification/HASIL_QA_LENGKAP.md": [],
+    "requirements-pro.txt": [
+      "c6e3d7ab10d1f4db1639ee2d75bbf6a73c6386316b78a9145dfbe832244c711e"
+    ],
+    "requirements.txt": [
+      "70f3ee477c0cea00ba35146a9dbdfbd077db335cbf9da940b8d3088e70f6e18b"
+    ],
+    "static/features/style5.js": [
+      "b870a2258a3b0a4ab46e3df6fc7302ceacdb38c3305aab34a65c933f1c385378"
+    ],
+    "static/index.html": [
+      "8ad12e83b8f0499e2f45c3cf44758c39d07daaaa2b77b6e9ed70aac0caf5d3e9"
+    ],
+    "static/studio4.js": [
+      "ad134558c34e28a32efa490fbd4ccc5a3e01649b35e120abdf5e0a54a16daaff"
+    ],
+    "tools/build_complete_release.py": [],
+    "tools/complete_installer.py": [],
+    "tools/qa_capcut_serializer.py": [],
+    "tools/qa_complete_render.py": [],
+    "tools/verify_complete.py": [],
+    "static/features/batch7.js": []
+  }
+}

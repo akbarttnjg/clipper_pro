@@ -11,6 +11,7 @@ from . import crop
 from .ffmpeg_util import even
 from .typography import token
 from . import placement
+from . import framing
 
 
 def active_area(frame):
@@ -29,18 +30,7 @@ def active_area(frame):
 
 
 def rectangle(area, face, aspect, focus=-1):
-    ax, ay, aw, ah = area
-    rw, rh = (ah * aspect, ah) if aw / ah > aspect else (aw, aw / aspect)
-    cx = ax + aw * focus if focus >= 0 else (face[0] + face[2] / 2 if face else ax + aw / 2)
-    # Leave headroom and keep upper body in view when horizontal footage is cropped.
-    cy = face[1] + face[3] * 1.5 if face else ay + ah / 2
-    rw, rh = min(aw, even(rw)), min(ah, even(rh))
-    x = round(max(ax, min(cx - rw / 2, ax + aw - rw)))
-    y = round(max(ay, min(cy - rh / 2, ay + ah - rh)))
-    if face:
-        # Face boxes exclude hair and can move down when someone reads a tablet.
-        y = min(y, max(ay, round(face[1]-face[3]*.65)))
-    return [x, y, int(rw), int(rh)]
+    return framing.crop_rect(area, face, aspect, focus)
 
 
 def region(value, width, height):
@@ -231,7 +221,7 @@ def analyze(media, plan, cfg, info):
                 if visual:face=selected['center_box'] if selected else None
                 panels = [r['panel'] for r in group if r.get('panel')]
                 material = region(cfg.material_rect, W, H)
-                if material is None and len(panels) >= max(1, len(group)*.6):
+                if material is None and cfg.source_kind not in ('speaker','podcast') and len(panels) >= max(1, len(group)*.6):
                     material = list(map(int, np.median(panels, axis=0)))
                 explicit_face = region(cfg.speaker_rect, W, H)
                 separated = material and face and not (material[0] <= face[0]+face[2]/2 <= material[0]+material[2]
@@ -303,17 +293,22 @@ def analyze(media, plan, cfg, info):
                         caption_panel = list(panel(cfg, pos))
                 keywords = {token(k) for k in plan['keywords']}
                 emph = [w['start'] - start for w in plan['words'] if start + 2 <= w['start'] < end - 3 and token(w['word']) in keywords]
-                zoom = emph[0] if cfg.punch_zoom and mode == 'fill' and end - start >= cfg.zoom_gap and emph else None
+                zoom = emph[0] if cfg.punch_zoom and mode == 'fill' and end-start >= 3.8 and emph else None
+                if zoom is not None and any(s.get('zoom_at') is not None and start+zoom-(s['start']+s['zoom_at'])<cfg.zoom_gap for s in shots):zoom=None
                 shots.append({'source_start': a + left / plan['fps'], 'source_end': a + right / plan['fps'],
                     'start': start, 'end': end, 'start_frame': span['start_frame'] + left,
                     'duration_frames': right - left, 'rect': rect, 'mode': mode, 'position': pos,
                     'face': face, 'zoom_at': zoom, 'zoom_amount': cfg.zoom_amount,
                     'face_rect': face_rect, 'material_share': material_share, 'caption_panel': caption_panel,
-                    'image_height': image_height, 'material_image_height': material_image_height, 'has_material': material is not None})
+                    'image_height': image_height, 'material_image_height': material_image_height, 'has_material': material is not None,
+                    'active_area':area,'head_bounds':selected['box'] if selected else None})
                 if mode == 'fit' and cfg.target_h > cfg.target_w:
                     plan['warnings'].append('Materi/tamu dipertahankan utuh. Periksa keterbacaan dalam format vertikal atau pilih 16:9.')
                 protected = [{'kind': 'face', 'box': f} for r in group for f in r['faces']]
-                protected += [{'kind': 'text', 'box': box} for r in group for box in r.get('texts', [])]
+                scene_kind=visual['scene']['kind'] if visual else cfg.source_kind
+                geometry=[{'kind':'text','box':box} for r in group for box in r.get('texts',[])]
+                if framing.geometry_is_protected(scene_kind, material is not None):protected+=geometry
+                else:shots[-1]['geometry_diagnostics']={'unconfirmed_regions':len(geometry),'policy':'Texture does not shrink a speaker scene; recognized OCR stays protected.'}
                 protected += [{'kind':'ocr','box':box} for box in evidence.protected_boxes(source_evidence,
                     a+left/plan['fps'],a+right/plan['fps'],W,H)]
                 if material:
@@ -331,6 +326,7 @@ def analyze(media, plan, cfg, info):
                         if mode=='fill' and placement.overlap(rect,selected['box'])<selected['box'][2]*selected['box'][3]*.98:
                             shots[-1].update(rect=area,mode='fit',zoom_at=None)
                             shots[-1]['visual']['speaker']['reason']+='; lintasan melewati crop, gambar utuh dipertahankan'
+                shots[-1]['protected_source']=framing.compact_protected(shots[-1]['protected_source'])
                 shots[-1]['composition_reason'] = ('Materi dan pembicara dipisah; ruang teks mengikuti rasio materi' if mode=='stream'
                     else 'Materi utuh, tanpa memangkas diagram' if material else 'Framing pembicara')
                 if visual:shots[-1]['composition_reason']+=' · '+visual['scene']['reason']+' · '+visual['speaker']['reason']

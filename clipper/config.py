@@ -83,6 +83,7 @@ class Config:
     caption_style: str = os.environ.get("CAPTION_STYLE", "narrative")
     # Existing projects retain their manually selected typography.
     style_preset: str = 'legacy'
+    caption_template_policy: str = 'auto'
     caption_seed: int = 2026
     caption_renderer: str = 'ass'
     semantic_emphasis: bool = True
@@ -178,6 +179,7 @@ class Config:
     visual_vlm: str = 'off'
     visual_backend_timeout: int = 240
     visual_cache_dir: str = ''
+    audio_cache_dir: str = ''
     visual_runtime_root: str = ''
     visual_overrides: dict | None = None
     visual_runtime_signature: list | None = None
@@ -211,6 +213,7 @@ def validate_overrides(form: dict) -> dict:
     out: dict = {}
     for key, choices in {'style_preset':('legacy','rapi','ekspresif','adaptif'),
                          'caption_renderer':('ass','auto','remotion'),
+                         'caption_template_policy':('auto','manual'),
                          'illustration_mode':('off','labels'),
                          'broll_ranker':('off','auto','siglip2'),
                          'sfx_mode':('off','sparse')}.items():
@@ -230,7 +233,7 @@ def validate_overrides(form: dict) -> dict:
     if 'semantic_emphasis' in form:
         if type(form['semantic_emphasis']) is not bool:raise ValueError('Penekanan makna harus boolean')
         out['semantic_emphasis']=form['semantic_emphasis']
-    for key, values in {'source_kind': ('auto','speaker','board','podcast'),
+    for key, values in {'source_kind': ('auto','speaker','board','podcast','screen','chart','graphic'),
                         'search_depth': ('balanced','broad'),
                         'workflow': ('review','automatic'),
                         'audience': ('general','creators','business','finance','students'),

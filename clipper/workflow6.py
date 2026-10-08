@@ -11,7 +11,7 @@ from .dependency_cache import content_id
 from .project_store import Conflict, dumps
 
 VERSION = '4.0.6'
-BRAND_FIELDS = frozenset({'style_preset','font_main','font_accent','accent_hex','base_hex',
+BRAND_FIELDS = frozenset({'style_preset','caption_template_policy','font_main','font_accent','accent_hex','base_hex',
     'caption_style','caption_position','caption_align','caption_scale','caption_backdrop',
     'motion_intensity','layout','material_share','semantic_emphasis','safe_placement'})
 SOURCE_FIELDS = frozenset({'language','audio_stream_index','whisper_model','whisper_device',
@@ -58,7 +58,7 @@ def native_reasons(plan):
         reasons.append('Komposisi beberapa area tidak dipetakan ke crop native; gunakan hibrida.')
     if any(s.get('zoom_at') is not None for s in plan['shots']):
         reasons.append('Zoom bergerak belum memiliki pemetaan identik di kedua editor; gunakan hibrida.')
-    if any(s.get('mode')=='fit' and s.get('image_height',plan.get('height'))!=plan.get('height') for s in plan['shots']):
+    if any(s.get('image_height') and s['image_height']!=plan.get('height') for s in plan['shots']):
         reasons.append('Area fit dengan tinggi khusus belum dipetakan ke native; gunakan hibrida.')
     return reasons
 

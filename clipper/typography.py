@@ -318,12 +318,13 @@ def display_units(words):
                 prior['word_ids'] += w['word_ids']
                 prior['token_ids'] += w['token_ids']
                 prior['meaning_emphasis'] = prior.get('meaning_emphasis',False) or w.get('meaning_emphasis',False)
+                prior['prosody_prominence'] = max(prior.get('prosody_prominence',0.),w.get('prosody_prominence',0.))
                 continue
         units.append(w)
     return units
 
 
-def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _phrases=None):
+def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _phrases=None, _following=None):
     from .motion import frames
     phrases = scene_groups(words, cfg, anchors) if _phrases is None else _phrases
     W, H = cfg.target_w, cfg.target_h
@@ -345,13 +346,13 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
             pos = anchor['position']
             side = pos in ('left', 'right') and W > H
         x,y,width,height = panel_box
-        emphasis = emphasis_indices(phrase, keywords)
+        emphasis = set() if getattr(cfg,'_emphasis_disabled',False) else emphasis_indices(phrase, keywords)
         focus = next(iter(emphasis), -1)
         base = round(min(W,H)*(.073 if side else .070)*cfg.caption_scale)
         for fs in range(max(18,base), 7, -1):
             accent_size = 1.20 if cfg.caption_style in ('magazine','impact') else 1.15
             families = [cfg.font_accent if i in emphasis and cfg.accent_font else cfg.font_main for i in range(len(phrase))]
-            sizes = [round(fs*optical_factor(cfg.fonts_dir,families[i])*(accent_size if i in emphasis else 1.)) for i in range(len(phrase))]
+            sizes = [round(fs*optical_factor(cfg.fonts_dir,families[i])*(accent_size*(1+.08*max(0.,min(1.,float(phrase[i].get('prosody_prominence',0.))))) if i in emphasis else 1.)) for i in range(len(phrase))]
             measures = [font(cfg.fonts_dir,sizes[i],families[i]).getlength(w['word']) for i,w in enumerate(phrase)]
             space = fs*.29
             rows = balanced_rows(phrase, measures, space, width*.9, 2 if height<H*.2 else 3, emphasis)
@@ -364,7 +365,9 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
             raise ValueError('Frasa terlalu panjang. Pecah teks pada transkrip atau kurangi ukuran teks.')
         start = phrase[0]['start']
         following = phrases[idx+1][0]['start'] if idx+1<len(phrases) else phrase[-1]['end']+.12
-        end = max(start+.02,min(phrase[-1]['end']+.14,following))
+        if _following is not None:following=_following
+        reading_end=max(phrase[-1]['end']+.14,start+len(' '.join(w['word'] for w in phrase))/22)
+        end = max(start+.02,min(reading_end,following))
         if anchor:
             end = min(end, anchor.get('end', end))
         cy = y+(height-sum(heights))*(.5 if side or use_anchor else .8)
