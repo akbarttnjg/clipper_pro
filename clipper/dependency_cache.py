@@ -68,7 +68,11 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     # Runtime metadata and result paths do not affect rendered pixels.
     candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe','included')}
     from .caption_renderer import signature
-    return fingerprint([VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe,signature(cfg)])
+    parts=[VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe,signature(cfg)]
+    if cfg.illustration_mode!='off':
+        from .explanation5 import STRUCTURES_VERSION
+        parts.append(STRUCTURES_VERSION)
+    return fingerprint(parts)
 
 
 def settings_impact(changes):

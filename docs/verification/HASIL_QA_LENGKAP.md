@@ -2,7 +2,7 @@
 
 Kode dasar dibandingkan dengan commit GitHub 9e0677c60605be0d16a6f19eebf8cb12094a3531: 53 file cocok. Pengujian mencakup geometri, penempatan caption, deduplikasi fakta, sumber kata/negasi/angka, preset manual, prosodi, diagram, audio, SQLite, antrean, ekspor massal dan pemasang.
 
-138 uji Python dan lima uji modul UI lolos. Pemasang diuji untuk checksum, cadangan SQLite, rollback, data model yang terlindungi, dan paket nyata 44 file. Log dan checksum paket tersedia dalam folder verification ZIP. Uji Python memakai pustaka standar dan FFmpeg nyata. Uji UI menggunakan modul sebenarnya melalui adapter DOM; ini bukan pengujian browser native.
+140 uji Python dan lima uji modul UI lolos. Pemasang diuji untuk checksum, cadangan SQLite, rollback, data model yang terlindungi, dan paket nyata 44 file. Log dan checksum paket tersedia dalam folder verification ZIP. Uji Python memakai pustaka standar dan FFmpeg nyata. Uji UI menggunakan modul sebenarnya melalui adapter DOM; ini bukan pengujian browser native.
 
 Replay visual memakai video tanpa teks dari ZIP pengguna sebelumnya. Plate 1514 × 852 dipulihkan dari canvas 1920 × 1080 dan dibesarkan kembali sebelum pengujian 14 detik. Transkrip serta pengamatan wajah berasal dari rencana edit sebelumnya; detektor dan ASR baru tidak dijalankan.
 
@@ -17,3 +17,13 @@ Uji pemasangan seluruh 44 payload di atas fixture kode dasar berhasil. Rollback 
 Penerimaan yang memerlukan perangkat sasaran: alignment CTC bahasa Indonesia pada Windows; detektor/ASR dari video mentah; renderer Remotion/Motion Canvas terpasang; impor, edit, render, simpan dan buka ulang editor; pengukuran seluruh alur untuk sumber 30 menit dan 1–2 jam.
 
 Status konstruksi, struktur, dan impor editor dibedakan. Kelengkapan cerita/akurasi transkrip/retensi tetap memerlukan tinjauan manusia. Tidak ada klaim bahwa semua komponen sudah berjalan pada laptop sasaran atau bahwa target 30 menit sudah terpenuhi.
+
+## Pemeriksaan unggahan GitHub pengguna
+
+Commit `1a6bcb82801c83d7bc19e00a18e125deb6c85454` pada `main`, 9 Oktober 2026 pukul 21:41 WIB, berisi seluruh 44 file pembenahan. Isi cocok dengan paket sebelumnya setelah normalisasi akhir baris pada `CEK_PEMBENAHAN.cmd`; 11 file penjaga juga cocok. Berkas pembenahan telah masuk ke kode aktif, bukan hanya menjadi arsip ZIP.
+
+Snapshot modul aplikasi dan UI dari commit tersebut lulus 138 uji Python dan lima uji modul UI. GitHub Actions belum memiliki riwayat run, dan commit tidak memiliki commit status; kelulusan di atas berasal dari pemeriksaan lokal, bukan CI GitHub. Sebagian pengujian memakai pengamatan/geometri OpenCV terkontrol karena OpenCV tidak tersedia pada host QA; detektor sebenarnya belum diuji di laptop.
+
+Dua kegagalan makna berhasil direproduksi pada diagram daftar: sumber dengan lima poin digambarkan hanya empat poin, dan kalimat pembatas di antara poin terbuang. Perbaikan menolak diagram jika daftar yang diamati melampaui empat poin atau ada kalimat tambahan di antara penanda poin. Ucapan sumber tetap dipertahankan. Regresi tambahan beserta seluruh suite lulus, sehingga total menjadi 140 uji Python. Perbaikan ini disiapkan pada branch PR; belum digabung otomatis ke `main`.
+
+Versi aturan diagram dimasukkan pada cache aset dan dependency preview/final hanya saat ilustrasi aktif. Uji SQLite memastikan empat final dua-klip/dua-rasio lama tidak digunakan ulang, sedangkan dependency analisis sumber serta render tanpa diagram tidak berubah. Pemasang revisi menerima checksum unggahan 4.0.8 terverifikasi agar pengguna yang sudah memasang pembenahan dapat menerapkan perbaikan ini.
