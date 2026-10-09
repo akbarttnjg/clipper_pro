@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-STRUCTURES_VERSION='explanation5-structured-v4-list-fidelity'
+STRUCTURES_VERSION='explanation5-structured-v5-complete-block'
 
 
 def lines_for(text,cfg,*,max_size=68,max_lines=3):
@@ -67,8 +67,12 @@ def structures(words):
     for a,w in enumerate(words):
         if re.sub(r'[^\w]','',w['word'].lower())!='pertama':continue
         row=[]
-        for v in words[a:a+36]:
+        for v in words[a:]:
             if row and v['start']-row[-1]['end']>3:break
+            # An explicit conclusion closes the list. A fixed word window
+            # cannot establish completeness: a later fifth item matters.
+            if row and re.search(r'[.!?]$',row[-1]['word']) and re.sub(r'[^\w]','',v['word'].lower()) in ('kesimpulannya','itulah','selesai'):
+                break
             row.append(v)
         tokens=[re.sub(r'[^\w]','',v['word'].lower()) for v in row]
         if any(t in ('kelima','keenam','ketujuh','kedelapan','kesembilan','kesepuluh') for t in tokens):continue
@@ -85,7 +89,7 @@ def structures(words):
             ending=next((k+1 for k,v in enumerate(clause) if re.search(r'[.!?]$',v['word'])),len(clause))
             # Intermediate items must be complete short clauses. Do not drop
             # a caveat between an item and the next numbered marker.
-            if i+1<count and ending!=len(clause):break
+            if ending!=len(clause):break
             clause=clause[:ending]
             if not 2<=len(clause)<=7:break
             labels.append(' '.join(v['word'] for v in clause));selected.extend(clause)

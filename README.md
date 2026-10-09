@@ -1,8 +1,10 @@
-# Clipper Studio 4.0.8
+# Clipper Studio 4.0.9
 
 Mesin pemotongan video lokal: transkripsi, pemilihan cerita, koreksi ucapan, framing, subtitle, audio, serta hasil 9:16 dan 16:9. Model ASR dan Ollama memakai instalasi lokal. Jumlah klip mengikuti pembahasan unik yang lolos tinjauan.
 
-Gunakan paket Pembenahan Lengkap dan [panduan pemasangan](docs/PEMBENAHAN_LENGKAP.md). Dasarnya adalah kode 4.0.7 yang telah diverifikasi terhadap commit GitHub `9e0677c60605be0d16a6f19eebf8cb12094a3531`. Pemasang memeriksa checksum, mencadangkan kode dan database, serta menyediakan rollback.
+Gunakan paket Upgrade 4.0.9 dan [panduan pemasangan](docs/UPGRADE_4_0_9.md). Paket mencakup pembenahan lengkap sebelumnya dan memeriksa hash dasar 4.0.7/4.0.8 yang telah diaudit. Pemasang mencadangkan kode dan database serta menyediakan rollback.
+
+Caption director menyediakan editorial bersih, frasa fokus besar dan kutipan tenang. Frasa, ukuran glyph pada layar ponsel, penempatan stabil serta efek diperiksa dengan metrik yang sama pada preview dan final. MediaPipe Selfie Multiclass opsional membantu melindungi wajah/rambut tanpa melarang overlay pada pakaian polos; pemakaian dibatasi delapan frame per klip di CPU.
 
 Jalankan `JALANKAN_PRO.cmd`, lalu buka `http://127.0.0.1:8765` dan tekan Ctrl+F5 setelah pembaruan. Pada **Periksa / ekspor**, pilih klip, terapkan preset Adaptif atau Rapi bila diinginkan, lalu tekan **Render seluruh pilihan · 9:16 + 16:9**. Setelah seluruh final tersedia, satu paket dapat mencakup semua klip terpilih dalam kedua rasio.
 

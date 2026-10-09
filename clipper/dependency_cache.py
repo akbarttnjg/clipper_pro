@@ -9,7 +9,7 @@ from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
 _SCOPE=ContextVar('clipper_content_scope',default=None)
-VERSION='studio4-content-v8-complete-repairs'
+VERSION='studio4-content-v9-caption-director'
 
 
 @contextmanager

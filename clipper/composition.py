@@ -168,7 +168,10 @@ def analyze(media, plan, cfg, info):
         panel = [round(v/ratio) for v in panel] if panel else None
         texts = [[round(v/ratio) for v in box] for box in placement.text_regions(small)]
         ocr=[r for frame in source_evidence.get('frames',[]) if abs(frame['time']-t)<.3 and frame['width']==W and frame['height']==H for r in frame['texts']]
-        return {'t': t, 'faces': faces, 'hist': hist, 'area': area, 'panel': panel, 'texts': texts,'ocr':ocr,
+        from .text_area import grid
+        area_grid=grid(small)
+        area_grid['source_size']=[W,H]
+        return {'t': t, 'faces': faces, 'hist': hist, 'area': area, 'panel': panel, 'texts': texts,'ocr':ocr,'area_grid':area_grid,
                 'face_confidence':confidence,'face_detector':'yunet' if detector is not None else 'haar_heuristic' if haar is not None else 'none'}
     shots = []
     try:
@@ -304,6 +307,7 @@ def analyze(media, plan, cfg, info):
                     'active_area':area,'head_bounds':selected['box'] if selected else None})
                 if mode == 'fit' and cfg.target_h > cfg.target_w:
                     plan['warnings'].append('Materi/tamu dipertahankan utuh. Periksa keterbacaan dalam format vertikal atau pilih 16:9.')
+                shots[-1]['area_samples']=[r['area_grid'] for r in group if r.get('area_grid')][:3]
                 protected = [{'kind': 'face', 'box': f} for r in group for f in r['faces']]
                 scene_kind=visual['scene']['kind'] if visual else cfg.source_kind
                 geometry=[{'kind':'text','box':box} for r in group for box in r.get('texts',[])]
@@ -345,6 +349,8 @@ def analyze(media, plan, cfg, info):
             box=selected['box'];old=previous['rect']
             if visual4.iou(old,shot['rect'])>.85 and placement.overlap(old,box)>=box[2]*box[3]*.98:shot['rect']=old.copy()
         previous=shot
+    from .segmentation import enrich
+    enrich(media,plan,cfg)
     placement.apply(plan, cfg)
     if cfg.visual_enabled:visual4.caption_envelopes(plan,cfg)
     return plan

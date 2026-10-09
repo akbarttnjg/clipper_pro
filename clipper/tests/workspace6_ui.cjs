@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict');
 class Element{constructor(tag){this.tagName=tag;this.children=[];this.attributes={};this.value='';this.text='';this.checked=false}
  set textContent(v){this.text=String(v);this.children=[]}get textContent(){return this.text+this.children.map(c=>c.textContent).join('')}
- append(...items){this.children.push(...items)}setAttribute(k,v){this.attributes[k]=v}}
+ append(...items){this.children.push(...items)}replaceChildren(...items){this.children=[];this.append(...items)}setAttribute(k,v){this.attributes[k]=v}}
 const storage=new Map(),context=vm.createContext({document:{createElement:t=>new Element(t)},crypto:require('node:crypto'),
  URLSearchParams,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../../static/features/workspace6.js'),'utf8').replace(/export /g,''),context);
@@ -27,5 +27,12 @@ const api=async(url,data)=>{calls.push({url,data});if(data){if(conflict)throw Er
  field(h,'Alasan: keterbacaan, cerita, efek dan audio').value='Review draft';field(h,'Alasan: keterbacaan, cerita, efek dan audio').oninput();assert(storage.has('clipper6-evaluation|p1|c1|portrait'));
  panel.destroy();h=new Element('div');panel=await context.mountEvaluation6(h,{project,clipId:'c1',variantId:'portrait',api,onChange:()=>{}});assert.equal(field(h,'Alasan: keterbacaan, cerita, efek dan audio').value,'Review draft');
  await button(h,'Buang draf evaluasi').onclick();assert.equal(Object.keys(panel.getDrafts()).length,0);assert(!storage.has('clipper6-evaluation|p1|c1|portrait'));panel.destroy();
+ project.exports=[{package_content_id:'pkg-both',variant_id:'both',export_mode:'hybrid',input_revision:4}];
+ ws.native_matrix=['c1','c2'].flatMap(clip_id=>['portrait','landscape'].flatMap(variant_id=>['capcut','resolve'].map(editor=>({clip_id,variant_id,editor,title:clip_id,package_content_id:'pkg-both',target_version:editor==='capcut'?'9.5.0':'21',status:'not_tested'}))));
+ h=new Element('div');panel=await context.mountEvaluation6(h,{project,clipId:'c1',variantId:'portrait',api,onChange:()=>{}});
+ const member=field(h,'Timeline yang diuji');assert.equal(member.children.length,4,'aggregate selector has one option per clip and ratio');
+ field(h,'Editor uji').value='resolve';field(h,'Editor uji').onchange();assert.equal(field(h,'Versi editor').value,'21');
+ member.value=JSON.stringify(['c2','landscape']);await button(h,'Simpan bukti impor').onclick();
+ assert.equal(calls.at(-1).data.clip_id,'c2');assert.equal(calls.at(-1).data.variant_id,'landscape');assert.equal(calls.at(-1).data.package_content_id,'pkg-both');panel.destroy();
  console.log('Workspace 6 DOM adapter passed: four steps, read-only opening, brand kit enablement, protected apply, revision conflicts, targeted alternative, evidence gates and persisted review drafts.');
 })().catch(e=>{console.error(e);process.exitCode=1});
