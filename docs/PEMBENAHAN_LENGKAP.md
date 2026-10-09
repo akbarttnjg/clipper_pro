@@ -2,6 +2,8 @@
 
 Paket ini melaksanakan pembenahan kode tahap 2–7 sekaligus, di atas tahap 1 versi 4.0.7. Dasar GitHub: `9e0677c60605be0d16a6f19eebf8cb12094a3531`. Pemeriksaan 53 file dasar tersedia di `docs/verification/BASELINE_GITHUB_4_0_7.json`. Pembaruan tidak mengunduh model atau mengganti driver/CUDA.
 
+Paket revisi juga menerima unggahan 4.0.8 yang telah diperiksa pada commit `1a6bcb82801c83d7bc19e00a18e125deb6c85454`. Revisi memperbaiki diagram daftar yang memotong poin kelima atau membuang kalimat pembatas. Render/preview dengan diagram ditandai perlu dibuat ulang; analisis sumber dan render dengan ilustrasi dimatikan tetap dapat digunakan kembali. Jika 4.0.8 sudah terpasang, tidak perlu mengulang pemasangan model.
+
 ## Pemasangan
 
 1. Ekstrak ZIP ke folder baru, misalnya `C:\AI\pembenahan-lengkap`. Hentikan antrean dan server Clipper dengan Ctrl+C.

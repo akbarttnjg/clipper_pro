@@ -1,4 +1,4 @@
-"""Build a checked offline repair overlay against the audited 4.0.7 baseline."""
+"""Build a checked offline repair overlay against audited 4.0.7/4.0.8 code."""
 import argparse
 import hashlib
 import importlib.util
@@ -39,8 +39,10 @@ def build(output,source_commit,verification=None,source_origin='local'):
             for name in baseline['guard_paths']]
     manifest={'schema_version':1,'version':'4.0.8','release_id':'complete-20261009',
         'source_commit':source_commit,'source_origin':source_origin,
-        'baseline_github_commit':baseline['base_commit'],'files':files,'guards':guards,
-        'requires_installation':'Clipper Studio 4.0.7 matching the audited baseline',
+        'baseline_github_commit':baseline['base_commit'],
+        'accepted_baseline_github_commits':[baseline['base_commit'],*baseline.get('additional_base_commits',[])],
+        'files':files,'guards':guards,
+        'requires_installation':'Clipper Studio 4.0.7 or the audited 4.0.8 upload matching known file hashes',
         'offline_update':True,'data_directories_untouched':['work','clips','uploads','.venv','ClipperModels','models'],
         'pending_acceptance':['Real Indonesian CTC alignment on Windows','Actual Remotion and Motion Canvas browser renders when selected',
                               'Native CapCut and Resolve import/edit/reopen','Fresh detector/ASR on the original raw video and a full-device benchmark']}
@@ -63,7 +65,7 @@ def build(output,source_commit,verification=None,source_origin='local'):
         '4. Jalankan JALANKAN_PRO.cmd dari mesin, lalu Ctrl+F5 di browser.\n'
         '5. Buka Periksa / ekspor, pilih klip, terapkan preset Adaptif atau Rapi.\n'
         '6. Klik Render seluruh pilihan untuk 9:16 + 16:9. Setelah selesai, buat satu paket.\n\n'
-        'Jangan menyalin payload secara manual. Pemasang memeriksa dasar 4.0.7,\n'
+        'Jangan menyalin payload secara manual. Pemasang memeriksa dasar 4.0.7 atau 4.0.8 terverifikasi,\n'
         'mencadangkan kode dan database, lalu menerapkan perubahan secara atomik.\n'
         'Kode lokal berbeda akan ditolak sebelum penyalinan. Tidak mengunduh model.\n'
         'Rollback kode tersedia; koreksi proyek setelah upgrade tetap disimpan.\n'
