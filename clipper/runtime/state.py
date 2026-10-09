@@ -22,7 +22,7 @@ def read(path, default=None):
     except FileNotFoundError:return default
 
 
-def signatures(root,keys=('yunet','rapidocr','talknet','smolvlm','qwen3-vl','sam2','remotion','motion-canvas','siglip2')):
+def signatures(root,keys=('yunet','rapidocr','talknet','smolvlm','qwen3-vl','sam2','mediapipe','remotion','motion-canvas','siglip2')):
     """Hash local generation receipts without importing model/video libraries."""
     root=Path(root);items=[]
     for key in keys:

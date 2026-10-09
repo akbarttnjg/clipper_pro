@@ -170,39 +170,45 @@ class JobQueue:
                 self.stop_event.wait(.5);continue
             with self.lock:
                 job=self.claim()
-                if job is None:continue
-                folder=self.work/job['project_id']/'tasks';folder.mkdir(parents=True,exist_ok=True)
-                try:
-                    with (folder/(job['id']+'.log')).open('ab') as log:
-                        options={'creationflags':subprocess.CREATE_NEW_PROCESS_GROUP} if os.name=='nt' else {'start_new_session':True}
-                        proc=subprocess.Popen([sys.executable,'-m','clipper.studio_worker','--db',str(self.store.path),'--job',job['id']],
-                            cwd=Path(__file__).resolve().parent.parent,stdout=log,stderr=log,**options)
-                        birth=process_birth(proc.pid);self.update(job['id'],pid=proc.pid,pid_birth=birth)
-                        from .metrics6 import ResourceMeter
-                        meter=ResourceMeter(proc.pid)
-                        cancel_time=None
-                        while proc.poll() is None:
-                            meter.sample()
-                            current=self.get(job['id'])
-                            if current['status']=='cancel_requested' or self.stop_event.is_set() and current['status']=='running':
-                                if cancel_time is None:
-                                    terminate_owned(proc.pid,birth);cancel_time=time.monotonic()
-                                elif time.monotonic()-cancel_time>4 and process_birth(proc.pid)==birth:
-                                    if os.name!='nt':os.killpg(proc.pid,signal.SIGKILL)
-                                    else:terminate_owned(proc.pid,birth)
-                            self.stop_event.wait(.2)
-                        current=self.get(job['id'])
-                        self.update(job['id'],result={**(current.get('result') or {}),'resource_metrics':meter.report()})
-                        if cancel_time is not None and current['status'] not in ('completed','failed','stale'):
-                            self.update(job['id'],status='canceled',message='Proses dihentikan. Hasil sah sebelumnya tetap ada.')
-                            try:
-                                from .config import Config
-                                from .editorial import release
-                                doc=self.store.get(job['project_id']);release(Config(**doc['settings']))
-                            except Exception:pass
-                        elif current['status']=='running':
-                            self.update(job['id'],status='failed',error='Worker berakhir sebelum mengesahkan hasil.',message='Lihat log proses; tahap yang sah dapat digunakan kembali.')
-                except Exception as exc:self.update(job['id'],status='failed',error=str(exc),message='Proses belum selesai; dapat dicoba lagi.')
+                if job is not None:self.run_claimed(job)
+            # Another server may own SQLite's serial resource. Release the
+            # local lock before the cancellable backoff.
+            if job is None:self.stop_event.wait(.5)
+
+    def run_claimed(self,job):
+        # The caller holds its local resource lock; SQLite owns global order.
+        folder=self.work/job['project_id']/'tasks';folder.mkdir(parents=True,exist_ok=True)
+        try:
+            with (folder/(job['id']+'.log')).open('ab') as log:
+                options={'creationflags':subprocess.CREATE_NEW_PROCESS_GROUP} if os.name=='nt' else {'start_new_session':True}
+                proc=subprocess.Popen([sys.executable,'-m','clipper.studio_worker','--db',str(self.store.path),'--job',job['id']],
+                    cwd=Path(__file__).resolve().parent.parent,stdout=log,stderr=log,**options)
+                birth=process_birth(proc.pid);self.update(job['id'],pid=proc.pid,pid_birth=birth)
+                from .metrics6 import ResourceMeter
+                meter=ResourceMeter(proc.pid)
+                cancel_time=None
+                while proc.poll() is None:
+                    meter.sample()
+                    current=self.get(job['id'])
+                    if current['status']=='cancel_requested' or self.stop_event.is_set() and current['status']=='running':
+                        if cancel_time is None:
+                            terminate_owned(proc.pid,birth);cancel_time=time.monotonic()
+                        elif time.monotonic()-cancel_time>4 and process_birth(proc.pid)==birth:
+                            if os.name!='nt':os.killpg(proc.pid,signal.SIGKILL)
+                            else:terminate_owned(proc.pid,birth)
+                    self.stop_event.wait(.2)
+                current=self.get(job['id'])
+                self.update(job['id'],result={**(current.get('result') or {}),'resource_metrics':meter.report()})
+                if cancel_time is not None and current['status'] not in ('completed','failed','stale'):
+                    self.update(job['id'],status='canceled',message='Proses dihentikan. Hasil sah sebelumnya tetap ada.')
+                    try:
+                        from .config import Config
+                        from .editorial import release
+                        doc=self.store.get(job['project_id']);release(Config(**doc['settings']))
+                    except Exception:pass
+                elif current['status']=='running':
+                    self.update(job['id'],status='failed',error='Worker berakhir sebelum mengesahkan hasil.',message='Lihat log proses; tahap yang sah dapat digunakan kembali.')
+        except Exception as exc:self.update(job['id'],status='failed',error=str(exc),message='Proses belum selesai; dapat dicoba lagi.')
 
     def close(self):
         self.stop_event.set()

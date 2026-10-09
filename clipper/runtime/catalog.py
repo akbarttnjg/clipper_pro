@@ -18,7 +18,9 @@ def component(key, name, role, kind, *, packages=(), model=None, repo=None,
                 access=access, note=note, requested_version=version,
                 source=official,code_source=official,weight_source=('https://huggingface.co/'+model if model else
                     'Drive ID dari demo resmi; checksum upstream tidak tersedia' if key=='talknet' else
-                    'YuNet dari Git LFS resmi' if key=='yunet' else 'Termasuk wheel paket' if key in ('rapidocr','silero-vad') else None),
+                    'YuNet dari Git LFS resmi' if key=='yunet' else
+                    'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite' if key=='mediapipe' else
+                    'Termasuk wheel paket' if key in ('rapidocr','silero-vad') else None),
                 platforms=['Windows','Linux / WSL'],runtime=('Node.js >=18; LTS 22 portabel pada Windows' if kind=='node' else
                     'Ollama lokal' if kind=='ollama' else 'FFmpeg di PATH' if kind=='system' else
                     'Dokumentasi dengan commit sumber' if kind=='docs' else 'Python 3.10–3.12, venv terisolasi'),
@@ -37,6 +39,7 @@ CATALOG = [
     component('scenedetect','PySceneDetect','Deteksi pergantian adegan','pip',packages=['scenedetect','opencv-python-headless'],estimate_gb=.8),
     component('yunet','OpenCV + YuNet','Deteksi wajah untuk framing','pip',packages=['opencv-python-headless'],repo='opencv/opencv_zoo',estimate_gb=.8),
     component('rapidocr','RapidOCR','Baca teks pada layar dan grafik','pip',packages=['rapidocr-onnxruntime'],estimate_gb=1),
+    component('mediapipe','MediaPipe Selfie Multiclass','Bantu pilih area teks: wajah/rambut dilindungi, pakaian polos boleh ditimpa','pip',packages=['mediapipe==0.10.21','numpy==1.26.4','opencv-contrib-python==4.11.0.86'],estimate_gb=2,version='0.10.21; model v1 SHA-256 dikunci',note='Opsional, CPU terisolasi. Maksimal delapan frame per klip; bukan pemeriksaan setiap frame. Jalankan uji sampel sebelum dipakai.'),
     component('e5','multilingual E5 small','Kemiripan cerita dan pencarian aset','pip',packages=['sentence-transformers','torch==2.8.0'],model='intfloat/multilingual-e5-small',estimate_gb=7),
     component('qwen3','Qwen3 lokal','Editor cerita yang sudah digunakan mesin','ollama',group='core',estimate_gb=6,version='tag lokal + digest Ollama; qwen3:8b',note='Memakai Ollama lokal. Pemasangan/pull tidak mengubah model aktif proyek.'),
     component('qwen3-vl','Qwen3-VL 2B','Analisis gambar selektif','pip',packages=['transformers','accelerate','torch==2.8.0','torchvision==0.23.0','Pillow'],model='Qwen/Qwen3-VL-2B-Instruct',estimate_gb=13,note='CPU sebagai uji awal. Tidak diasumsikan muat pada VRAM 4 GB.'),
@@ -54,7 +57,7 @@ CATALOG = [
     component('opus-skill','OpusClip skill','Konektor pembanding layanan OpusClip','docs',repo='opus-pro/opus-skills',group='experiments',estimate_gb=.03,access='OPUSCLIP_API_KEY',version='commit sumber dikunci',note='Unduh dokumentasi saja. Tidak membuat job berbayar atau mengirim video.'),
 ]
 BY_ID = {item['id']:item for item in CATALOG}
-assert len(CATALOG) == len(BY_ID) == 26
+assert len(CATALOG) == len(BY_ID) == 27
 
 
 def get(key):

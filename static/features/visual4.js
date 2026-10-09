@@ -23,6 +23,7 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  if(report){
   note.textContent=`${report.summary?.sample_count||0} sampel · ${report.summary?.cache_reused?'cache dipakai':'analisis tersimpan'}${report.stale?' · perlu diperbarui':''}. ${report.summary?.note||''}`;
   const asd=report.summary?.active_speaker||{};host.append(e('p',`Pembicara aktif: ${{ready:'TalkNet dijalankan',unavailable:'bobot lokal belum siap',disabled:'dinonaktifkan',not_needed:'satu pembicara',failed:'worker gagal'}[asd.status]||'bukti belum cukup'}. ${asd.note||''}`));
+  const seg=report.segmentation||{};host.append(e('p',`Area teks MediaPipe: ${{ready:`${seg.sampled_frames||0} frame sumber diproses pada CPU`,unavailable:'komponen opsional belum siap',disabled:'dinonaktifkan',failed:'inference gagal; memakai bukti lain'}[seg.status]||'belum diperiksa'}. ${seg.note||''}${seg.status==='ready'?' Pakaian polos boleh ditimpa; wajah, rambut, OCR dan objek yang dikenali dilindungi.':''}`));
  }
  const policies=e('div');policies.className='fields';host.append(policies);
  const active=select(policies,'Pembicara aktif',[['auto','Otomatis bila TalkNet siap'],['off','Pertahankan semua tamu']],cfg.visual_active_speaker||'auto');

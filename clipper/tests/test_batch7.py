@@ -38,6 +38,10 @@ class Diagrams(unittest.TestCase):
 
     def test_long_ambiguous_clause_skipped(self):
         self.assertEqual(list(explanation5.structures(words('Bukan sesuatu yang dapat kita lakukan tanpa memikirkan konsekuensi dalam jangka waktu panjang tetapi latihan.'))),[])
+    def test_longer_list_and_intermediate_caveat_cannot_be_silently_omitted(self):
+        for text in ['Pertama modal. Kedua risiko. Ketiga catatan. Keempat evaluasi. Kelima disiplin.',
+                     'Pertama simpan modal. Tetapi bukan semuanya. Kedua atur risiko.']:
+            self.assertEqual(list(explanation5.structures(words(text))),[])
 
     def test_emotional_speaker_and_material_preserved(self):
         row=words('Bukan jalan pintas tetapi latihan konsisten.')
@@ -103,6 +107,23 @@ class Batch(unittest.TestCase):
         before=self.svc.dependency(self.doc,self.cids[0],'portrait');self.include(self.cids[0],False)
         current=self.svc.store.get(self.pid);self.assertEqual(before,self.svc.dependency(current,self.cids[0],'portrait'))
         self.assertEqual(len(self.svc.enqueue_batch(self.pid,current['revision'])['jobs']),2)
+    def test_diagram_policy_change_invalidates_final_without_restarting_source_analysis(self):
+        from clipper.dependency_cache import render_key
+        cfg=Config(illustration_mode='labels');clip={'start':0,'end':3};spoken=words('Pertama modal. Kedua risiko.',start=0)
+        self.svc.store.mutate(self.pid,self.doc['revision'],'enable-diagrams',{},
+            lambda d:d['settings'].__setitem__('illustration_mode','labels'))
+        self.doc=self.svc.store.get(self.pid)
+        with patch.object(explanation5,'STRUCTURES_VERSION','explanation5-structured-v3'):
+            self.seed_results()
+            old_source=self.svc.dependency(self.doc,kind='analyze')
+            old_render=render_key(self.source,spoken,clip,cfg)
+            old_off=render_key(self.source,spoken,clip,replace(cfg,illustration_mode='off'))
+        current=self.svc.store.get(self.pid)
+        self.assertEqual(old_source,self.svc.dependency(current,kind='analyze'))
+        self.assertNotEqual(old_render,render_key(self.source,spoken,clip,cfg))
+        self.assertEqual(old_off,render_key(self.source,spoken,clip,replace(cfg,illustration_mode='off')))
+        self.assertFalse(batch7.snapshot(self.svc,current,fresh=True)['ready'])
+        self.assertEqual(len(self.svc.enqueue_batch(self.pid,current['revision'])['jobs']),4)
     def test_batch_preset_applies_both_ratios_only_to_included_clips(self):
         self.include(self.cids[1],False);doc=self.svc.store.get(self.pid)
         self.svc.changes({'project_id':self.pid,'expected_revision':doc['revision'],'operation_id':'batch-preset-test',

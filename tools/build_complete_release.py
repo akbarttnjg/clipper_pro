@@ -1,4 +1,4 @@
-"""Build a checked offline repair overlay against the audited 4.0.7 baseline."""
+"""Build a checked offline repair overlay against audited 4.0.7/4.0.8 code."""
 import argparse
 import hashlib
 import importlib.util
@@ -15,7 +15,7 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def build(output,source_commit,verification=None,source_origin='local'):
+def build(output,source_commit,verification=None,source_origin='local',*,version='4.0.8',base_file='complete_base_hashes.json'):
     if not re.fullmatch(r'[0-9a-f]{40}',source_commit):
         raise ValueError('SHA commit sumber harus lengkap.')
     if source_origin not in ('local','github'):
@@ -23,7 +23,7 @@ def build(output,source_commit,verification=None,source_origin='local'):
     output=Path(output).resolve();archive=output.with_suffix('.zip')
     if output.exists() or archive.exists():
         raise ValueError('Pilih nama paket baru.')
-    baseline=json.loads((ROOT/'docs/releases/complete_base_hashes.json').read_text())
+    baseline=json.loads((ROOT/'docs/releases'/base_file).read_text())
     spec=importlib.util.spec_from_file_location('complete_installer',ROOT/'tools/complete_installer.py')
     installer=importlib.util.module_from_spec(spec);spec.loader.exec_module(installer)
     output.mkdir(parents=True);files=[]
@@ -37,10 +37,12 @@ def build(output,source_commit,verification=None,source_origin='local'):
             'allowed_text_sha256':sorted(set(baseline['allowed_hashes'].get(name,[])+[text_hash]))})
     guards=[{'path':name,'allowed_text_sha256':baseline['allowed_hashes'][name]}
             for name in baseline['guard_paths']]
-    manifest={'schema_version':1,'version':'4.0.8','release_id':'complete-20261009',
+    manifest={'schema_version':1,'version':version,'release_id':'typography9-20261010' if version=='4.0.9' else 'complete-20261009',
         'source_commit':source_commit,'source_origin':source_origin,
-        'baseline_github_commit':baseline['base_commit'],'files':files,'guards':guards,
-        'requires_installation':'Clipper Studio 4.0.7 matching the audited baseline',
+        'baseline_github_commit':baseline['base_commit'],
+        'accepted_baseline_github_commits':[baseline['base_commit'],*baseline.get('additional_base_commits',[])],
+        'files':files,'guards':guards,
+        'requires_installation':'Clipper Studio 4.0.7 or the audited 4.0.8 upload matching known file hashes',
         'offline_update':True,'data_directories_untouched':['work','clips','uploads','.venv','ClipperModels','models'],
         'pending_acceptance':['Real Indonesian CTC alignment on Windows','Actual Remotion and Motion Canvas browser renders when selected',
                               'Native CapCut and Resolve import/edit/reopen','Fresh detector/ASR on the original raw video and a full-device benchmark']}
@@ -63,11 +65,30 @@ def build(output,source_commit,verification=None,source_origin='local'):
         '4. Jalankan JALANKAN_PRO.cmd dari mesin, lalu Ctrl+F5 di browser.\n'
         '5. Buka Periksa / ekspor, pilih klip, terapkan preset Adaptif atau Rapi.\n'
         '6. Klik Render seluruh pilihan untuk 9:16 + 16:9. Setelah selesai, buat satu paket.\n\n'
-        'Jangan menyalin payload secara manual. Pemasang memeriksa dasar 4.0.7,\n'
+        'Jangan menyalin payload secara manual. Pemasang memeriksa dasar 4.0.7 atau 4.0.8 terverifikasi,\n'
         'mencadangkan kode dan database, lalu menerapkan perubahan secara atomik.\n'
         'Kode lokal berbeda akan ditolak sebelum penyalinan. Tidak mengunduh model.\n'
         'Rollback kode tersedia; koreksi proyek setelah upgrade tetap disimpan.\n'
         'Baca PANDUAN_PEMBENAHAN_LENGKAP.md untuk perubahan dan batas verifikasi.\n',encoding='utf-8')
+    if version=='4.0.9':
+        shutil.copyfile(ROOT/'docs/UPGRADE_4_0_9.md',output/'PANDUAN_UPGRADE_4_0_9.md')
+        shutil.copyfile(output/'PASANG_PEMBENAHAN_LENGKAP.cmd',output/'PASANG_UPGRADE_4_0_9.cmd')
+        shutil.copyfile(output/'PULIHKAN_PEMBENAHAN_LENGKAP.cmd',output/'PULIHKAN_UPGRADE_4_0_9.cmd')
+        (output/'BACA_DULU.txt').write_text(
+            'Clipper Studio 4.0.9 - Tipografi dan pembenahan audit\n\n'
+            '1. Ekstrak ZIP ke folder baru. Hentikan antrean dan server dengan Ctrl+C.\n'
+            '2. Jalankan CEK_SEBELUM_UPGRADE.cmd --target "C:\\AI\\clipper".\n'
+            '3. Jika lulus, jalankan PASANG_UPGRADE_4_0_9.cmd --target "C:\\AI\\clipper".\n'
+            '4. Jalankan JALANKAN_PRO.cmd dari mesin, lalu Ctrl+F5 di browser.\n'
+            '5. Pilih preset Adaptif, Rapi, atau Ekspresif. Pilih Komposisi frasa Otomatis.\n'
+            '6. Buat preview baru untuk dua rasio. Periksa keterbacaan, lalu render final.\n\n'
+            'Paket mencakup pembenahan 4.0.8 sebelumnya. Tidak menimpa .env, proyek,\n'
+            'video sumber, font pribadi atau model. Tidak mengunduh model saat pemasangan.\n'
+            'MediaPipe opsional: pasang dari panel Komponen lalu jalankan uji sampel CPU.\n'
+            'Perbaikan frasa, ukuran, dan posisi tetap aktif tanpa MediaPipe.\n'
+            'Jika ada kode lokal berbeda, pemasang berhenti sebelum menimpa file.\n'
+            'Rollback kode: PULIHKAN_UPGRADE_4_0_9.cmd --target "C:\\AI\\clipper".\n'
+            'Baca PANDUAN_UPGRADE_4_0_9.md dan verification/ untuk bukti dan batas uji.\n',encoding='utf-8')
     if verification:
         shutil.copytree(verification,output/'verification')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as zip:

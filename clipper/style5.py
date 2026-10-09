@@ -5,7 +5,7 @@ import json
 import math
 from dataclasses import replace
 
-VERSION='4.0.8'
+VERSION='4.0.9'
 PRESETS=(
     {'id':'rapi','name':'Rapi','description':'Frasa utuh, baseline stabil, aksen secukupnya.','settings':{'font_main':'dm_sans','font_accent':'dm_serif_italic','motion_intensity':'calm','caption_backdrop':True}},
     {'id':'ekspresif','name':'Ekspresif','description':'Hierarki dan arah gerak bervariasi dengan desain yang tersimpan.','settings':{'font_main':'dm_sans','font_accent':'dm_serif_italic','motion_intensity':'balanced','caption_backdrop':True}},
@@ -29,19 +29,13 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
         material=cfg.source_kind in ('board','screen','chart','graphic') or any(a.get('has_material') or any(p.get('kind') in ('material','panel') for p in a.get('protected',[])) for a in touching)
         cps=sum(len(w['word']) for w in phrase)/max(.02,phrase[-1]['end']-phrase[0]['start'])
         quiet=cfg.style_preset=='rapi' or (cfg.style_preset=='adaptif' and (material or cps>18))
-        template=cfg.caption_style if cfg.caption_template_policy=='manual' else 'magazine' if quiet else ('magazine','slide','pop','blur')[choice%4]
-        local=replace(cfg,style_preset='legacy',caption_style=template,
-                      motion_intensity='calm' if quiet else cfg.motion_intensity,
-                      caption_scale=cfg.caption_scale*(.85 if cfg.style_preset=='adaptif' and material else 1))
-        local._motion_direction=('left','right','up','down')[(choice//4)%4]
-        local._emphasis_disabled=not cfg.semantic_emphasis
-        if not quiet and cfg.caption_align=='auto':local.caption_align=('left','center','right')[(choice//16)%3]
         local_words=[dict(w) for w in phrase]
+        from .caption_director import focus,compose
+        semantic=focus(local_words,keywords) if cfg.semantic_emphasis else set()
+        local,composition=compose(cfg,local_words,semantic,quiet,choice)
         if cfg.semantic_emphasis:
             # Acoustic prominence supports a semantic candidate, never selects a
             # negation or number fragment independently from its context.
-            from .typography import emphasis_indices
-            semantic=emphasis_indices(local_words,keywords)
             from .transcript_correction import PROTECTED
             for i in list(semantic):
                 if i>0 and token(local_words[i-1]['word'].split()[-1]) in PROTECTED:semantic.add(i-1)
@@ -53,8 +47,15 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
             for w in local_words:w.pop('meaning_emphasis',None)
         following=parts[index+1][0]['start'] if index+1<len(parts) else max((a.get('end',phrase[-1]['end']+.12) for a in touching),default=phrase[-1]['end']+.12)
         planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words],_following=following)['phrases'][0]
+        if cfg.caption_composition=='auto' and composition=='focus':
+            from .caption_director import visible_cap
+            if min((visible_cap(w,cfg.fonts_dir,360,cfg.target_w) for w in planned['words']),default=14)<14:
+                # A separate focus row must not make its context unreadable.
+                # Keep source words and emphasis; use the inline composition.
+                composition='editorial';local._composition=composition;local._accent_ratio=1.12
+                planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words],_following=following)['phrases'][0]
         if index+1<len(parts):planned['end']=min(planned['end'],parts[index+1][0]['start'])
-        if quiet:
+        if quiet or composition=='quote':
             # All words appear together; stable reading baseline and no bounce.
             last=max(1,math.ceil((planned['end']-planned['start'])*cfg.output_fps))
             for w in planned['words']:
@@ -72,6 +73,7 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
         planned.update(phrase_id=digest[:20],design={'preset':cfg.style_preset,'quiet':quiet,'material':material,
                         'density_cps':round(cps,2),'template':local.caption_style,'direction':local._motion_direction,
                         'seed':cfg.caption_seed,'hierarchy':'phrase_then_focus','alignment':planned['alignment'],
+                        'composition':composition,'director_version':VERSION,'reveal':'whole_phrase',
                         'template_policy':cfg.caption_template_policy},source_word_ids=[wid for w in phrase for wid in w.get('word_ids',[]) if wid is not None])
         output.append(planned)
     result={'version':5,'timebase':'output_seconds','width':cfg.target_w,'height':cfg.target_h,
@@ -108,7 +110,10 @@ def readability(plan,cfg):
         if not cfg.caption_backdrop:issue('background_unknown','Kontras terhadap gambar bergerak belum dijamin.','Aktifkan latar/outline subtitle atau periksa frame sumber.')
         if min((contrast(w.get('color',cfg.base_hex)) for w in phrase['words']),default=21)<4.5:
             issue('contrast','Warna teks kurang kontras terhadap outline gelap.','Pilih putih atau aksen yang lebih terang.')
-        if min((w['size']/min(W,H) for w in phrase['words']),default=1)<.030:
+        from .caption_director import visible_cap
+        caps=[visible_cap(w,cfg.fonts_dir,360,W) for w in phrase['words']]
+        row.update(display_width_px=360,min_visible_cap_px=round(min(caps,default=0),2),minimum_cap_px=14)
+        if min(caps,default=14)<14:
             issue('small_text','Huruf mengecil untuk menampung frasa.','Pecah frasa panjang atau pilih area subtitle yang lebih luas.')
         boxes=[];collision=False;overflow=False
         for word in phrase['words']:

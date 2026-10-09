@@ -18,7 +18,7 @@ import urllib.request
 
 MODULES={'faster-whisper':'faster_whisper','silero-vad':'silero_vad','whisperx':'whisperx',
          'stable-ts':'stable_whisper','pyannote':'pyannote.audio','scenedetect':'scenedetect',
-         'yunet':'cv2','rapidocr':'rapidocr_onnxruntime','e5':'sentence_transformers',
+         'yunet':'cv2','rapidocr':'rapidocr_onnxruntime','mediapipe':'mediapipe','e5':'sentence_transformers',
          'qwen3-vl':'transformers','smolvlm':'transformers','siglip2':'transformers',
          'opentimelineio':'opentimelineio','pycapcut':'pycapcut','clipsai':'clipsai','auto-editor':'auto_editor',
          'fonttools':'fontTools','talknet':'torch','sam2':'torch'}
@@ -62,6 +62,7 @@ def infer(request):
     if key in ('talknet','sam2'):
         sys.path.insert(0,str(source))
         importlib.import_module('model.talkNetModel' if key=='talknet' else 'sam2.build_sam')
+    if key=='mediapipe':device='cpu'
     result={'passed':True,'level':'import','device':device,'detail':'Impor modul lulus; inference belum dijalankan','artifacts':[]}
     if key in ('ffmpeg','libass'):
         ffmpeg=shutil.which('ffmpeg');ffprobe=shutil.which('ffprobe')
@@ -186,6 +187,17 @@ def infer(request):
         if 'clipper' not in text.lower():raise ValueError('OCR tidak mengenali teks contoh: '+text)
         image.save(sample_dir/'ocr.png')
         return {**result,'level':'sample','detail':'Teks sampel terbaca: '+text,'artifacts':['sample/ocr.png']}
+    if key=='mediapipe':
+        sys.path.insert(0,str(repo))
+        from clipper.visual_worker import run
+        video=sample_dir/'segment-input.mp4'
+        command(['ffmpeg','-nostdin','-v','error','-y','-f','lavfi','-i','color=c=gray:s=320x180:r=1:d=1','-c:v','libx264','-threads','1',video])
+        payload=run({'component':key,'directory':str(directory),'output_dir':str(sample_dir),'source':str(video),
+                     'source_content_id':'synthetic-gray-segmentation-sample-v1','times':[0.],'max_width':320})
+        if payload.get('status')!='ready' or len(payload.get('frames',[]))!=1:raise ValueError('Inference segmentasi sampel belum lengkap.')
+        (sample_dir/'segmentation.json').write_text(json.dumps(payload,ensure_ascii=False),encoding='utf-8')
+        return {**result,'level':'sample','detail':'Inference CPU enam kelas dan mask valid pada frame abu-abu. Akurasi wajah/pakaian video pengguna belum dinilai.',
+                'artifacts':['sample/segment-input.mp4','sample/segmentation.json',*[str(Path(p).relative_to(directory)).replace('\\','/') for p in payload['artifacts']]]}
     if key=='e5':
         from sentence_transformers import SentenceTransformer
         model=SentenceTransformer(str(weights),device=device,local_files_only=True)

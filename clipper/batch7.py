@@ -33,6 +33,7 @@ def _snapshot(service,doc,*,fresh=False,mode=None,require_ready=False):
             if not choice['available']:blockers.append({**target,'status':'unsupported','title':doc['clips'][cid]['title'],'message':' '.join(choice['reasons'])})
         result=variant.get('result') or {}
         rows.append({**target,'dependency':dependency,
+                     'reference':{k:result.get(k) for k in ('width','height','length','duration','output_content_id')},
                      'output_content_id':result.get('output_content_id'),
                      'plan_content_id':result.get('plan_content_id'),
                      'absolute_file':result.get('absolute_file'),'plan_path':result.get('plan_path')})
@@ -46,12 +47,14 @@ def _snapshot(service,doc,*,fresh=False,mode=None,require_ready=False):
 def export_project(service,job):
     from pathlib import Path
     from . import projects
-    from .dependency_cache import content_id
+    from .dependency_cache import content_id, fresh_scope
     from .project_store import Conflict
     from .studio_worker import StaleJob
     pid=job['project_id'];options=job['request'].get('options',{});mode=options.get('mode','hybrid')
     expected=job['request']['dependency']
     def check():
+        with fresh_scope():return validate()
+    def validate():
         doc=service.store.get(pid)
         if service.queue.get(job['id'])['status']=='cancel_requested':raise StaleJob('Paket dibatalkan.')
         current=snapshot(service,doc,fresh=True,mode=mode,require_ready=True)
@@ -69,7 +72,7 @@ def export_project(service,job):
     result=projects.export_bundle(results,service.config(doc),progress,mode=mode)
     if result['timelines']!=state['timelines']:raise ValueError('Jumlah timeline tidak sesuai klip dan rasio yang dipilih.')
     result.update(variant_id='both',clip_ids=list(dict.fromkeys(t['clip_id'] for t in state['targets'])),
-                  coverage=[{k:t[k] for k in ('clip_id','variant_id','output_content_id')} for t in state['targets']],
+                  coverage=[{k:t[k] for k in ('clip_id','variant_id','output_content_id','reference')} for t in state['targets']],
                   dependency=expected,input_revision=doc['revision'],package_content_id=content_id(result['zip'],fresh=True))
     result['url']=service.register_file(pid,result['zip'])
     def publish(current):

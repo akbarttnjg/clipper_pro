@@ -11,12 +11,14 @@ export function mountStyle5(host,{project,clipId,variantId,api,onChange=()=>{},o
  const select=(label,key,options,fallback)=>{const l=e('label',label),s=e('select');s.setAttribute('aria-label',label);for(const [id,name] of options){const o=e('option',name);o.value=id;s.append(o)}s.value=draft?.values?.[key]??cfg[key]??fallback;s.onchange=storeDraft;fields[key]=s;l.append(s);host.append(l);return s};
  select('Preset tipografi','style_preset',[['legacy','Gaya manual sebelumnya'],['rapi','Rapi · tenang dan terukur'],['ekspresif','Ekspresif · hierarki dan variasi'],['adaptif','Adaptif · mengikuti materi']],'legacy');
  select('Pilihan template','caption_template_policy',[['auto','Variasi mengikuti preset'],['manual','Kunci gaya teks yang dipilih']],'auto');
+ select('Komposisi frasa','caption_composition',[['auto','Otomatis · editorial, fokus, kutipan'],['editorial','Editorial bersih'],['focus','Frasa fokus besar'],['quote','Kutipan tenang']],'auto');
+ select('Pendukung area teks','segmentation_enabled',[['true','MediaPipe bila sudah siap'],['false','Tanpa segmentasi tambahan']],'true');
  const label=e('label','Seed desain'),seed=e('input');seed.type='number';seed.min='0';seed.max='2147483647';seed.value=draft?.values?.caption_seed??cfg.caption_seed??2026;seed.setAttribute('aria-label','Seed desain');fields.caption_seed=seed;seed.oninput=storeDraft;label.append(seed);host.append(label);
  select('Renderer subtitle','caption_renderer',[['ass','Subtitle lokal'],['auto','Remotion bila siap'],['remotion','Wajib Remotion lokal']],'ass');
  select('Ilustrasi penjelas','illustration_mode',[['off','Nonaktif'],['labels','Diagram perbandingan atau daftar dari ucapan']],'off');
  select('Peringkat aset visual','broll_ranker',[['off','Metadata dan pemeriksaan visual'],['auto','SigLIP2 bila siap'],['siglip2','Wajib SigLIP2 lokal']],'auto');
  select('Penekanan makna','semantic_emphasis',[['true','Makna, angka utuh, dan negasi'],['false','Tanpa warna penekanan']],'true');
- const values=()=>Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,k==='caption_seed'?Number(v.value):k==='semantic_emphasis'?v.value==='true':v.value]));
+ const values=()=>Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,k==='caption_seed'?Number(v.value):['semantic_emphasis','segmentation_enabled'].includes(k)?v.value==='true':v.value]));
  btn('Simpan gaya Tahap 5',async()=>{const selected=values();
     if(selected.style_preset!=='legacy'&&selected.style_preset!==cfg.style_preset)Object.assign(selected,{font_main:'dm_sans',font_accent:'dm_serif_italic',caption_backdrop:true,motion_intensity:selected.style_preset==='rapi'?'calm':'balanced'});
     await api('/changes',{project_id:project.project_id,clip_id:clipId,variant_id:variantId,

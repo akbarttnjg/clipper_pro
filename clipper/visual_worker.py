@@ -27,6 +27,50 @@ def frame_at(source,time):
 
 def run(request):
     key=request['component'];directory=Path(request['directory']);weights=directory/'weights';folder=Path(request['output_dir']);folder.mkdir(parents=True,exist_ok=True)
+    if key=='mediapipe':
+        import cv2
+        import numpy as np
+        from PIL import Image
+        import mediapipe as mp
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+        from clipper.segmentation import MODEL_SHA256,MODEL_LABELS
+        model=weights/'selfie_multiclass_256x256.tflite'
+        if hashlib.sha256(model.read_bytes()).hexdigest()!=MODEL_SHA256:raise ValueError('Bobot MediaPipe berbeda dari model yang dikunci.')
+        times=request['times']
+        if not 1<=len(times)<=8 or len(set(times))!=len(times) or any(not math.isfinite(t) or t<0 for t in times):raise ValueError('Sampel segmentasi tidak valid.')
+        options=vision.ImageSegmenterOptions(base_options=python.BaseOptions(model_asset_path=str(model),delegate=python.BaseOptions.Delegate.CPU),
+            running_mode=vision.RunningMode.IMAGE,output_category_mask=True,output_confidence_masks=True)
+        frames=[];artifacts=[];identities={}
+        with vision.ImageSegmenter.create_from_options(options) as segmenter:
+            for t in times:
+                frame=frame_at(request['source'],t);H,W=frame.shape[:2]
+                scale=min(1.,min(512,int(request.get('max_width',512)))/W)
+                frame=cv2.resize(frame,(max(1,round(W*scale)),max(1,round(H*scale))))
+                image=mp.Image(image_format=mp.ImageFormat.SRGB,data=cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
+                result=segmenter.segment(image)
+                if len(result.confidence_masks or [])!=6 or result.category_mask is None:raise ValueError('Model segmentasi harus menghasilkan enam kelas.')
+                confidence=np.stack([m.numpy_view() for m in result.confidence_masks],axis=-1)
+                mask=result.category_mask.numpy_view().copy();mask=np.squeeze(mask)
+                if confidence.ndim!=3 or confidence.shape[-1]!=6 or not np.isfinite(confidence).all() or confidence.min()<-.001 or confidence.max()>1.001 or mask.shape!=confidence.shape[:2] or mask.max()>5:
+                    raise ValueError('Mask segmentasi tidak valid.')
+                if not np.allclose(confidence.sum(axis=-1),1.,atol=.03):raise ValueError('Probabilitas kelas segmentasi tidak ternormalisasi.')
+                name='segment-'+hashlib.sha256(json.dumps([request['source_content_id'],t,MODEL_SHA256]).encode()).hexdigest()[:24]+'.npz'
+                path=folder/name;np.savez_compressed(path,category=mask.astype(np.uint8),confidence=confidence.astype(np.float16))
+                artifacts.append(str(path));identities[str(path)]='sha256:'+hashlib.sha256(path.read_bytes()).hexdigest()
+                categories=np.stack([np.asarray(Image.fromarray(confidence[:,:,i]).resize((32,18),Image.Resampling.BOX)) for i in range(6)],axis=-1).round(4).tolist()
+                protected=[]
+                for classes,kind in (((1,3),'hair_face'),((5,),'accessory')):
+                    selected=np.isin(mask,classes)&(np.max(confidence[:,:,list(classes)],axis=-1)>.65)
+                    for contour in cv2.findContours(selected.astype(np.uint8),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)[0]:
+                        x,y,w,h=cv2.boundingRect(contour)
+                        if w*h/(mask.shape[0]*mask.shape[1])<.002:continue
+                        sx,sy=W/mask.shape[1],H/mask.shape[0]
+                        protected.append({'kind':kind,'box':[max(0,(x-w*.08)*sx),max(0,(y-h*.08)*sy),w*1.16*sx,h*1.16*sy],'confidence_threshold':.65})
+                frames.append({'time':t,'source_size':[W,H],'protected':protected,'categories':categories,'artifact':str(path)})
+        return {'status':'ready','frames':frames,'artifacts':artifacts,'artifact_content_ids':identities,'labels':MODEL_LABELS,
+                'model_sha256':MODEL_SHA256,'scope':'bounded_cpu_multiclass_inference; clothing is not protected'}
     if key=='siglip2':
         import io
         import torch
