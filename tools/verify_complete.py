@@ -115,7 +115,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser();parser.add_argument('--project');parser.add_argument('--alignment',action='store_true')
     parser.add_argument('--benchmark',action='store_true');parser.add_argument('--output',type=Path);args=parser.parse_args(argv)
     sys.path.insert(0,str(ROOT));os.chdir(ROOT)
-    report={'version':'4.0.8','timestamp':time.strftime('%Y-%m-%dT%H:%M:%S%z'),'python':sys.executable,'errors':[]}
+    report={'version':'4.0.9','timestamp':time.strftime('%Y-%m-%dT%H:%M:%S%z'),'python':sys.executable,'errors':[]}
     output=args.output or ROOT/'work'/'verification'/('complete-'+time.strftime('%Y%m%d-%H%M%S')+'.json')
     try:
         from dotenv import load_dotenv

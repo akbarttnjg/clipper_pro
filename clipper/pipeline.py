@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.8'
+RENDER_VERSION = '4.0.9'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -20,6 +20,8 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
     work = Path(cfg.work_dir)
     work.mkdir(parents=True, exist_ok=True)
     key = source_key(media_path, cfg)
+    preparation_seconds = time.monotonic() - started
+    asr_started = time.monotonic()
     cached = read_json(work / 'asr-cache.json', {})
     if key and cached.get('key') == key:
         transcript = cached['transcript']
@@ -33,13 +35,17 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
             write_json(work / 'asr-cache.json', {'key': key, 'transcript': transcript})
     if not transcript['words']:
         raise RuntimeError('Tidak ada percakapan yang terdeteksi.')
+    asr_seconds = time.monotonic() - asr_started
+    evidence_started = time.monotonic()
     if cfg.source_content_id:
         from . import evidence
         report = evidence.scan(media_path, cfg, transcript['duration'], on_progress, input_fingerprint=key)
         transcript['ocr_suggestions'] = evidence.suggestions(transcript['words'], report)
+    evidence_seconds = time.monotonic() - evidence_started
+    correction_started = time.monotonic()
     transcript = transcript_correction.refine(transcript, cfg)
     write_json(work / 'transcript-corrections.json', transcript['correction_report'])
-    asr_seconds = time.monotonic() - started
+    correction_seconds = time.monotonic() - correction_started
     selection_started = time.monotonic()
     if cfg.processing_mode == 'full':
         clips = [{'start': 0., 'end': transcript['duration'], 'title': Path(media_path).stem,
@@ -51,7 +57,12 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
         c['warnings'] = list(c.get('warnings', [])) + transcript.get('warnings', [])
     write_json(work / 'clip-decisions.json', clips)
     transcript['timings'] = {'transcription_seconds': round(asr_seconds, 2),
+        'preparation_seconds': round(preparation_seconds, 2),
+        'evidence_seconds': round(evidence_seconds, 2),
+        'correction_seconds': round(correction_seconds, 2),
         'selection_seconds': round(time.monotonic() - selection_started, 2),
+        'analysis_total_seconds': round(time.monotonic() - started, 2),
+        'scope': 'analysis_only; rendering and editor export excluded',
         'cache_reused': bool(key and cached.get('key') == key)}
     write_json(work / 'transcript.json', transcript)
     on_progress(100, f'{len(clips)} kandidat siap diperiksa')

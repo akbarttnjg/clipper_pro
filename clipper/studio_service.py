@@ -252,7 +252,11 @@ class StudioService:
         fonts=[asset_id(p,fresh=fresh) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
         candidate={k:v for k,v in clip.items() if k not in ('variants','revision','result','preview','included')}
         from .caption_renderer import signature
-        return fingerprint(base+[candidate,settings,recipe,assets,fonts,doc.get('clip_corrections',{}).get(clip_id),doc.get('alignment_overrides',{}).get('clips',{}).get(clip_id),variant.get('timeline',{}),signature(cfg)])
+        parts=base+[candidate,settings,recipe,assets,fonts,doc.get('clip_corrections',{}).get(clip_id),doc.get('alignment_overrides',{}).get('clips',{}).get(clip_id),variant.get('timeline',{}),signature(cfg)]
+        if cfg.illustration_mode!='off':
+            from .explanation5 import STRUCTURES_VERSION
+            parts.append(STRUCTURES_VERSION)
+        return fingerprint(parts)
 
     def _correction_target(self,doc,clip_id,op):
         if op.get('transcript_id')!=doc.get('transcript_id'):raise ValueError('Transkrip telah diganti; draf tidak diterapkan pada ucapan lain')

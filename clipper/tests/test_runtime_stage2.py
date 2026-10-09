@@ -61,9 +61,9 @@ def partial(server,tmp_path):
     return target
 
 
-def test_catalog_exact26_roles_and_official_sources():
-    assert len(CATALOG)==26
-    assert len({row['id'] for row in CATALOG})==26
+def test_catalog_exact27_roles_and_official_sources():
+    assert len(CATALOG)==27
+    assert len({row['id'] for row in CATALOG})==27
     assert get('opus-skill')['repo']=='opus-pro/opus-skills'
     assert all(row['role'] and row['source'].startswith('https://') and not row['default_enabled'] for row in CATALOG)
     copy=get('talknet');copy['packages'].clear();assert get('talknet')['packages']
@@ -311,7 +311,7 @@ def test_runtime_api_queue_and_artifact_guard(manager,tmp_path):
     from clipper.api_runtime import router
     app=FastAPI();app.include_router(router(SimpleNamespace(runtime=manager)))
     with TestClient(app) as client:
-        snapshot=client.get('/runtime').json();assert snapshot['counts']['total']==26
+        snapshot=client.get('/runtime').json();assert snapshot['counts']['total']==27
         response=client.post('/runtime/jobs',json={'component':'sam2','action':'install'});assert response.status_code==200
         assert client.post('/runtime/jobs',json={'component':'sam2','action':'install'}).status_code==400
         jid=response.json()['id'];assert client.post('/runtime/jobs/'+jid+'/cancel').json()['status']=='canceled'

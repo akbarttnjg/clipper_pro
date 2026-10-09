@@ -124,6 +124,11 @@ def plan(manager,job,directory):
     result=dict(schema=1,component=item['id'],platform=sys.platform,python=sys.version,packages=packages,
                 requested=item['requested_version'],source=None,weights=None,extra_models=[],created=time.time())
     if item['repo']:result['source']=source_plan(item)
+    if item['id']=='mediapipe':
+        from ..segmentation import MODEL_URL,MODEL_SHA256,MODEL_BYTES,MODEL_GENERATION
+        result['weights']={'repo':'google/mediapipe-selfie-multiclass','commit':MODEL_SHA256,
+            'generation':MODEL_GENERATION,'source_url':MODEL_URL,'integrity':'pinned_sha256',
+            'files':[{'path':'weights/selfie_multiclass_256x256.tflite','url':MODEL_URL,'hash':MODEL_SHA256,'algorithm':'sha256','size':MODEL_BYTES}]}
     if model:
         try:result['weights']=model_plan(model,os.environ.get('HF_TOKEN'))
         except urllib.error.HTTPError as exc:

@@ -8,6 +8,7 @@
     "clipper/batch7.py",
     "clipper/boundaries.py",
     "clipper/capcut_worker7.py",
+    "clipper/caption_director.py",
     "clipper/composition.py",
     "clipper/config.py",
     "clipper/dependency_cache.py",
@@ -20,7 +21,12 @@
     "clipper/placement.py",
     "clipper/projects.py",
     "clipper/render.py",
+    "clipper/runtime/catalog.py",
+    "clipper/runtime/install.py",
+    "clipper/runtime/probe.py",
+    "clipper/runtime/state.py",
     "clipper/runtime/templates/motion5/src/scene.tsx",
+    "clipper/segmentation.py",
     "clipper/story.py",
     "clipper/studio_service.py",
     "clipper/studio_worker.py",
@@ -29,35 +35,48 @@
     "clipper/tests/test_batch7.py",
     "clipper/tests/test_complete_installer.py",
     "clipper/tests/test_complete_repairs.py",
+    "clipper/tests/test_runtime_stage2.py",
+    "clipper/tests/test_typography9.py",
+    "clipper/tests/test_typography9_installer.py",
+    "clipper/tests/workspace6_ui.cjs",
+    "clipper/text_area.py",
     "clipper/typography.py",
     "clipper/visual4.py",
+    "clipper/visual_worker.py",
     "clipper/workflow6.py",
     "docs/PEMBENAHAN_LENGKAP.md",
+    "docs/UPGRADE_4_0_9.md",
     "docs/releases/complete_base_hashes.json",
+    "docs/releases/typography9_base_hashes.json",
+    "docs/releases/typography9_fixture.zip",
     "docs/verification/BASELINE_GITHUB_4_0_7.json",
+    "docs/verification/HASIL_QA_4_0_9.md",
     "docs/verification/HASIL_QA_LENGKAP.md",
     "static/features/batch7.js",
     "static/features/style5.js",
+    "static/features/visual4.js",
+    "static/features/workspace6.js",
     "static/index.html",
     "static/studio4.js",
     "tools/build_complete_release.py",
+    "tools/build_typography9_release.py",
     "tools/complete_installer.py",
     "tools/qa_capcut_serializer.py",
     "tools/qa_complete_render.py",
+    "tools/qa_typography9.py",
     "tools/verify_complete.py"
   ],
   "guard_paths": [
     "app.py",
-    "requirements.txt",
-    "requirements-pro.txt",
-    "clipper/stage3.py",
-    "clipper/speech_jobs.py",
-    "clipper/visual_worker.py",
-    "clipper/font_catalog.py",
-    "clipper/editplan.py",
-    "clipper/subtitle_edit.py",
     "clipper/caption_checks.py",
-    "clipper/project_store.py"
+    "clipper/editplan.py",
+    "clipper/font_catalog.py",
+    "clipper/project_store.py",
+    "clipper/speech_jobs.py",
+    "clipper/stage3.py",
+    "clipper/subtitle_edit.py",
+    "requirements-pro.txt",
+    "requirements.txt"
   ],
   "allowed_hashes": {
     ".gitignore": [
@@ -101,14 +120,16 @@
     ],
     "clipper/dependency_cache.py": [
       "3ae7583fe6a8e71ae76be3ce305fa91183a59cc082215b6153120aa4f12c09eb",
-      "cac723edd3339da37c387c7628b9593d18088c79ba6b44acace59770283ed3da"
+      "cac723edd3339da37c387c7628b9593d18088c79ba6b44acace59770283ed3da",
+      "bafd59a4c0b819bbb94c8a71078f3a4c38a989ca84bb7a4c382b0eea6c99b1e2"
     ],
     "clipper/editplan.py": [
       "1abdef5b8ae2553d6a713bcd2528a6ae8d7b341173f4fa96a35ab45aceeb2674"
     ],
     "clipper/explanation5.py": [
       "532d92b8b21125157891fb41a3cbe02fb2a4d8df364b4ed7f3edcde980fa3400",
-      "e0c4569131ef42d301e67e6920dd7b542e55d792d2d8dbe7ade4a2b1316e06a6"
+      "e0c4569131ef42d301e67e6920dd7b542e55d792d2d8dbe7ade4a2b1316e06a6",
+      "800a0a83762b3e324d5853e089b4047b19e9e7228ac6969ff7ea98159fc96709"
     ],
     "clipper/export6.py": [
       "622e06d92f6f4b5a9b9e9145d9697e58011e27e928a0d3b7aef4307963774b95",
@@ -163,7 +184,8 @@
     ],
     "clipper/studio_service.py": [
       "1486acbadac15479b61c674b60ec07c88373f15318386ad2e2731b1c382ffea9",
-      "af7a2cb47db52151dc004d790f0226222b5f4fcfaf919618802d8d9d6b1c0a01"
+      "af7a2cb47db52151dc004d790f0226222b5f4fcfaf919618802d8d9d6b1c0a01",
+      "9b9c578409dcbd69d74821265fb7e2009d620fffcc2b48ec309762ea9721f719"
     ],
     "clipper/studio_worker.py": [
       "4c6f476286e964ba2295c0b07e4f6b25d8a9378efa04a839b5725e102ff7ad91",
@@ -180,7 +202,8 @@
       "871974763acc6a97ca9139626ed5942b898df68e141af4cd8a7068aa6dce1aba"
     ],
     "clipper/tests/test_batch7.py": [
-      "742d44ecfed614c39141a779c7f0a59dec4653559bf96061dee39b0dad795410"
+      "742d44ecfed614c39141a779c7f0a59dec4653559bf96061dee39b0dad795410",
+      "880d15eb9c64e653eaf30f36de00326a301c2c6b9e8d71422325d27b4a164c07"
     ],
     "clipper/tests/test_complete_installer.py": [
       "58cb747756a5c0590a33aef290f289eff8494e040ef98fc9b48d35973719a01d"
@@ -204,16 +227,19 @@
       "a401796296e6f839f1345c34e4788bcd1a7c1b7cf3e6e7a02c010adf732911c4"
     ],
     "docs/PEMBENAHAN_LENGKAP.md": [
-      "8e31d16b402b970b86cd7a504c14ab53ac36d02b5887184f502ee0b074a222d4"
+      "8e31d16b402b970b86cd7a504c14ab53ac36d02b5887184f502ee0b074a222d4",
+      "a01d0e541a2c92749475c85adbc6f3a6cf689c46e7da159e191240c027668bc0"
     ],
     "docs/releases/complete_base_hashes.json": [
-      "e9ab6d0cf3731cd53f7e250355ac6f73a77e520255c0302b66aba944979754d4"
+      "e9ab6d0cf3731cd53f7e250355ac6f73a77e520255c0302b66aba944979754d4",
+      "b2b86ade43b2950e565bd2218bb97f55987db71b30f308f6017c1a314d4cd425"
     ],
     "docs/verification/BASELINE_GITHUB_4_0_7.json": [
       "5efb7973d3b4576abfa0d7fa7d0503599d1a4d2e0323013bd8857ed41ec60e10"
     ],
     "docs/verification/HASIL_QA_LENGKAP.md": [
-      "444dcf07a1d8f458396e63680c59505dd3cf97d613ef163fea5d1a876e36f163"
+      "444dcf07a1d8f458396e63680c59505dd3cf97d613ef163fea5d1a876e36f163",
+      "651def3c56b4c8cddd88eff5456e46d6d2921e8d04c1c4986090cc4f9dacd1b9"
     ],
     "requirements-pro.txt": [
       "c6e3d7ab10d1f4db1639ee2d75bbf6a73c6386316b78a9145dfbe832244c711e"
@@ -234,7 +260,8 @@
       "ad134558c34e28a32efa490fbd4ccc5a3e01649b35e120abdf5e0a54a16daaff"
     ],
     "tools/build_complete_release.py": [
-      "c3affdc6c2a4af3be70390c68346de65ad5905c7b67eef6caf9efbd447ba9c6f"
+      "c3affdc6c2a4af3be70390c68346de65ad5905c7b67eef6caf9efbd447ba9c6f",
+      "441cb6d7cefe9e005dbeb48a6bb5c1387dd0f8758b9aec4c2af874d37cabac94"
     ],
     "tools/complete_installer.py": [
       "d52e3b1d7f7961b27f142c8ac6af58defa11033201699659ec0ad090f049b929"
@@ -250,9 +277,46 @@
     ],
     "static/features/batch7.js": [
       "31ede1e213ec183adafd50fb8bb2c2f0415c33e0c25e486130bc7be713f91076"
-    ]
+    ],
+    "clipper/caption_director.py": [],
+    "clipper/runtime/catalog.py": [
+      "dd207cf3dda16010502f12b54d49ade483e0f122d85e790e20b4909a538e823b"
+    ],
+    "clipper/runtime/install.py": [
+      "d92caef94fd1585663261618673b35286e8cc98f5d46d2e258f5bd169b6ced66"
+    ],
+    "clipper/runtime/probe.py": [
+      "1da7af409d858b3b10c4b2465fdb76cc2afab9c13a7e7f7614652d19f9472126"
+    ],
+    "clipper/runtime/state.py": [
+      "8f380db15c3faea276ac4b3076ff1fbba73aebda5864df01cc66c05fffa21409"
+    ],
+    "clipper/segmentation.py": [],
+    "clipper/tests/test_runtime_stage2.py": [
+      "4c8575b52b86d5e6d61e2ff30c308e21ed1cab8570313e435079aebfeea78ee1"
+    ],
+    "clipper/tests/test_typography9.py": [],
+    "clipper/tests/test_typography9_installer.py": [],
+    "clipper/tests/workspace6_ui.cjs": [
+      "f257e391383d6100f95e464ba5ec926dc37af7af392425fe77d50187bfcee87e"
+    ],
+    "clipper/text_area.py": [],
+    "docs/UPGRADE_4_0_9.md": [],
+    "docs/releases/typography9_base_hashes.json": [],
+    "tools/build_typography9_release.py": [],
+    "tools/qa_typography9.py": [],
+    "static/features/visual4.js": [
+      "635f2d8f8832c16f631faba835c6722dee4ac67f31289de572ab728c9055ddd0"
+    ],
+    "docs/releases/typography9_fixture.zip": [],
+    "static/features/workspace6.js": [
+      "2bdd07d8f5dc429623148968c4095803a48ac9c976de2b72ec94bb27df16a1fa"
+    ],
+    "docs/verification/HASIL_QA_4_0_9.md": []
   },
   "additional_base_commits": [
-    "1a6bcb82801c83d7bc19e00a18e125deb6c85454"
-  ]
+    "1a6bcb82801c83d7bc19e00a18e125deb6c85454",
+    "8f6450c0d24aaf9e217a551ed7edcd0a6f1fd59c"
+  ],
+  "recipe": "4.0.9 overlay includes prior complete repairs, pinned pre-upgrade texts and new module paths"
 }

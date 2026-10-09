@@ -17,8 +17,8 @@ from .dependency_cache import content_id
 from .storage import read_json, write_json
 from . import placement
 
-VERSION = '4.0.8'
-OBSERVATION_VERSION = '4.0.4-visual2'
+VERSION = '4.0.9'
+OBSERVATION_VERSION = '4.0.9-text-area-grid'
 KINDS = ('speaker', 'podcast', 'board', 'screen', 'chart', 'graphic', 'unknown')
 
 
@@ -139,7 +139,7 @@ def component_runtime(key, cfg):
 def runtime_signature(root=None):
     from .runtime.state import runtime_root,safe_path
     root=Path(root) if root else runtime_root();items=[]
-    for key in ('yunet','rapidocr','talknet','smolvlm','qwen3-vl','sam2'):
+    for key in ('yunet','rapidocr','talknet','smolvlm','qwen3-vl','sam2','mediapipe'):
         p=root/'components'/key/'active.json'
         if p.is_file():
             try:
@@ -155,7 +155,11 @@ def backend(key, request, cfg, folder):
     if runtime is None:return {'status':'unavailable','component':key,'note':'Lingkungan, bobot dan uji sampel lokal diperlukan'}
     identity=fingerprint([VERSION,key,runtime,request]);cache=Path(folder)/('backend-'+identity+'.json')
     cached=read_json(cache,{}) or {}
-    if cached.get('status')=='ready' and all(Path(a).is_file() for a in cached.get('artifacts',[])):return {**cached,'cache_reused':True}
+    if cached.get('status')=='ready' and all(Path(a).is_file() for a in cached.get('artifacts',[])):
+        try:
+            if all(content_id(p,fresh=True)==ident for p,ident in cached.get('artifact_content_ids',{}).items()):
+                return {**cached,'cache_reused':True}
+        except (OSError,ValueError):pass
     request={**request,'component':key,'directory':runtime['directory'],'output_dir':str(Path(folder).resolve()),'device':'cpu'}
     incoming=Path(folder)/('request-'+identity+'.json');outgoing=Path(folder)/('result-'+identity+'.json')
     write_json(incoming,request)
@@ -324,7 +328,9 @@ def caption_envelopes(plan,cfg):
                 for b in placement.protected_boxes(s,cfg.target_w,cfg.target_h):
                     x,y,w,h=b['box'];z=1+cfg.zoom_amount
                     boxes.append({'kind':b['kind'],'box':[cfg.target_w/2+(x-cfg.target_w/2)*z,cfg.target_h/2+(y-cfg.target_h/2)*z,w*z,h*z]})
-        selected,pos,clear=placement.choose_panel(boxes,cfg.target_w,cfg.target_h,touching[0].get('caption_panel'))
+        from .text_area import output_quality
+        quality=[q for s in touching for q in output_quality(s,cfg.target_w,cfg.target_h)]
+        selected,pos,clear=placement.choose_panel(boxes,cfg.target_w,cfg.target_h,touching[0].get('caption_panel'),cfg=cfg,quality=quality)
         for s in touching:
             if clear:s.update(caption_panel=list(selected),position=pos,protected_output=placement.protected_boxes(s,cfg.target_w,cfg.target_h))
             else:placement.reserve_band(s,cfg)
@@ -373,7 +379,7 @@ def report(plan,media,cfg):
                     cv2.imwrite(str(poster),small)
             finally:cap.release()
         entry={k:copy.deepcopy(shot.get(k)) for k in ('source_start','source_end','start','end','rect','face_rect','mode','caption_panel','composition_reason','protected_source','protected_output')}
-        entry.update(id='shot-'+fingerprint([shot['source_start'],shot['source_end']])[:16],frame_time=t,visual=visual,poster_path=str(poster) if poster.is_file() else None,
+        entry.update(id='shot-'+fingerprint([shot['source_start'],shot['source_end']])[:16],frame_time=t,visual=visual,segmentation=shot.get('segmentation'),poster_path=str(poster) if poster.is_file() else None,
                      coordinate_space='canonical_source_pixels',mask={'status':'disabled'})
         if index==mask_index and controls.get('sam_enabled'):
             selected=visual.get('speaker',{}).get('selected');box=pixels(controls['sam_box'],plan['source']['width'],plan['source']['height']) if controls.get('sam_box') else selected.get('box') if selected else None
@@ -389,6 +395,6 @@ def report(plan,media,cfg):
                 if entry['mask']['status']!='invalid_range':entry['mask']=backend('sam2',request,cfg,folder)
             else:entry['mask']={'status':'needs_box','note':'Tentukan area SAM atau pilih pembicara yang terlihat'}
         shots.append(entry)
-    return {'version':VERSION,'summary':copy.deepcopy(plan.get('visual_summary',{})),'shots':shots,
+    return {'version':VERSION,'summary':copy.deepcopy(plan.get('visual_summary',{})),'segmentation':copy.deepcopy(plan.get('segmentation',{})),'shots':shots,
             'source_size':[plan['source']['width'],plan['source']['height']],'output_size':[cfg.target_w,cfg.target_h],
             'note':'SAM opsional: frame acuan atau propagasi rentang terpilih maksimal enam detik. Mask disimpan terpisah; belum dikomposit ke render atau proyek editor.'}

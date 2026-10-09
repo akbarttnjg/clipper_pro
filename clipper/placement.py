@@ -76,7 +76,9 @@ def protected_boxes(shot, W, H):
         box = item['box']
         if item['kind'] == 'face':
             x, y, w, h = box
-            box = [x-w*.25, y-h*.45, w*1.5, h*1.7]
+            # The editorial profile leaves plain upper clothing available.
+            # Sampled MediaPipe hair masks supplement this head clearance.
+            box = [x-w*.12,y-h*.28,w*1.24,h*1.40] if shot.get('caption_profile')=='editorial9' else [x-w*.25, y-h*.45, w*1.5, h*1.7]
         for region, transform in mappings(shot, W, H):
             projected = project_box(box, region, transform)
             if projected:
@@ -90,7 +92,10 @@ def overlap(a, b):
     return max(0, min(x+w, bx+bw)-max(x, bx)) * max(0, min(y+h, by+bh)-max(y, by))
 
 
-def choose_panel(boxes, W, H, preferred=None):
+def choose_panel(boxes, W, H, preferred=None, *, cfg=None, quality=()):
+    if cfg is not None and (cfg.style_preset!='legacy' or getattr(cfg,'_director',False)):
+        from .text_area import choose
+        return choose(boxes,W,H,preferred,quality)
     portrait = H > W
     # Platform UI margins are reserved before comparing available space.
     wide = W*.78 if portrait else W*.72
@@ -129,7 +134,8 @@ def choose_panel(boxes, W, H, preferred=None):
 
 def reserve_band(shot, cfg):
     W, H = cfg.target_w, cfg.target_h
-    shot['image_height'] = int(H*.79)//2*2
+    directed=cfg.style_preset!='legacy' or getattr(cfg,'_director',False)
+    shot['image_height'] = int(H*(.67 if directed else .79))//2*2
     if shot['mode']=='fill':
         area=shot.get('active_area')
         if area:
@@ -143,7 +149,7 @@ def reserve_band(shot, cfg):
         shot['canvas_height']=shot['image_height']
         shot['material_image_height']=None
     shot['zoom_at']=None
-    shot['caption_panel']=[W*.08,H*.815,W*.78,H*.16]
+    shot['caption_panel']=[W*.07,H*.685,W*(.80 if H>W else .84),H*(.15 if H>W else .27)] if directed else [W*.08,H*.815,W*.78,H*.16]
     shot['position']='bottom'
     shot['protected_output']=protected_boxes(shot,W,H)
     shot['placement']={'mode':'reserved_band','detector':'sampled_faces_and_text_geometry',
@@ -152,11 +158,13 @@ def reserve_band(shot, cfg):
 
 def place_shot(shot, cfg):
     W, H = cfg.target_w, cfg.target_h
+    shot['caption_profile']='editorial9' if cfg.style_preset!='legacy' else 'legacy'
     if cfg.caption_position!='auto' or not cfg.safe_placement:
         shot['placement']={'mode':'manual' if cfg.caption_position!='auto' else 'disabled'}
         return
     boxes=protected_boxes(shot,W,H)
-    selected,pos,clear=choose_panel(boxes,W,H,shot.get('caption_panel'))
+    from .text_area import output_quality
+    selected,pos,clear=choose_panel(boxes,W,H,shot.get('caption_panel'),cfg=cfg,quality=output_quality(shot,W,H))
     if not clear:
         reserve_band(shot,cfg)
         return
@@ -173,7 +181,7 @@ def place_shot(shot, cfg):
 def apply(plan, cfg):
     previous = None
     for shot in plan['shots']:
-        if previous and previous['mode'] == shot['mode'] and not shot.get('caption_panel'):
+        if previous and previous['mode'] == shot['mode'] and cfg.caption_position=='auto' and (not shot.get('caption_panel') or cfg.style_preset!='legacy'):
             # Prefer the previous position only when geometry remains similar.
             a,b = previous['rect'],shot['rect']
             stable = overlap(a,b)/max(1,min(a[2]*a[3],b[2]*b[3])) > .8
@@ -229,7 +237,7 @@ def caption_anchors(plan, cfg=None):
             touching=[s for s in plan['shots'] if s['start']<phrase[-1]['end'] and s['end']>phrase[0]['start']]
             if len(touching)<2: continue
             boxes=[b for s in touching for b in s.get('protected_output',[])]
-            _,_,clear=choose_panel(boxes,cfg.target_w,cfg.target_h,touching[0].get('caption_panel'))
+            _,_,clear=choose_panel(boxes,cfg.target_w,cfg.target_h,touching[0].get('caption_panel'),cfg=cfg)
             if not clear:
                 for shot in touching: reserve_band(shot,cfg)
     return [{'time':(s['start']+s['end'])/2,'start':s['start'],'end':s['end'],

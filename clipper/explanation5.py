@@ -9,6 +9,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
+STRUCTURES_VERSION='explanation5-structured-v5-complete-block'
+
 
 def lines_for(text,cfg,*,max_size=68,max_lines=3):
     from .typography import font
@@ -65,10 +67,15 @@ def structures(words):
     for a,w in enumerate(words):
         if re.sub(r'[^\w]','',w['word'].lower())!='pertama':continue
         row=[]
-        for v in words[a:a+36]:
+        for v in words[a:]:
             if row and v['start']-row[-1]['end']>3:break
+            # An explicit conclusion closes the list. A fixed word window
+            # cannot establish completeness: a later fifth item matters.
+            if row and re.search(r'[.!?]$',row[-1]['word']) and re.sub(r'[^\w]','',v['word'].lower()) in ('kesimpulannya','itulah','selesai'):
+                break
             row.append(v)
         tokens=[re.sub(r'[^\w]','',v['word'].lower()) for v in row]
+        if any(t in ('kelima','keenam','ketujuh','kedelapan','kesembilan','kesepuluh') for t in tokens):continue
         positions=[next((i for i,t in enumerate(tokens) if t==o),None) for o in ordinals]
         count=next((i for i,p in enumerate(positions) if p is None),4)
         if count<2 or any(p is not None for p in positions[count:]) or positions[:count]!=sorted(positions[:count]):continue
@@ -80,6 +87,9 @@ def structures(words):
             stop=positions[i+1] if i+1<count else len(row)
             clause=row[p:stop]
             ending=next((k+1 for k,v in enumerate(clause) if re.search(r'[.!?]$',v['word'])),len(clause))
+            # Intermediate items must be complete short clauses. Do not drop
+            # a caveat between an item and the next numbered marker.
+            if ending!=len(clause):break
             clause=clause[:ending]
             if not 2<=len(clause)<=7:break
             labels.append(' '.join(v['word'] for v in clause));selected.extend(clause)
@@ -91,7 +101,7 @@ def make_asset(text,word_ids,cfg,diagram=None):
     from .typography import font
     from PIL import Image,ImageDraw
     lines,size=lines_for(text,cfg);face_path=Path(cfg.fonts_dir)/FONTS[cfg.font_main]['file']
-    key=hashlib.sha256(json.dumps([text,word_ids,diagram,cfg.accent_hex,face_path.read_bytes().hex(),'explanation5-structured-v3'],ensure_ascii=False).encode()).hexdigest()[:24]
+    key=hashlib.sha256(json.dumps([text,word_ids,diagram,cfg.accent_hex,face_path.read_bytes().hex(),STRUCTURES_VERSION],ensure_ascii=False).encode()).hexdigest()[:24]
     folder=Path(cfg.work_dir)/'explanations'/key;folder.mkdir(parents=True,exist_ok=True)
     runtime=motion_runtime(cfg)
     # The editable project is retained even when the optional renderer is absent.

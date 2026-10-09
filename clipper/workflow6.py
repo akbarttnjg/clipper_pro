@@ -11,7 +11,7 @@ from .dependency_cache import content_id
 from .project_store import Conflict, dumps
 
 VERSION = '4.0.6'
-BRAND_FIELDS = frozenset({'style_preset','caption_template_policy','font_main','font_accent','accent_hex','base_hex',
+BRAND_FIELDS = frozenset({'style_preset','caption_template_policy','caption_composition','font_main','font_accent','accent_hex','base_hex',
     'caption_style','caption_position','caption_align','caption_scale','caption_backdrop',
     'motion_intensity','layout','material_share','semantic_emphasis','safe_placement'})
 SOURCE_FIELDS = frozenset({'language','audio_stream_index','whisper_model','whisper_device',
@@ -39,6 +39,31 @@ EXPORT_MODES = {
         'limitations':['Hanya shot crop tunggal tanpa zoom animasi; layout materi + pembicara memakai mode hibrida.',
             'Salinan video sumber utuh masuk paket agar potongan dan crop dapat diedit.',
             'Posisi/ukuran teks dipetakan; kesamaan blur, fade, font dan hasil akhir belum dibuktikan di editor.']}}
+
+
+def package_members(package,doc):
+    """One evidence target per timeline; old single-timeline packages still work.
+
+    Legacy aggregate packages may recover a reference only while the current
+    final has the exact output identity recorded in their coverage snapshot.
+    """
+    coverage=package.get('coverage')
+    if not coverage:
+        coverage=[{'clip_id':package.get('clip_id'),'variant_id':package.get('variant_id'),
+                   'reference':package.get('reference'),'output_content_id':package.get('output_content_id')}]
+    members=[];seen=set()
+    for item in coverage:
+        cid,vid=item.get('clip_id'),item.get('variant_id')
+        if vid not in ('portrait','landscape') or (cid,vid) in seen:continue
+        seen.add((cid,vid));reference=item.get('reference')
+        clip=doc.get('clips',{}).get(cid,{})
+        current=clip.get('variants',{}).get(vid,{}).get('result') or {}
+        if not reference and current and (not package.get('coverage') or
+                item.get('output_content_id') and current.get('output_content_id')==item['output_content_id']):
+            reference={k:current.get(k) for k in ('width','height','length','duration','output_content_id')}
+        members.append({'clip_id':cid,'variant_id':vid,'title':item.get('title') or clip.get('title') or cid or 'Klip',
+                        'output_content_id':item.get('output_content_id'),'reference':reference or {}})
+    return members
 
 
 def brand_values(values):
@@ -197,17 +222,21 @@ class Workspace:
         doc=self.store.get(pid);rows=[];evidence=self.rows('native_evidence6',pid)
         for package in doc.get('exports',[]):
             if package.get('export_mode')=='preserved':continue
-            for editor,version in (('capcut','9.5.0'),('resolve','21')):
-                match=next((e for e in evidence if e['package_content_id']==package.get('package_content_id') and e['editor']==editor and e['variant_id']==package['variant_id']),None)
-                status='not_tested'
-                if match:
-                    try:
-                        if content_id(package['zip'],fresh=True)!=match['package_content_id'] or content_id(match['render_path'],fresh=True)!=match['render_content_id']:
-                            status='stale'
-                        else:status=match['status']
-                    except (OSError,ValueError):status='evidence_missing'
-                rows.append({'package_content_id':package.get('package_content_id'),'variant_id':package['variant_id'],
-                    'editor':editor,'target_version':version,'status':status,'evidence':match})
+            members=package_members(package,doc)
+            for member in members:
+                for editor,version in (('capcut','9.5.0'),('resolve','21')):
+                    match=next((e for e in reversed(evidence) if e['package_content_id']==package.get('package_content_id')
+                        and e['editor']==editor and e['variant_id']==member['variant_id']
+                        and (e.get('clip_id')==member['clip_id'] or len(members)==1 and 'clip_id' not in e and package.get('variant_id')!='both')),None)
+                    status='not_tested'
+                    if match:
+                        try:
+                            if content_id(package['zip'],fresh=True)!=match['package_content_id'] or content_id(match['render_path'],fresh=True)!=match['render_content_id']:
+                                status='stale'
+                            else:status=match['status']
+                        except (OSError,ValueError):status='evidence_missing'
+                    rows.append({**member,'package_content_id':package.get('package_content_id'),
+                        'editor':editor,'target_version':version,'status':status,'evidence':match})
         for variant in ('portrait','landscape'):
             for editor,version in (('capcut','9.5.0'),('resolve','21')):
                 if not any(r['variant_id']==variant and r['editor']==editor for r in rows):
@@ -218,6 +247,13 @@ class Workspace:
     def native_evidence(self,pid,data):
         doc=self.store.get(pid);package=next((e for e in doc.get('exports',[]) if e.get('package_content_id')==data.get('package_content_id')),None)
         if not package or package.get('export_mode')=='preserved':raise ValueError('Pilih paket editor yang tersimpan.')
+        members=package_members(package,doc)
+        selected=[m for m in members if m['clip_id']==data.get('clip_id') and m['variant_id']==data.get('variant_id')]
+        if len(members)==1 and not data.get('clip_id') and not data.get('variant_id'):selected=members
+        if len(selected)!=1:raise ValueError('Pilih klip dan rasio yang terdapat dalam paket ini.')
+        member=selected[0];target=member['reference']
+        if not target.get('width') or not target.get('height') or (target.get('length') or target.get('duration')) is None:
+            raise ValueError('Rujukan timeline paket lama belum lengkap; ekspor ulang kedua rasio sebelum mencatat bukti.')
         if content_id(package['zip'],fresh=True)!=package['package_content_id']:raise ValueError('Isi paket berubah; ekspor ulang.')
         if data.get('editor') not in ('capcut','resolve'):raise ValueError('Editor tidak valid.')
         editor_state=package.get('editors',{}).get(data['editor'],{})
@@ -230,14 +266,14 @@ class Workspace:
         if any(type(v) is not bool for v in flags.values()):raise ValueError('Lengkapi lima langkah bukti impor.')
         from .evaluation6 import media_info
         path=Path(data.get('render_path','')).expanduser().resolve();info=media_info(path)
-        target=package.get('reference') or doc['clips'][package['clip_id']]['variants'][package['variant_id']].get('result',{})
         if [info['width'],info['height']]!=[target.get('width'),target.get('height')]:raise ValueError('Rasio/resolusi render editor berbeda dari final rujukan.')
-        duration=target.get('length',target.get('duration'))
+        duration=target.get('length') or target.get('duration')
         if duration is not None and abs(info['duration']-float(duration))>.1:raise ValueError('Durasi render editor berbeda dari final rujukan.')
         note=str(data.get('note','')).strip()
         if not note or len(note)>2000:raise ValueError('Tuliskan hasil pembandingan font, efek dan audio.')
         return self.append('native_evidence6',pid,{**flags,'editor':data['editor'],'version':version,
-            'variant_id':package['variant_id'],'package_content_id':package['package_content_id'],
+            'clip_id':member['clip_id'],'variant_id':member['variant_id'],
+            'reference':target,'output_content_id':member['output_content_id'],'package_content_id':package['package_content_id'],
             'render_path':str(path),'render_content_id':content_id(path,fresh=True),'media':info,'note':note,
             'status':'user_reported_passed' if all(flags.values()) else 'user_reported_issue',
             'assessment':'user_reported; media identity and dimensions checked; editor actions not automated'})

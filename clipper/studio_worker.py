@@ -10,7 +10,7 @@ from .config import Config
 from .project_store import Conflict
 from .storage import read_json, write_json
 from .contracts import fingerprint
-from .dependency_cache import content_id, render_key, asset_id
+from .dependency_cache import content_id, render_key, asset_id, fresh_scope
 
 
 class StaleJob(ValueError):pass
@@ -49,6 +49,10 @@ def execute(service,job):
     work=Path(cfg.work_dir);work.mkdir(parents=True,exist_ok=True)
     def progress(value,message):service.queue.update(job['id'],progress=max(0,min(100,int(value))),message=message)
     def check(current=None):
+        # One fresh snapshot per validation phase. Never reuse a fresh hash
+        # across the expensive stage or the subsequent publication check.
+        with fresh_scope():return validate(current)
+    def validate(current=None):
         current=current or service.store.get(pid)
         if service.queue.get(job['id'])['status']=='cancel_requested':raise StaleJob('Proses sudah dibatalkan')
         if dependency!=service.dependency(current,cid,vid,fresh=True,kind=kind):raise StaleJob('Masukan berubah ketika proses berjalan. Hasil lama dipertahankan; jalankan ulang revisi aktif.')

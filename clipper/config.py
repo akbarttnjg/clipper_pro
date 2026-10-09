@@ -84,6 +84,7 @@ class Config:
     # Existing projects retain their manually selected typography.
     style_preset: str = 'legacy'
     caption_template_policy: str = 'auto'
+    caption_composition: str = 'auto'
     caption_seed: int = 2026
     caption_renderer: str = 'ass'
     semantic_emphasis: bool = True
@@ -172,6 +173,7 @@ class Config:
     cache_limit_gb: float = 0.
     # Stage 4: sampled source evidence is shared by both aspect variants.
     visual_enabled: bool = True
+    segmentation_enabled: bool = True
     visual_interval_s: float = .5
     visual_max_frames: int = 360
     visual_active_speaker: str = 'auto'
@@ -214,6 +216,7 @@ def validate_overrides(form: dict) -> dict:
     for key, choices in {'style_preset':('legacy','rapi','ekspresif','adaptif'),
                          'caption_renderer':('ass','auto','remotion'),
                          'caption_template_policy':('auto','manual'),
+                         'caption_composition':('auto','editorial','focus','quote'),
                          'illustration_mode':('off','labels'),
                          'broll_ranker':('off','auto','siglip2'),
                          'sfx_mode':('off','sparse')}.items():
@@ -349,6 +352,9 @@ def validate_overrides(form: dict) -> dict:
         if key in form:
             if form[key] not in choices:raise ValueError('Pilihan analisis visual tidak valid')
             out[key]=form[key]
+    if 'segmentation_enabled' in form:
+        if type(form['segmentation_enabled']) is not bool:raise ValueError('Status segmentasi harus boolean')
+        out['segmentation_enabled']=form['segmentation_enabled']
     if 'visual_enabled' in form:
         if type(form['visual_enabled']) is not bool:raise ValueError('Status analisis visual harus boolean')
         out['visual_enabled']=form['visual_enabled']

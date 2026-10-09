@@ -100,6 +100,8 @@ def probe_runtime(target, after=False):
             "load_dotenv(Path(sys.argv[1])/'.env.pro',override=True); from clipper.config import Config; ")
     if after:
         code += 'import clipper.framing,clipper.batch7,clipper.projects,clipper.pipeline,clipper.visual4,clipper.visual_worker,clipper.stage3,clipper.speech_jobs,clipper.api_studio,clipper.studio_exchange,clipper.style5,clipper.caption_renderer,clipper.explanation5,clipper.asset_rank,clipper.workflow6,clipper.evaluation6,clipper.export6,clipper.metrics6; '
+        if (target/'clipper/caption_director.py').is_file():
+            code += 'import clipper.caption_director,clipper.text_area,clipper.segmentation; '
     code += "print(json.dumps({'python':sys.version.split()[0],'core_modules':'available','work_dir':str((Path(sys.argv[1])/Config().work_dir).resolve())}))"
     process = subprocess.run([str(python), '-I', '-c', code, str(target)], cwd=target,
                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
@@ -115,7 +117,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if data.get('schema_version') != 1 or data.get('version') != '4.0.8':
+    if data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     for key in ('files', 'guards'):
         rows = data.get(key)
@@ -227,7 +229,7 @@ def backup_project_database(target, backup, work_dir=None):
 def install(target, package, dry_run=False):
     target, package = target.resolve(), package.resolve()
     manifest, changes, runtime = preflight(target, package)
-    print(f'Target: {target}\nVersi paket: 4.0.8\nFile yang diperbarui: {len(changes)}')
+    print(f"Target: {target}\nVersi paket: {manifest['version']}\nFile yang diperbarui: {len(changes)}")
     print('Pemeriksaan Python: ' + runtime.get('python', ''))
     if dry_run:
         print('Pemeriksaan lulus. Jalankan PASANG_PEMBENAHAN_LENGKAP.cmd untuk memasang.'); return None
@@ -241,7 +243,7 @@ def install(target, package, dry_run=False):
         if existed:
             atomic_copy(dest, safe_path(backup / 'original', row['path']))
         records.append({**row, 'existed': existed, 'original_sha256': checksum(dest) if existed else None})
-    record = {'schema_version': 1, 'version': '4.0.8', 'source_commit': manifest['source_commit'],
+    record = {'schema_version': 1, 'version': manifest['version'], 'source_commit': manifest['source_commit'],
               'target': str(target), 'status': 'prepared', 'files': records,
               'database_backup': backup_project_database(target, backup, runtime.get('work_dir'))}
     journal = backup / 'complete-backup.json'; atomic_json(journal, record)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import math
 import re
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 from PIL import ImageFont
@@ -11,6 +12,7 @@ STOP = set("yang dan di ke dari untuk dengan karena kalau bahwa adalah itu ini j
 STOP.update('gue gua lo lu kalian nih sih dong lah kok tuh deh kan gitu begitu nah ya iya eh oh enggak nggak gak mau punya'.split())
 STRONG = set('risiko penghasilan pendapatan modal biaya untung rugi investasi strategi disiplin gagal berhasil pertumbuhan uang waktu tujuan alasan bukti solusi masalah rahasia money risk growth cost income profit loss strategy'.split())
 STRONG.update('skill keterampilan pendidikan kualitas pelanggan hasil tabungan bisnis keuntungan kebebasan konsisten konsistensi'.split())
+STRONG.update('bahaya berbahaya memuncak rencana emosional emosi kehilangan hancur bertahan pulih keputusan'.split())
 
 
 def token(text):
@@ -51,7 +53,17 @@ def protected_pair(left, right):
     a,b = token(left['word'].split()[-1]),token(right['word'].split()[0])
     return (a in PROTECTED or (a,b) in {('stop','loss'),('take','profit'),('time','frame'),
         ('risk','reward'),('drop','base'),('base','drop'),('rally','base'),('base','rally'),
-        ('supply','demand'),('support','resistance')})
+        ('supply','demand'),('support','resistance'),('hari','ini'),('hari','itu'),
+        ('saat','ini'),('saat','itu'),('kali','ini'),('oleh','karena'),
+        ('hal','ini'),('hal','itu'),
+        ('makin','memuncak'),('semakin','memuncak')})
+
+
+def protected_boundary(words,index):
+    if protected_pair(words[index-1],words[index]):return True
+    from .transcript_correction import PROTECTED
+    # Do not leave "tidak punya" / "belum pernah" detached from its object.
+    return index>1 and token(words[index-2]['word']) in PROTECTED and token(words[index-1]['word']) in {'punya','ada','pernah','mau'}
 
 
 def groups(words, cfg):
@@ -61,6 +73,7 @@ def groups(words, cfg):
         if current and (w.get('part') != current[-1].get('part')
                 or w['start']-current[-1]['end'] > cfg.caption_gap_s
                 or current[-1].get('sentence_end')
+                or len(current)>1 and w['word'][:1].isupper() and token(w['word']) in {'dan','namun','tapi','pokoknya','jadi','ketika'}
                 or re.search(r'[!?;:]$|(?<!\d)\.$', current[-1]['word'])):
             runs.append(current); current = []
         current.append(w)
@@ -70,23 +83,30 @@ def groups(words, cfg):
     result = []
     for run in runs:
         n = len(run); costs = [float('inf')]*(n+1); paths = [None]*(n+1); costs[n] = 0
+        curated=cfg.style_preset!='legacy' or getattr(cfg,'_director',False)
+        group_sizes=Counter(w.get('meaning_group') for w in run if w.get('meaning_group') is not None)
+        group_chars=Counter()
+        for w in run:
+            if w.get('meaning_group') is not None:group_chars[w['meaning_group']]+=len(w['word'])+1
         for a in range(n-1,-1,-1):
-            for b in range(a+1,min(n,a+max(4,cfg.editorial_words+1))+1):
+            limit=min(n,a+max(4,cfg.editorial_words+1))
+            while limit<n and protected_boundary(run,limit):limit+=1
+            for b in range(a+1,limit+1):
                 count = b-a
-                if count>1 and run[b-1]['end']-run[a]['start'] > max(3.4,cfg.editorial_phrase_s+.6):
+                if b<n and protected_boundary(run,b):continue
+                if count>1 and run[b-1]['end']-run[a]['start'] > max(3.4,cfg.editorial_phrase_s+.6) and costs[a]<float('inf'):
                     break
-                penalty = (count-4.5)**2*.3 + (9 if count==1 else 0)
+                penalty = (count-(3.3 if curated else 4.5))**2*.3 + (9 if count==1 else 0)
                 characters = sum(len(w['word']) for w in run[a:b])+count-1
+                if curated:penalty+=max(0,characters-22)**2*.6
                 duration = max(.05,run[b-1]['end']-run[a]['start'])
                 penalty += max(0,characters/duration-22)*.12
-                if b<n and protected_pair(run[b-1],run[b]):
-                    penalty += 80
                 if b<n and token(run[b-1]['word']) in weak:
                     penalty += 8
                 # Source-grounded phrases from the editorial review must stay
                 # together when they fit; a long phrase can still wrap safely.
                 if b<n and run[b-1].get('meaning_group') is not None and run[b-1].get('meaning_group') == run[b].get('meaning_group'):
-                    penalty += 24
+                    penalty += .25 if curated and (group_sizes.get(run[b]['meaning_group'],0)>4 or group_chars.get(run[b]['meaning_group'],0)>23) else 24
                 if b<n and token(run[b]['word']) in {'jadi','tapi','namun','karena','kalau'}:
                     penalty -= 2
                 if a>0 and token(run[a]['word']) in {'nya','lah','pun'}:
@@ -109,6 +129,7 @@ def balanced_rows(phrase, measures, space, width, max_rows, emphasis):
     weak={'yang','dan','di','ke','dari','untuk','dengan','tidak','bukan','harus','butuh','akan'}
     for count in range(1,min(max_rows,n)+1):
         for cuts in combinations(range(1,n),count-1):
+            if any(protected_boundary(phrase,c) for c in cuts):continue
             bounds=(0,*cuts,n)
             rows=[list(range(a,b)) for a,b in zip(bounds,bounds[1:])]
             widths=[sum(measures[i] for i in row)+space*(len(row)-1) for row in rows]
@@ -142,7 +163,7 @@ def emphasis_indices(words, keywords=()):
     scores = []
     for i, w in enumerate(words):
         t = token(w["word"])
-        if not t or t in STOP or not (t in keys or re.search(r'\d', t) or (not keys and t in STRONG)):
+        if not t or t in STOP or not (t in keys or re.search(r'\d', t) or t in STRONG):
             continue
         score = 10 * (t in keys) + 5 * bool(re.search(r"\d", t)) + min(len(t), 12) / 12
         scores.append((score, i))
@@ -150,7 +171,7 @@ def emphasis_indices(words, keywords=()):
     if selected:
         from .transcript_correction import PROTECTED
         i = next(iter(selected))
-        if i>0 and token(words[i-1]['word']) in PROTECTED:
+        if i>0 and (token(words[i-1]['word']) in PROTECTED or protected_pair(words[i-1],words[i])):
             selected.add(i-1)
     return selected
 
@@ -208,7 +229,7 @@ def phrase_anchor(phrase, anchors, cfg):
     if len(touching)>1 and cfg.caption_position=='auto':
         from .placement import choose_panel
         boxes = [b for a in touching for b in a.get('protected', [])]
-        panel_box, pos, _ = choose_panel(boxes, cfg.target_w, cfg.target_h, anchor.get('panel'))
+        panel_box, pos, _ = choose_panel(boxes, cfg.target_w, cfg.target_h, anchor.get('panel'),cfg=cfg)
         anchor.update(panel=panel_box, position=pos, protected=boxes)
     return anchor
 
@@ -340,28 +361,38 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
             pos = cfg.caption_position
         side = pos in ('left','right') and W > H
         panel_box = (W*(.055 if pos == 'left' else .54), H*.21, W*.385, H*.49) if side else (W*.085,H*(.57 if H>W else .62),W*.78,H*(.23 if H>W else .25))
+        if getattr(cfg,'_director',False) and cfg.caption_position=='auto' and not anchor:
+            from .caption_director import default_panel
+            panel_box=default_panel(cfg);pos='bottom'
         use_anchor = bool(anchor and anchor.get('panel') and cfg.caption_position == 'auto')
         if use_anchor:
             panel_box = anchor['panel']
             pos = anchor['position']
             side = pos in ('left', 'right') and W > H
         x,y,width,height = panel_box
+        usable_width=width*(.94 if getattr(cfg,'_director',False) else .90)
         emphasis = set() if getattr(cfg,'_emphasis_disabled',False) else emphasis_indices(phrase, keywords)
         focus = next(iter(emphasis), -1)
-        base = round(min(W,H)*(.073 if side else .070)*cfg.caption_scale)
+        base = getattr(cfg,'_base_font',round(min(W,H)*(.073 if side else .070)*cfg.caption_scale))
         for fs in range(max(18,base), 7, -1):
-            accent_size = 1.20 if cfg.caption_style in ('magazine','impact') else 1.15
+            accent_size = getattr(cfg,'_accent_ratio',1.20 if cfg.caption_style in ('magazine','impact') else 1.15)
             families = [cfg.font_accent if i in emphasis and cfg.accent_font else cfg.font_main for i in range(len(phrase))]
             sizes = [round(fs*optical_factor(cfg.fonts_dir,families[i])*(accent_size*(1+.08*max(0.,min(1.,float(phrase[i].get('prosody_prominence',0.))))) if i in emphasis else 1.)) for i in range(len(phrase))]
             measures = [font(cfg.fonts_dir,sizes[i],families[i]).getlength(w['word']) for i,w in enumerate(phrase)]
             space = fs*.29
-            rows = balanced_rows(phrase, measures, space, width*.9, 2 if height<H*.2 else 3, emphasis)
+            rows = balanced_rows(phrase, measures, space, usable_width, 2 if height<H*.2 else 3, emphasis)
+            composition=getattr(cfg,'_composition',None)
+            if composition=='focus':
+                from .caption_director import focus_rows
+                focused=focus_rows(len(phrase),emphasis)
+                if focused and max(sum(measures[i] for i in row)+space*(len(row)-1) for row in focused)<=usable_width:
+                    rows=focused
             if rows is None:
                 continue
             heights = [max(sizes[i] for i in row)*1.18 for row in rows]
             if len(rows)<=3 and sum(heights)<=height*.88 and max(measures)<=width*.88:
                 break
-        if rows is None or len(rows)>3 or max(measures)>width*.9 or sum(heights)>height:
+        if rows is None or len(rows)>3 or max(measures)>usable_width or sum(heights)>height:
             raise ValueError('Frasa terlalu panjang. Pecah teks pada transkrip atau kurangi ukuran teks.')
         start = phrase[0]['start']
         following = phrases[idx+1][0]['start'] if idx+1<len(phrases) else phrase[-1]['end']+.12
@@ -375,10 +406,10 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
         for row,rh in zip(rows,heights):
             row_width=sum(measures[i] for i in row)+space*(len(row)-1)
             cx=row_left(x,width,row_width,alignment(cfg,pos))
-            reveal=max(0,min(phrase[i]['start'] for i in row)-start-.055)
+            reveal=0. if getattr(cfg,'_whole_phrase',False) else max(0,min(phrase[i]['start'] for i in row)-start-.055)
             for i in row:
                 w=phrase[i]; size=sizes[i]
-                word_reveal = min(max(0,end-start-.65),max(reveal,w['start']-start-.06) if i in emphasis else reveal)
+                word_reveal = 0. if getattr(cfg,'_whole_phrase',False) else min(max(0,end-start-.65),max(reveal,w['start']-start-.06) if i in emphasis else reveal)
                 kind,samples=frames(cfg.caption_style,end-start,max(0,word_reveal),idx,i in emphasis,cfg,position=pos)
                 wx, wy = cx+measures[i]/2, cy+rh/2
                 # Keep the entire animation inside the chosen empty-space panel.
@@ -397,6 +428,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
                 cx+=measures[i]+space
             cy+=rh
         plans.append({'start':start,'end':end,'position':pos,'panel':list(panel_box),'alignment':alignment(cfg,pos),
+                      'composition':getattr(cfg,'_composition','legacy'),
                       'placement_source':'auto' if cfg.caption_position == 'auto' else 'manual',
                       'protected': anchor.get('protected', []) if use_anchor else [], 'words':placed})
     return {'version':4,'timebase':'output_seconds','width':W,'height':H,'font':FONTS[cfg.font_main]['family'],
