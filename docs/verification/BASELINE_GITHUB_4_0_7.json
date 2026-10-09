@@ -1,0 +1,377 @@
+{
+  "github_commit": "9e0677c60605be0d16a6f19eebf8cb12094a3531",
+  "local_parent": "57c6f42f92919c8c6b058c88efd84c4ee5ff0f82",
+  "checks": [
+    {
+      "path": ".gitignore",
+      "local_git_sha": "332296c1cbb25c132bc680b5ec6b168b060a1e49",
+      "remote_git_sha": "332296c1cbb25c132bc680b5ec6b168b060a1e49",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "README.md",
+      "local_git_sha": "377643295b61c43d681aad67d4e7b57a740177fa",
+      "remote_git_sha": "377643295b61c43d681aad67d4e7b57a740177fa",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "app.py",
+      "local_git_sha": "181d0344b6679cb9296f5aaab689b4c3c1ec1426",
+      "remote_git_sha": "181d0344b6679cb9296f5aaab689b4c3c1ec1426",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/boundaries.py",
+      "local_git_sha": "0c7fc719d7befb875cb170aa9c0a36e16779ad66",
+      "remote_git_sha": "0c7fc719d7befb875cb170aa9c0a36e16779ad66",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/caption_renderer.py",
+      "local_git_sha": "2c6d4ec42c0090920f1f24fc0c5aad26439d0184",
+      "remote_git_sha": "2c6d4ec42c0090920f1f24fc0c5aad26439d0184",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/captions_pro.py",
+      "local_git_sha": "fba5fcf9016a396886f068243fda04b598c6ea6e",
+      "remote_git_sha": "fba5fcf9016a396886f068243fda04b598c6ea6e",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/composition.py",
+      "local_git_sha": "f6459d55784df0471d0a48ece626af0289c364e9",
+      "remote_git_sha": "f6459d55784df0471d0a48ece626af0289c364e9",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/config.py",
+      "local_git_sha": "2681826908adcb7d68a8b54b6255a5bf1d89e595",
+      "remote_git_sha": "2681826908adcb7d68a8b54b6255a5bf1d89e595",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/dependency_cache.py",
+      "local_git_sha": "e4fb2990ef2dbca710d0fdee5d04925939d114c2",
+      "remote_git_sha": "e4fb2990ef2dbca710d0fdee5d04925939d114c2",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/explanation5.py",
+      "local_git_sha": "487728accbe99a88acccceffc46c90cc77bda460",
+      "remote_git_sha": "487728accbe99a88acccceffc46c90cc77bda460",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/export_verify.py",
+      "local_git_sha": "e5bc3638b3e68dfac21aed2dc3f237152114326a",
+      "remote_git_sha": "e5bc3638b3e68dfac21aed2dc3f237152114326a",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/intelligence/core.py",
+      "local_git_sha": "94ee2eff11eddc7be641186a82169fe1906f3fb9",
+      "remote_git_sha": "94ee2eff11eddc7be641186a82169fe1906f3fb9",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/job_queue.py",
+      "local_git_sha": "72a208b5528af4f6f1e6a43cfa53fdf24eff6389",
+      "remote_git_sha": "72a208b5528af4f6f1e6a43cfa53fdf24eff6389",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/placement.py",
+      "local_git_sha": "de48b9c2771664829bdd1090edc92945fca6a450",
+      "remote_git_sha": "de48b9c2771664829bdd1090edc92945fca6a450",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/project_store.py",
+      "local_git_sha": "875102ce6e8be7ba2ad14c2baf34d048a0dfc2a2",
+      "remote_git_sha": "875102ce6e8be7ba2ad14c2baf34d048a0dfc2a2",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/projects.py",
+      "local_git_sha": "4e7e4dc85e18e6a3d1c01a17036361ca6854d513",
+      "remote_git_sha": "4e7e4dc85e18e6a3d1c01a17036361ca6854d513",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/render.py",
+      "local_git_sha": "6f57c7b27196c951e4b57a8847aac6c1a1021341",
+      "remote_git_sha": "6f57c7b27196c951e4b57a8847aac6c1a1021341",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/runtime/templates/motion5/src/bridge.ts",
+      "local_git_sha": "3e36ce9a3ca88d80a8990a66ca0ad22d85136603",
+      "remote_git_sha": "3e36ce9a3ca88d80a8990a66ca0ad22d85136603",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/runtime/templates/motion5/src/scene.tsx",
+      "local_git_sha": "cf6d59ea9e665e8ccefca4533d3bfcc7202c6795",
+      "remote_git_sha": "cf6d59ea9e665e8ccefca4533d3bfcc7202c6795",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/runtime/templates/remotion5/caption_math.mjs",
+      "local_git_sha": "afa16f8fee4ab5165838b43cbea144ab651b308b",
+      "remote_git_sha": "afa16f8fee4ab5165838b43cbea144ab651b308b",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/runtime/templates/remotion5/index.jsx",
+      "local_git_sha": "3c311cf0d504f7dea10cc5ced011c5992f0853a9",
+      "remote_git_sha": "3c311cf0d504f7dea10cc5ced011c5992f0853a9",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/speech_jobs.py",
+      "local_git_sha": "2ae12fe392427a7f25993695a206db00726e841c",
+      "remote_git_sha": "2ae12fe392427a7f25993695a206db00726e841c",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/stage3.py",
+      "local_git_sha": "7016c1302bda822a8b7be810564d15c6b00819d8",
+      "remote_git_sha": "7016c1302bda822a8b7be810564d15c6b00819d8",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/story.py",
+      "local_git_sha": "9f81746649f64f809af90f177660ca94a6e13a05",
+      "remote_git_sha": "9f81746649f64f809af90f177660ca94a6e13a05",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/studio_service.py",
+      "local_git_sha": "91e731cbd5ebb96f0a0d15bd9e0e753f431076c3",
+      "remote_git_sha": "91e731cbd5ebb96f0a0d15bd9e0e753f431076c3",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/studio_worker.py",
+      "local_git_sha": "6113d8061a95f31bd8c3429066fbaa90808265f9",
+      "remote_git_sha": "6113d8061a95f31bd8c3429066fbaa90808265f9",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/style5.py",
+      "local_git_sha": "1f53ec18fad0a2605672c3ce12b869bf346e518a",
+      "remote_git_sha": "1f53ec18fad0a2605672c3ce12b869bf346e518a",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/tests/repair1_ui.cjs",
+      "local_git_sha": "d0f63d40a46ba5d63415654668210b9b1f05ffd5",
+      "remote_git_sha": "d0f63d40a46ba5d63415654668210b9b1f05ffd5",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/tests/test_repair1.py",
+      "local_git_sha": "6481086d7cfef4ec78cb8f4f353c5e3b2aa21701",
+      "remote_git_sha": "6481086d7cfef4ec78cb8f4f353c5e3b2aa21701",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/tests/test_repair1_installer.py",
+      "local_git_sha": "be4018c95c924c8f8c78927bcd80327aa82c6dcd",
+      "remote_git_sha": "be4018c95c924c8f8c78927bcd80327aa82c6dcd",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/trim.py",
+      "local_git_sha": "f02a67e5355c8835a11d94b20ace85e0b7b09397",
+      "remote_git_sha": "f02a67e5355c8835a11d94b20ace85e0b7b09397",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/typography.py",
+      "local_git_sha": "4609f19a49faa931b55cfc9c20e1b631443b8c5a",
+      "remote_git_sha": "4609f19a49faa931b55cfc9c20e1b631443b8c5a",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/visual4.py",
+      "local_git_sha": "de1acb45cf81ff453125f11edf4f44f5f46c43e1",
+      "remote_git_sha": "de1acb45cf81ff453125f11edf4f44f5f46c43e1",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "docs/PEMBENAHAN_1_STABILITAS.md",
+      "local_git_sha": "641dfd6731f950bb31457c6999046022a4013421",
+      "remote_git_sha": "641dfd6731f950bb31457c6999046022a4013421",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "docs/releases/repair1_base_hashes.json",
+      "local_git_sha": "8283ef722211154ad8103668cb6e27172fae7f1d",
+      "remote_git_sha": "8283ef722211154ad8103668cb6e27172fae7f1d",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "docs/verification/HASIL_QA_PEMBENAHAN_1.md",
+      "local_git_sha": "09e2e8f15dce42da62ca265eb83ed1beb910073f",
+      "remote_git_sha": "09e2e8f15dce42da62ca265eb83ed1beb910073f",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "static/features/transcript3.js",
+      "local_git_sha": "ef7eeafccb9c74ca47890789cfb851da04ae3afc",
+      "remote_git_sha": "ef7eeafccb9c74ca47890789cfb851da04ae3afc",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "static/index.html",
+      "local_git_sha": "be1a9ebb1ef4f547298498db48750ee7b8a06e2d",
+      "remote_git_sha": "be1a9ebb1ef4f547298498db48750ee7b8a06e2d",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "static/studio4.js",
+      "local_git_sha": "0930c68d9687d7d8ddd3a6584ff852760f4411c7",
+      "remote_git_sha": "0930c68d9687d7d8ddd3a6584ff852760f4411c7",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "tools/build_repair1_release.py",
+      "local_git_sha": "84f648ae3896a70ed47119a98511e3e392a2409b",
+      "remote_git_sha": "84f648ae3896a70ed47119a98511e3e392a2409b",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "tools/repair1_installer.py",
+      "local_git_sha": "883967c21a9c1b6cfd30e9c83ed4ba017cc0ee7d",
+      "remote_git_sha": "883967c21a9c1b6cfd30e9c83ed4ba017cc0ee7d",
+      "match": true,
+      "error": null
+    },
+    {
+      "path": "clipper/api_studio.py",
+      "error": false,
+      "local_git_sha": "7eb02c286f4383de4c57cdb784b9814564722646",
+      "remote_git_sha": "7eb02c286f4383de4c57cdb784b9814564722646",
+      "match": true
+    },
+    {
+      "path": "clipper/caption_checks.py",
+      "error": false,
+      "local_git_sha": "bc10a604fa00f7ba095fbec486dd0fad8ba4748b",
+      "remote_git_sha": "bc10a604fa00f7ba095fbec486dd0fad8ba4748b",
+      "match": true
+    },
+    {
+      "path": "clipper/editplan.py",
+      "error": false,
+      "local_git_sha": "39937ee5297850a5017729cde49ae62be33bc43f",
+      "remote_git_sha": "39937ee5297850a5017729cde49ae62be33bc43f",
+      "match": true
+    },
+    {
+      "path": "clipper/export6.py",
+      "error": false,
+      "local_git_sha": "6321152eaac9187be0f490ae30cf064ffafac3fa",
+      "remote_git_sha": "6321152eaac9187be0f490ae30cf064ffafac3fa",
+      "match": true
+    },
+    {
+      "path": "clipper/font_catalog.py",
+      "error": false,
+      "local_git_sha": "d03ebbafca924c66034994d035765ddd657805c7",
+      "remote_git_sha": "d03ebbafca924c66034994d035765ddd657805c7",
+      "match": true
+    },
+    {
+      "path": "clipper/pipeline.py",
+      "error": false,
+      "local_git_sha": "4bfe27edaa9017e43de1ca666800aa9712283af6",
+      "remote_git_sha": "4bfe27edaa9017e43de1ca666800aa9712283af6",
+      "match": true
+    },
+    {
+      "path": "clipper/subtitle_edit.py",
+      "error": false,
+      "local_git_sha": "400e83e2779529a9250bf6201e8e02b8d80fb432",
+      "remote_git_sha": "400e83e2779529a9250bf6201e8e02b8d80fb432",
+      "match": true
+    },
+    {
+      "path": "clipper/visual_worker.py",
+      "error": false,
+      "local_git_sha": "023de976f2c3139c55f9f598ac136a5930e637f0",
+      "remote_git_sha": "023de976f2c3139c55f9f598ac136a5930e637f0",
+      "match": true
+    },
+    {
+      "path": "clipper/workflow6.py",
+      "error": false,
+      "local_git_sha": "dd3cbeefe92ca598611073989218791c72e5903d",
+      "remote_git_sha": "dd3cbeefe92ca598611073989218791c72e5903d",
+      "match": true
+    },
+    {
+      "path": "requirements-pro.txt",
+      "error": false,
+      "local_git_sha": "4dd429f80617efcded9334ec8b639041b4c7fc22",
+      "remote_git_sha": "4dd429f80617efcded9334ec8b639041b4c7fc22",
+      "match": true
+    },
+    {
+      "path": "requirements.txt",
+      "error": false,
+      "local_git_sha": "750c133256306dad7840b64db230c336617412e2",
+      "remote_git_sha": "750c133256306dad7840b64db230c336617412e2",
+      "match": true
+    },
+    {
+      "path": "static/features/style5.js",
+      "error": false,
+      "local_git_sha": "c48ee987e7e0faed4df68ad92c6ef76d09e897f1",
+      "remote_git_sha": "c48ee987e7e0faed4df68ad92c6ef76d09e897f1",
+      "match": true
+    }
+  ]
+}

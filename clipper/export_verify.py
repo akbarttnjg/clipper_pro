@@ -114,6 +114,7 @@ def validate_bundle(root, results):
             required(f'Media/{name}-{suffix}', common, allow_empty=suffix == 'credits.txt' or not phrases and suffix == 'captions.srt')
         media = [plan.get('source', {}).get('path')]
         media += list(plan.get('audio', {}).get('stems', {}).values())
+        if manifest.get('version',0)>=8:media.append(plan.get('audio',{}).get('mix'))
         media += [event.get('path') for event in plan.get('broll', [])]
         if not plan.get('audio', {}).get('stems'):
             common.append(f'Klip {i}: stem audio tidak tersedia')

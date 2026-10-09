@@ -5,7 +5,7 @@ import json
 import math
 from dataclasses import replace
 
-VERSION='4.0.5'
+VERSION='4.0.8'
 PRESETS=(
     {'id':'rapi','name':'Rapi','description':'Frasa utuh, baseline stabil, aksen secukupnya.','settings':{'font_main':'dm_sans','font_accent':'dm_serif_italic','motion_intensity':'calm','caption_backdrop':True}},
     {'id':'ekspresif','name':'Ekspresif','description':'Hierarki dan arah gerak bervariasi dengan desain yang tersimpan.','settings':{'font_main':'dm_sans','font_accent':'dm_serif_italic','motion_intensity':'balanced','caption_backdrop':True}},
@@ -26,13 +26,15 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
     for index,phrase in enumerate(parts):
         digest=identity(phrase,cfg.caption_seed);choice=int(digest[:8],16)
         touching=[a for a in anchors or [] if a.get('start',0)<phrase[-1]['end'] and a.get('end',float('inf'))>phrase[0]['start']]
-        material=cfg.source_kind=='board' or any(a.get('has_material') or any(p.get('kind') in ('material','panel','text') for p in a.get('protected',[])) for a in touching)
+        material=cfg.source_kind in ('board','screen','chart','graphic') or any(a.get('has_material') or any(p.get('kind') in ('material','panel') for p in a.get('protected',[])) for a in touching)
         cps=sum(len(w['word']) for w in phrase)/max(.02,phrase[-1]['end']-phrase[0]['start'])
         quiet=cfg.style_preset=='rapi' or (cfg.style_preset=='adaptif' and (material or cps>18))
-        local=replace(cfg,style_preset='legacy',caption_style='magazine' if quiet else ('magazine','slide','pop','blur')[choice%4],
+        template=cfg.caption_style if cfg.caption_template_policy=='manual' else 'magazine' if quiet else ('magazine','slide','pop','blur')[choice%4]
+        local=replace(cfg,style_preset='legacy',caption_style=template,
                       motion_intensity='calm' if quiet else cfg.motion_intensity,
                       caption_scale=cfg.caption_scale*(.85 if cfg.style_preset=='adaptif' and material else 1))
         local._motion_direction=('left','right','up','down')[(choice//4)%4]
+        local._emphasis_disabled=not cfg.semantic_emphasis
         if not quiet and cfg.caption_align=='auto':local.caption_align=('left','center','right')[(choice//16)%3]
         local_words=[dict(w) for w in phrase]
         if cfg.semantic_emphasis:
@@ -43,16 +45,14 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
             from .transcript_correction import PROTECTED
             for i in list(semantic):
                 if i>0 and token(local_words[i-1]['word'].split()[-1]) in PROTECTED:semantic.add(i-1)
-            candidates=[i for i in semantic if local_words[i].get('prosody_prominence',0)>.60]
-            if candidates:
-                for i in semantic:local_words[i]['meaning_emphasis']=True
             # A full keyword phrase keeps any preceding negation even without
             # an acoustic cue. Colors and font hierarchy protect that context.
             if semantic:
                 for i in semantic:local_words[i]['meaning_emphasis']=True
         else:
             for w in local_words:w.pop('meaning_emphasis',None)
-        planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words])['phrases'][0]
+        following=parts[index+1][0]['start'] if index+1<len(parts) else max((a.get('end',phrase[-1]['end']+.12) for a in touching),default=phrase[-1]['end']+.12)
+        planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words],_following=following)['phrases'][0]
         if index+1<len(parts):planned['end']=min(planned['end'],parts[index+1][0]['start'])
         if quiet:
             # All words appear together; stable reading baseline and no bounce.
@@ -71,7 +71,8 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
                 'protected_context':any(token(p['word'].split()[0]) in ('tidak','bukan','jangan','belum','never','not') for p in origin)}
         planned.update(phrase_id=digest[:20],design={'preset':cfg.style_preset,'quiet':quiet,'material':material,
                         'density_cps':round(cps,2),'template':local.caption_style,'direction':local._motion_direction,
-                        'seed':cfg.caption_seed,'hierarchy':'phrase_then_focus','alignment':planned['alignment']},source_word_ids=[wid for w in phrase for wid in w.get('word_ids',[]) if wid is not None])
+                        'seed':cfg.caption_seed,'hierarchy':'phrase_then_focus','alignment':planned['alignment'],
+                        'template_policy':cfg.caption_template_policy},source_word_ids=[wid for w in phrase for wid in w.get('word_ids',[]) if wid is not None])
         output.append(planned)
     result={'version':5,'timebase':'output_seconds','width':cfg.target_w,'height':cfg.target_h,
             'fps':cfg.output_fps,'font_main':cfg.font_main,'font_accent':cfg.font_accent,'font':cfg.font_main,
@@ -142,7 +143,8 @@ def annotate_prosody(words,voice_path):
                 audio.setpos(left);samples=array.array('h',audio.readframes(min(right-left,rate*4)))
                 energy=math.sqrt(sum(float(v)*v for v in samples)/max(1,len(samples)))
                 energies.append(energy)
-        sorted_energy=sorted(energies);baseline=sorted_energy[len(sorted_energy)//2] if sorted_energy else 0
+        from statistics import median
+        baseline=median(energies) if energies else 0
         return [{**w,'prosody_prominence':round(min(1.,max(0.,(e/max(1.,baseline)-1)/2)),3),
                  'prosody_method':'pcm_rms_relative_to_clip_median'} for w,e in zip(words,energies)]
     except (OSError,ValueError,wave.Error):return words

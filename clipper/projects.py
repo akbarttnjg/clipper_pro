@@ -8,12 +8,13 @@ import copy
 from dataclasses import replace
 import hashlib
 import json
+import subprocess
+import sys
 import shutil
 import time
 import uuid
 from pathlib import Path
 from xml.etree import ElementTree as ET
-from PIL import Image
 from .storage import read_json, write_json
 from .timebase import seconds_to_us, endpoint_range, video_track_ranges
 
@@ -47,7 +48,7 @@ def fusion_comp(phrase, plan, path):
         return 'Input { SourceOp = "' + name + '", Source = "Value" }'
     for i, w in enumerate(phrase['words']):
         ident = f'Word{i + 1}'
-        c = plan['style']['accent'] if w.get('emphasis') else plan['style']['base']
+        c = w.get('color') or (plan['style']['accent'] if w.get('emphasis') else plan['style']['base'])
         rgb = [int(c.lstrip('#')[j:j+2], 16) / 255 for j in (0, 2, 4)]
         family = w['family'] if w.get('font_id') else ('DejaVu Serif' if w.get('family') == 'serif' else 'DejaVu Sans')
         size = f"Input {{ Value = {w['size']/plan['height']:.8f} }}"
@@ -159,6 +160,7 @@ def xml_timeline(plan, name, path, transparent):
 
 
 def resolve_export(items, root):
+    from PIL import Image
     folder = root / 'DaVinci'
     folder.mkdir()
     # Run inside Workspace > Console > Lua, which does not need external scripting.
@@ -289,7 +291,7 @@ def capcut_export(items, root):
             seg = cc.TextSegment(w['text'], trange(target_start, target_duration),
                 style=cc.TextStyle(size=w['size'] * 120 / min(W,H), bold=w.get('bold',w.get('family')!='regular'), italic=bool(w.get('italic')), color=rgb, align=1),
                 clip_settings=cc.ClipSettings(transform_x=2*w['x']/W-1, transform_y=1-2*w['y']/H),
-                border=cc.TextBorder(width=0 if samples else 8, alpha=.65))
+                border=cc.TextBorder(width=8 if p['captions'].get('contrast',True) else 0, alpha=.65))
             timed = {min(target_duration, max(0, us(k['t']-reveal))): k for k in samples if k['t'] >= reveal}
             for when, key in sorted(timed.items()):
                 if key['t'] < reveal:
@@ -306,7 +308,7 @@ def capcut_export(items, root):
                     text_segment(w, phrase['start'], w['start'], p['style']['base'], f'Kata {k+1}')
                     text_segment(w, w['start'], phrase['end'], p['style']['accent'], f'Kata {k+1}')
                 else:
-                    text_segment(w, phrase['start'], phrase['end'], p['style']['accent'] if w['emphasis'] else p['style']['base'], f'Kata {k+1}')
+                    text_segment(w, phrase['start'], phrase['end'], w.get('color') or (p['style']['accent'] if w['emphasis'] else p['style']['base']), f'Kata {k+1}')
         title = p['captions'].get('title')
         if title:
             script.add_track(cc.TrackType.text, 'Judul', relative_index=maxwords+1)
@@ -322,8 +324,9 @@ def capcut_export(items, root):
             fontpath = str((root / 'Fonts' / fontmap[material['id']]).resolve()).replace('\\','/')
             for style in body['styles']:
                 style['font'] = {'path': fontpath, 'id': ''}
-                style['shadows'] = [{'diffuse': .02, 'alpha': .6, 'distance': 3,
+                style['shadows'] = ([{'diffuse': .02, 'alpha': .6, 'distance': 3,
                     'content': {'solid': {'color': [0., 0., 0.]}}, 'angle': -45}]
+                    if p['captions'].get('contrast',True) else [])
             material['content'] = json.dumps(body, ensure_ascii=False)
         data['name'] = item['title']
         data['canvas_config']['ratio'] = '9:16' if H>W else '16:9'
@@ -379,7 +382,44 @@ def update_capcut_meta(folder, data, name, timelines):
     write_json(folder / 'draft_meta_info.json', meta)
 
 
+def capcut_backend(items,root,cfg):
+    """Use the app environment, or a tested isolated component generation."""
+    try:
+        import pycapcut
+    except ModuleNotFoundError as exc:
+        if exc.name!='pycapcut':raise
+        from .visual4 import component_runtime
+        runtime=component_runtime('pycapcut',cfg)
+        if not runtime:raise ValueError('pyCapCut belum tersedia di aplikasi atau komponen lokal yang lolos uji sampel.') from exc
+        request=root/'capcut-request.json';response=root/'capcut-response.json'
+        write_json(request,{'items':items,'root':str(root.resolve()),'response':str(response.resolve())})
+        worker=Path(__file__).with_name('capcut_worker7.py')
+        run=subprocess.run([runtime['python'],'-I',str(worker),str(request.resolve())],capture_output=True,
+                           timeout=max(600,cfg.visual_backend_timeout*len(items)))
+        (root/'capcut-component.log').write_bytes(run.stdout+b'\n'+run.stderr)
+        status=read_json(response,{})
+        request.unlink(missing_ok=True);response.unlink(missing_ok=True)
+        if run.returncode or not status.get('passed'):raise ValueError('Komponen pyCapCut gagal: '+str(status.get('error') or run.stderr.decode('utf-8','replace')[-500:]))
+        return {'environment':'managed_component','generation':runtime['generation'],'test_scope':runtime.get('test_scope')}
+    else:
+        capcut_export(items,root)
+        try:
+            from importlib.metadata import version
+            installed=version('pycapcut')
+        except Exception:installed=getattr(pycapcut,'__version__','unknown')
+        return {'environment':'application','python':sys.executable,'version':installed}
+
+
+def coverage(results):
+    return [{k:r.get(k) for k in ('clip_id','variant_id','title','width','height','output_content_id')} for r in results]
+
+
 def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
+    from .dependency_cache import fresh_scope
+    with fresh_scope():return _export_bundle(results,cfg,progress,mode=mode)
+
+
+def _export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
     from .workflow6 import EXPORT_MODES,native_reasons
     if mode not in EXPORT_MODES:raise ValueError('Mode ekspor tidak valid.')
     from .dependency_cache import content_id
@@ -402,6 +442,24 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
     if licenses.is_dir():
         shutil.copytree(licenses, root / 'Font-Licenses')
     items = []
+    packed_files={}
+    def pack(source,label):
+        key=content_id(source,fresh=True)
+        if key not in packed_files:
+            target=root/'Media'/label;shutil.copy2(source,target)
+            if content_id(target,fresh=True)!=key:raise ValueError('Salinan media paket berubah: '+label)
+            packed_files[key]=target
+        return packed_files[key]
+    def pack_asset(asset):
+        if asset.get('path'):asset['path']=str(pack(asset['path'],'asset-'+hashlib.sha256(asset['path'].encode()).hexdigest()[:16]+Path(asset['path']).suffix).resolve())
+        if asset.get('editable_path') and Path(asset['editable_path']).is_file():
+            asset['editable_path']=str(pack(asset['editable_path'],'editable-'+hashlib.sha256(asset['editable_path'].encode()).hexdigest()[:16]+Path(asset['editable_path']).suffix).resolve())
+        if asset.get('motion_project_path'):
+            source=Path(asset['motion_project_path'])
+            if source.is_dir():
+                target=root/'Editable'/hashlib.sha256(str(source).encode()).hexdigest()[:16]
+                if not target.exists():shutil.copytree(source,target,ignore=shutil.ignore_patterns('node_modules','dist','.git'))
+                asset['motion_project_path']=str(target.resolve())
     for i, result in enumerate(results):
         p = read_json(result['plan_path'])
         if not p or p['revision'] != result['revision']:
@@ -417,36 +475,38 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
         clean = Path(result['plan_path']).parent / 'video-clean.mp4'
         cache = clean.with_suffix('.cache.json')
         fingerprint = {k:p.get(k) for k in ('shots','source','width','height','fps','duration','render_config')}
-        fingerprint['version'] = '4.0.7-source-only'
+        fingerprint['version'] = '4.0.8-source-only'
         fingerprint['render_mode'] = 'source_only'
         from .dependency_cache import content_id
         fingerprint['media_content_id'] = content_id(p['source']['path'],fresh=True)
         fingerprint['mix_content_id'] = content_id(p['audio']['mix'],fresh=True)
         key = hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
-        if mode=='hybrid' and (not clean.exists() or read_json(cache,{}).get('key') != key):
+        receipt=read_json(cache,{})
+        reuse=clean.is_file() and receipt.get('key')==key and receipt.get('content_id')==content_id(clean,fresh=True)
+        if mode=='hybrid' and not reuse:
             progress(round(5+30*i/max(1,len(results))), f'Menyiapkan video tanpa teks {i+1}/{len(results)}')
             render.video(p['source']['path'], p, clean_cfg, None, clean, p['audio']['mix'],
                 lambda fraction: progress(round(5+30*(i+fraction)/max(1,len(results))),
                     f'Video tanpa teks {i+1}/{len(results)}'),mode='source_only')
         if mode=='hybrid':
             qc.inspect(clean, clean_cfg, p['duration'])
-            write_json(cache, {'key':key})
-            packed_clean = root / 'Media' / f'{i+1:02}-video-clean.mp4'
-            shutil.copy2(clean, packed_clean)
+            write_json(cache, {'key':key,'content_id':content_id(clean,fresh=True)})
+            packed_clean=pack(clean,f'{i+1:02}-video-clean.mp4')
         else:
-            packed_clean=root/'Media'/f'{i+1:02}-source{Path(p["source"]["path"]).suffix.lower()}'
-            shutil.copy2(p['source']['path'],packed_clean)
+            packed_clean=pack(p['source']['path'],f'{i+1:02}-source{Path(p["source"]["path"]).suffix.lower()}')
         from .illustrations import credits
         credit_rows=credits(p)
         write_json(root/'Media'/f'{i+1:02}-credits.json',credit_rows)
         (root/'Media'/f'{i+1:02}-credits.txt').write_text('\n'.join(c['credit'] for c in credit_rows),encoding='utf-8')
         for j,event in enumerate(p.get('broll',[])):
-            packed=root/'Media'/f'{i+1:02}-broll-{j+1:02}.mp4'
-            shutil.copy2(event['path'],packed)
+            packed=pack(event['path'],f'{i+1:02}-broll-{j+1:02}.mp4')
             event['path']=str(packed.resolve());event['asset']['path']=str(packed.resolve())
+            pack_asset(event['asset'])
+        for asset in p.get('explanation_assets',[]):pack_asset(asset)
         subtitle = Path(p.get('subtitle_path', Path(result['plan_path']).parent / 'captions.ass'))
         if subtitle.is_file():
             shutil.copy2(subtitle, root / 'Media' / f'{i+1:02}-captions.ass')
+            p['subtitle_path']=str((root/'Media'/f'{i+1:02}-captions.ass').resolve())
         write_srt(p, root / 'Media' / f'{i+1:02}-captions.srt')
         write_json(root / f'original-edit-plan-{i+1:02}.json', original)
         # Framing and zoom are baked into V1; typography and audio remain separate.
@@ -456,12 +516,14 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
                            'width': p['width'], 'height': p['height'], 'duration': p['duration']}
             p['shots'] = [{**s, 'source_start': s['start'], 'source_end': s['end'],
                            'rect': [0,0,p['width'],p['height']], 'mode': 'fill',
-                           'face_rect': None, 'zoom_at': None} for s in p['shots']]
+                           'face_rect': None, 'zoom_at': None,'image_height':p['height'],
+                           'canvas_height':p['height'],'active_area':[0,0,p['width'],p['height']],
+                           'head_bounds':None,'protected':s.get('protected_output',[])} for s in p['shots']]
         else:p['source']={**p['source'],'path':str(packed_clean.resolve())}
         for kind, source in list(p['audio']['stems'].items()):
-            target = root / 'Media' / f'{i+1:02}-{kind}.wav'
-            shutil.copy2(source, target)
+            target=pack(source,f'{i+1:02}-{kind}.wav')
             p['audio']['stems'][kind] = str(target.resolve())
+        p['audio']['mix']=str(pack(p['audio']['mix'],f'{i+1:02}-master.wav').resolve())
         write_json(root / f'edit-plan-{i+1:02}.json', p)
         items.append({**result, 'plan': p})
     progress(35, 'Membuat timeline DaVinci dan komposisi teks editable')
@@ -472,11 +534,12 @@ def export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
         resolve_error = str(exc)
     progress(65, 'Membuat draft CapCut dengan track video, kata, dan audio')
     capcut_error = None
+    backend=None
     try:
-        capcut_export(items, root)
+        backend=capcut_backend(items,root,cfg)
     except Exception as exc:
         capcut_error = str(exc)
-    manifest = {'version': 4, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
+    manifest = {'version': 8,'coverage':coverage(results),'capcut_backend':backend, 'created_root': str(root.resolve()).replace('\\','/'), 'timelines': len(items),
         'source_files': sorted({p['plan']['source']['path'] for p in items}),
         'capcut_status': 'experimental-generated' if capcut_error is None else 'failed', 'capcut_error': capcut_error,
         'resolve_status': 'generated-unverified-in-editor' if resolve_error is None else 'failed', 'resolve_error': resolve_error,

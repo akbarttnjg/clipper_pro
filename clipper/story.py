@@ -41,7 +41,7 @@ def windows(segments, cfg):
         i = max(i + 1, next((k for k in range(i + 1, j) if segments[k]['start'] >= next_time), j))
 
 
-REVIEW_VERSION = '3.4-step1'
+REVIEW_VERSION = '4.0.8-story'
 
 
 def request(block, cfg, candidate=None, focus=None, feedback=None):
@@ -257,16 +257,24 @@ def validated_response(path, block, words, cfg, duration, candidate=None, focus=
 def duplicate(c, prior, words):
     overlap = max(0, min(c['end'], prior['end']) - max(c['start'], prior['start']))
     share = overlap / max(.01, min(c['end']-c['start'], prior['end']-prior['start']))
-    # Explicitly different source-grounded stories can share context footage.
-    if c.get('main_claim') and prior.get('main_claim') and c['main_claim'] != prior['main_claim']:
-        return False
+    # A different label or nested quote cannot turn the same footage into a
+    # second story. Compare the actual spoken facts before claim metadata.
     from .stage3 import fact_signature
-    if c.get('story_kind') and prior.get('story_kind') and c['story_kind']!=prior['story_kind']:return False
+    def source_words(clip):
+        return [w for w in words if w['end']>clip['start'] and w['start']<clip['end']]
+    actual_a,actual_b=source_words(c),source_words(prior)
+    actual_text_a=' '.join(w['word'] for w in actual_a)
+    actual_text_b=' '.join(w['word'] for w in actual_b)
+    if share>.93 and fact_signature(actual_text_a)==fact_signature(actual_text_b):return True
+    if fact_signature(actual_text_a)!=fact_signature(actual_text_b):return False
+    ca,cb=[token(t) for t in c.get('main_claim','').split()],[token(t) for t in prior.get('main_claim','').split()]
+    def contains(a,b):return bool(b) and any(a[i:i+len(b)]==b for i in range(len(a)-len(b)+1))
+    nested=contains(ca,cb) or contains(cb,ca)
+    if share<.75 and ca and cb and ca!=cb and not nested:return False
+    if share<.75 and c.get('story_kind') and prior.get('story_kind') and c['story_kind']!=prior['story_kind'] and not nested:return False
     def claim(clip):
         return (clip.get('main_claim') or ' '.join(w['word'] for w in words if clip['start']<=w['start']<clip['end']))+' '+clip.get('ending_evidence','')
     if fact_signature(claim(c))!=fact_signature(claim(prior)):return False
-    if share > .93:
-        return True
     def tokens(clip):
         return [token(w['word']) for w in words if clip['start'] <= w['start'] < clip['end'] and token(w['word'])]
     a, b = tokens(c), tokens(prior)
@@ -309,7 +317,7 @@ def select(transcript, cfg, progress=lambda p, m: None, existing=None):
     consecutive_offline = 0
     def discover(block, focus=None):
         key = hashlib.sha256(json.dumps([block, cfg.model, cfg.min_clip_s, cfg.max_clip_s,
-            cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, focus, cfg.selection_floor, 'topic-v4.0.3'], ensure_ascii=False).encode()).hexdigest()[:24]
+            cfg.topic_grace_s, cfg.audience, cfg.ollama_num_ctx, focus, cfg.selection_floor, REVIEW_VERSION], ensure_ascii=False).encode()).hexdigest()[:24]
         path = journal / (key + '.json')
         found, cached, proposed, audit = validated_response(path, block, transcript['words'], cfg, transcript['duration'], focus=focus)
         rejections.extend(audit.get('rejections',[]))
@@ -407,7 +415,7 @@ def select(transcript, cfg, progress=lambda p, m: None, existing=None):
     result = distinct(result, transcript['words'], cfg)
     from .stage3 import chapter_plan
     source_coverage=discovery.coverage(blocks,completed,transcript['duration'])
-    discovery.save_report({'version':'4.0.3','analysis_revision':discovery.revision(transcript,cfg),
+    discovery.save_report({'version':REVIEW_VERSION,'analysis_revision':discovery.revision(transcript,cfg),
         'model':cfg.model,'objective':objective,'existing_candidates':len(existing),'new_candidates':len(result),
         'coverage':source_coverage,'chapters':chapter_plan(segments,transcript['duration'],[*existing,*result],source_coverage['source_ranges']),
         'rejections':rejections,'extra_window_budget':cfg.discovery_extra_windows,
@@ -444,7 +452,7 @@ def review_candidate(candidate, transcript, cfg, refresh=False):
              if s['end'] > candidate['start'] - 45 and s['start'] < candidate['end'] + 60]
     key = hashlib.sha256(json.dumps([block, candidate['start'], candidate['end'], candidate['title'],
         cfg.model, cfg.min_clip_s, cfg.max_clip_s, cfg.audience, cfg.selection_floor,
-        cfg.ollama_num_ctx, cfg.topic_grace_s, 'boundary-v3.3'], ensure_ascii=False).encode()).hexdigest()[:24]
+        cfg.ollama_num_ctx, cfg.topic_grace_s, REVIEW_VERSION], ensure_ascii=False).encode()).hexdigest()[:24]
     path = Path(cfg.work_dir) / 'boundary-reviews' / (key + '.json')
     c = annotate(candidate, words, cfg.max_clip_s + cfg.topic_grace_s)
     c['source_context'] = discovery.context(candidate,transcript)

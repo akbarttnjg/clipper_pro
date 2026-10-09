@@ -5,6 +5,7 @@ not claim to read handwriting. Dense scenes get a separate caption band.
 """
 import cv2
 import numpy as np
+from . import framing
 
 
 def text_regions(frame):
@@ -51,7 +52,7 @@ def mappings(shot, W, H):
         return [(rect, mat), (shot['face_rect'], _fit(shot['face_rect'], [0, top_h, W, canvas_h-top_h]))]
     if shot['mode'] == 'fill':
         # rectangle() already matches the target aspect, allowing subpixel drift.
-        return [(rect, _fit(rect, [0, 0, W, H], cover=True))]
+        return [(rect, _fit(rect, [0, 0, W, shot.get('image_height') or H], cover=True))]
     image_h = shot.get('image_height') or H
     return [(rect, _fit(rect, [0, 0, W, image_h]))]
 
@@ -103,23 +104,41 @@ def choose_panel(boxes, W, H, preferred=None):
                 candidates.append(([x, y, W*.40, H*.40], pos))
     for y in ((H*.56, H*.35, H*.10) if portrait else (H*.68, H*.08, H*.40)):
         candidates.append(([W*.07, y, wide, tall], 'bottom'))
+    # Search readable smaller panels before allocating a separate strip. The
+    # previous panel is first, so unchanged scenes retain a stable position.
+    widths=(.78,.65,.55) if portrait else (.36,.31,.27,.50,.65)
+    heights=(.22,.18,.15) if portrait else (.28,.22,.18)
+    for wf in widths:
+        for hf in heights:
+            for xf in (.055, max(.055,.88-wf)):
+                pos='bottom' if portrait else 'left' if xf<.3 else 'right'
+                for yf in (.64,.48,.30,.12,.78):
+                    candidates.append(([W*xf,H*yf,W*wf,H*hf],pos))
     best = None
     for order, (panel, pos) in enumerate(candidates):
         # No detected face, text or material may intersect the animation envelope.
         x, y, w, h = panel
+        if min(w,h)<=0 or x<0 or y<0 or x+w>W*.97 or y+h>H*.975:continue
         envelope = [x-W*.012, y-H*.012, w+W*.024, h+H*.024]
         hits = sum(overlap(envelope, b['box']) for b in boxes)
         value = (hits > 0, hits/max(1, w*h), order)
         if best is None or value < best[0]:
             best = (value, panel, pos)
-    return best[1], best[2], best[0][0] is False
+    return best[1], best[2], not best[0][0]
 
 
 def reserve_band(shot, cfg):
     W, H = cfg.target_w, cfg.target_h
     shot['image_height'] = int(H*.79)//2*2
     if shot['mode']=='fill':
-        shot['mode']='fit'
+        area=shot.get('active_area')
+        if area:
+            rect=framing.crop_rect(area,shot.get('face'),W/shot['image_height'],cfg.framing_x)
+            head=shot.get('head_bounds')
+            if head and overlap(rect,head)<head[2]*head[3]*.98:
+                shot.update(mode='fit',rect=list(area))
+            else:shot['rect']=rect
+        else:shot['mode']='fit'
     if shot['mode']=='stream' and H>W and shot.get('face_rect'):
         shot['canvas_height']=shot['image_height']
         shot['material_image_height']=None
@@ -145,7 +164,7 @@ def place_shot(shot, cfg):
         factor=1+cfg.zoom_amount
         zoomed=[[W/2+(b['box'][0]-W/2)*factor,H/2+(b['box'][1]-H/2)*factor,
                  b['box'][2]*factor,b['box'][3]*factor] for b in boxes]
-        if any(overlap(selected, b)>0 for b in zoomed):
+        if any(overlap(selected, b)>0 for b in zoomed) or not framing.zoom_keeps_heads(boxes,W,H,cfg.zoom_amount):
             shot['zoom_at']=None
     shot.update(caption_panel=selected,position=pos,protected_output=boxes,
                 placement={'mode':'empty_space','detector':'sampled_faces_and_text_geometry','regions':len(boxes)})
@@ -167,7 +186,7 @@ def apply(plan, cfg):
         'empty_space': sum(s.get('placement', {}).get('mode') == 'empty_space' for s in plan['shots']),
         'reserved_band': sum(s.get('placement', {}).get('mode') == 'reserved_band' for s in plan['shots']),
         'ocr_regions':sum(b['kind']=='ocr' for s in plan['shots'] for b in s.get('protected_source',[])),
-        'note': 'Wajah, geometri tulisan dan OCR pada sampel; posisi dikunci per frasa. Periksa preview bila deteksi meleset.'}
+        'note': 'Wajah, OCR, materi dan area manual dilindungi; tekstur adegan pembicara tidak memaksa pengecilan. Posisi dikunci per frasa.'}
 
 
 def protect_broll(plan, cfg):

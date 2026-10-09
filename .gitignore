@@ -28,3 +28,5 @@ PLAN.md
 /steezy_backups/
 __pycache__/
 *.py[cod]
+.env.pro
+node_modules/

@@ -136,7 +136,7 @@ class StudioService:
                 and (not candidate.get('main_claim') or c.get('main_claim')==candidate.get('main_claim'))),None)
             if matching:added.append(matching);continue
             clip_id=identifier('clip')
-            doc['clips'][clip_id]={**copy.deepcopy(candidate),'clip_id':clip_id,'revision':0,
+            doc['clips'][clip_id]={**copy.deepcopy(candidate),'clip_id':clip_id,'revision':0,'included':True,
                 'variants':{v:{'settings':{},'override_keys':[],'timeline_revision':0} for v in VARIANTS}}
             added.append(clip_id)
         return added
@@ -177,6 +177,8 @@ class StudioService:
                     for shot in report.get('shots',[]):
                         if shot.get('poster_path'):shot['poster_url']=self.register_file(project_id,shot['poster_path'])
                         if shot.get('mask',{}).get('mask'):shot['mask']['url']=self.register_file(project_id,shot['mask']['mask'])
+        from .batch7 import snapshot
+        out['batch']=snapshot(self,doc) if doc.get('clips') and any(c.get('included',True) for c in doc['clips'].values()) else {'selected_clips':0,'timelines':0,'ready':False,'blockers':[]}
         out['jobs']=self.queue.list(project_id);return out
 
     def export_readiness(self,doc,clip_id,variant_id,*,dependency=None,fresh=False):
@@ -243,12 +245,12 @@ class StudioService:
             return fingerprint(base+[doc['settings'],kind])
         variant=self.variant(doc,clip_id,variant_id);clip=doc['clips'][clip_id]
         cfg=self.config(doc,clip_id,variant_id);settings=asdict(cfg)
-        for key in ('out_dir','work_dir','pexels_key','variant_id','cache_limit_gb'):settings.pop(key,None)
+        for key in ('out_dir','work_dir','pexels_key','variant_id','cache_limit_gb','audio_cache_dir','visual_cache_dir'):settings.pop(key,None)
         recipe=active_recipe(variant.get('recipe',{}),cfg)
         assets=[asset_id(s.get('asset',{}).get('path'),fresh=fresh) for s in recipe.get('scenes',[])]
         assets += [asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
         fonts=[asset_id(p,fresh=fresh) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
-        candidate={k:v for k,v in clip.items() if k not in ('variants','revision','result','preview')}
+        candidate={k:v for k,v in clip.items() if k not in ('variants','revision','result','preview','included')}
         from .caption_renderer import signature
         return fingerprint(base+[candidate,settings,recipe,assets,fonts,doc.get('clip_corrections',{}).get(clip_id),doc.get('alignment_overrides',{}).get('clips',{}).get(clip_id),variant.get('timeline',{}),signature(cfg)])
 
@@ -319,18 +321,34 @@ class StudioService:
             touched=set();transcript_changed=False
             for op in operations:
                 kind=op.get('op')
-                if kind in ('correct_word','correct_token'):
+                if kind=='include_clip':
+                    selected=op.get('clip_id',cid)
+                    if selected not in doc['clips'] or type(op.get('included')) is not bool:raise ValueError('Pilihan klip tidak valid.')
+                    doc['clips'][selected]['included']=op['included']
+                elif kind in ('correct_word','correct_token'):
                     self._correct(doc,cid,op);transcript_changed=True
                 elif kind in ('alias_upsert','alias_remove'):
                     from .correction_memory import propose_change
                     doc['aliases']=propose_change(doc.get('aliases',[]),op)
                 elif kind in ('settings','analysis_settings'):
                     values=validate_overrides(op.get('values',{}))
+                    if 'caption_style' in values and 'caption_template_policy' not in op.get('values',{}):values['caption_template_policy']='manual'
                     if not values:raise ValueError('Tidak ada pengaturan valid')
                     if op.get('scope')=='project' or kind=='analysis_settings':doc['settings'].update(values)
                     else:
                         variant=self.variant(doc,cid,vid);variant['settings'].update(values)
                         variant['override_keys']=sorted(set(variant.get('override_keys',[]))|set(values));touched.add((cid,vid))
+                elif kind=='preset_batch':
+                    preset=op.get('preset')
+                    if preset not in ('rapi','adaptif','ekspresif'):raise ValueError('Pilih preset Rapi, Adaptif atau Ekspresif.')
+                    from .batch7 import targets
+                    values={'style_preset':preset,'font_main':'dm_sans','font_accent':'dm_serif_italic',
+                            'caption_template_policy':'auto','caption_backdrop':True,'semantic_emphasis':True,
+                            'motion_intensity':'calm' if preset=='rapi' else 'balanced'}
+                    for target in targets(doc):
+                        c,v=target['clip_id'],target['variant_id'];variant=self.variant(doc,c,v)
+                        variant['settings'].update(values)
+                        variant['override_keys']=sorted(set(variant.get('override_keys',[]))|set(values));touched.add((c,v))
                 elif kind=='style':
                     from .edit_styles import recipe
                     values=recipe(op['style_id'])
@@ -445,6 +463,12 @@ class StudioService:
     def enqueue(self,project_id,kind,clip_id=None,variant_id='portrait',expected_revision=None,options=None):
         doc=self.store.get(project_id)
         if expected_revision is not None and expected_revision!=doc['revision']:raise Conflict(doc['revision'])
+        if kind=='export_project':
+            from .batch7 import snapshot
+            mode=(options or {}).get('mode','hybrid')
+            state=snapshot(self,doc,fresh=True,mode=mode,require_ready=True)
+            return self.queue.enqueue_many(project_id,[(kind,{'clip_id':None,'variant_id':'both'},
+                {'dependency':state['dependency'],'options':{'mode':mode}})],doc['revision'])[0]
         if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation'):raise ValueError('Tahap tidak dikenal')
         if kind in ('analyze','source_evidence','correction','discovery','waveform'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
@@ -476,6 +500,25 @@ class StudioService:
             if (options or {}).get('category') not in CATEGORIES:raise ValueError('Pilih kategori evaluasi.')
             if any(p[0]['clip_id']!=clip_id or p[0]['variant_id']!=variant_id for p in pair):raise ValueError('Hasil pembanding harus dari klip dan rasio aktif.')
         return self.queue.enqueue(project_id,kind,target,request)
+
+    def enqueue_batch(self,project_id,expected_revision):
+        from .dependency_cache import fresh_scope
+        with fresh_scope():return self._enqueue_batch(project_id,expected_revision)
+
+    def _enqueue_batch(self,project_id,expected_revision):
+        from .batch7 import targets
+        doc=self.store.get(project_id)
+        if type(expected_revision) is not int or expected_revision!=doc['revision']:raise Conflict(doc['revision'])
+        if not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia.')
+        if doc['source'].get('requires_analysis'):raise ValueError('Analisis sumber aktif dahulu.')
+        rows=targets(doc);jobs=[];skipped=[]
+        for t in rows:
+            cid=t['clip_id'];vid=t['variant_id'];self.variant(doc,cid,vid)
+            dep=self.dependency(doc,cid,vid,fresh=True)
+            if self.export_readiness(doc,cid,vid,dependency=dep,fresh=True)['status']=='ready':skipped.append(t);continue
+            jobs.append(('render',t,{'dependency':dep,'options':{}}))
+        queued=self.queue.enqueue_many(project_id,jobs,doc['revision'])
+        return {'jobs':queued,'skipped':skipped,'timelines':len(rows),'selected_clips':len(rows)//2}
 
     def analysis_snapshot(self,target,document=None):
         from . import analysis_adapter as adapter

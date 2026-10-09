@@ -39,6 +39,9 @@ def save_analysis_take(service,pid,media,transcript,cfg):
 
 
 def execute(service,job):
+    if job['kind']=='export_project':
+        from .batch7 import export_project
+        return export_project(service,job)
     if job['kind']=='evaluation':return evaluation_job(service,job)
     from . import media_context, evidence, transcript_correction, story, analysis_adapter, editorial
     pid=job['project_id'];target=job['target'];cid=target.get('clip_id');vid=target.get('variant_id','portrait');kind=job['kind']
@@ -132,15 +135,18 @@ def execute(service,job):
             clip={k:v for k,v in doc['clips'][cid].items() if k!='variants'};variant=service.variant(doc,cid,vid)
             if variant.get('timeline'):clip['manual_keep_spans']=variant['timeline']['keep_spans']
             display=render_words(transcript,doc,clip,cfg)
-            plan=editplan.build(display,clip,cfg)
             progress(10,'Memeriksa wajah, materi dan ruang teks sepanjang klip')
-            composition.analyze(source,plan,cfg,ffmpeg_util.probe(source))
+            from .pipeline import source_plan
+            display,plan=source_plan(source,display,clip,cfg,ffmpeg_util.probe(source),context_words=transcript['words'])
             if kind=='style_review':
                 from .typography import make_plan
                 from .placement import caption_anchors
                 from .subtitle_edit import clean
-                from .style5 import readability
+                from .style5 import readability,annotate_prosody
+                from . import render
                 cleaned,_,_=clean(plan['words'],cfg.caption_cleanup,cfg.caption_punctuation,cfg)
+                voice=render.voice_stem(source,plan,cfg,work/'style-review-audio')
+                cleaned=annotate_prosody(cleaned,voice)
                 plan['display_words']=cleaned
                 captions=make_plan(cleaned,cfg,clip.get('keywords',[]),anchors=caption_anchors(plan,cfg))
                 result=readability(captions,cfg)
@@ -174,14 +180,15 @@ def execute(service,job):
                 scale=edge/max(cfg.target_w,cfg.target_h)
                 folder=work/'cache'/'previews'/(dependency[:24]+'-'+quality)
                 cfg=replace(cfg,target_w=round(cfg.target_w*scale/2)*2,target_h=round(cfg.target_h*scale/2)*2,
-                    work_dir=str(folder),out_dir=str(folder/'output'),job_id='',preview_seconds=0)
+                    work_dir=str(folder),out_dir=str(folder/'output'),job_id='',preview_seconds=0,
+                    audio_cache_dir=cfg.audio_cache_dir or str(work),visual_cache_dir=cfg.visual_cache_dir or str(work/'visual4'))
                 folder.mkdir(parents=True,exist_ok=True)
                 if (work/'source-evidence.json').is_file():write_json(folder/'source-evidence.json',read_json(work/'source-evidence.json'))
             key=render_key(source,words,clip,cfg,fresh=True)
             # A full-content manifest is checked on every reuse, including the output itself.
             cached=read_json(Path(cfg.work_dir)/'render-cache'/f'{key}.json',{})
             path=Path(cached.get('absolute_file',''))
-            if path.is_file() and cached.get('output_content_id')==content_id(path,fresh=True) and cached.get('plan_content_id') and cached['plan_content_id']==asset_id(cached.get('plan_path'),fresh=True):result=cached
+            if not job['request'].get('options',{}).get('force') and path.is_file() and cached.get('output_content_id')==content_id(path,fresh=True) and cached.get('plan_content_id') and cached['plan_content_id']==asset_id(cached.get('plan_path'),fresh=True):result=cached
             else:
                 name=f'{cid}-{vid}-{key[:12]}'
                 result=pipeline.render_clip(source,words,clip,name,cfg,progress,context_words=transcript['words'])

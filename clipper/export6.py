@@ -10,7 +10,7 @@ from .workflow6 import EXPORT_MODES
 
 def preserved(results,cfg,progress=lambda p,m:None):
     from .library_paths import project_root
-    from .projects import write_srt
+    from .projects import write_srt,coverage
     root=project_root(cfg)/'projects'/f'preserved-{cfg.job_id}-{time.time_ns()}'
     (root/'Media').mkdir(parents=True,exist_ok=False)
     inventory=[]
@@ -32,7 +32,7 @@ def preserved(results,cfg,progress=lambda p,m:None):
         write_json(root/f'reference-plan-{i:02}.json',reference)
         inventory.append({'path':target.relative_to(root).as_posix(),'bytes':target.stat().st_size,'content_id':expected})
         progress(round(i/max(1,len(results))*80),'Menyalin final dengan checksum yang sama')
-    manifest={'version':6,'export_mode':'preserved',**copy.deepcopy(EXPORT_MODES['preserved']),
+    manifest={'version':8,'coverage':coverage(results),'export_mode':'preserved',**copy.deepcopy(EXPORT_MODES['preserved']),
         'timelines':len(results),'structural_status':'passed','native_editor_status':'not_applicable',
         'editors':{},'inventory':inventory}
     write_json(root/'manifest.json',manifest)

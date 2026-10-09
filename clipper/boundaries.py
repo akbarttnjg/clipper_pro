@@ -6,7 +6,7 @@ completeness. Re-review supplies surrounding context and remains reviewable.
 import re
 from .typography import token
 
-VERSION = 2
+VERSION = 3
 
 
 def segments_from_words(words):
@@ -46,6 +46,16 @@ def audit(clip, words, max_duration=120):
         issues.append('Pembuka mungkin membutuhkan kalimat sebelumnya.')
     if re.search(r'(?:(?:gue|gua|saya|aku) (?:pengen|ingin|mau) (?:tahu|tau)|pertanyaannya|gimana menurut (?:kalian|kamu))[^.!?]{0,45}[,.?]?$', tail):
         issues.append('Penutup membuka pertanyaan baru; akhiri pada kesimpulan sebelumnya atau sertakan jawabannya.')
+    # A pause or an ASR full stop is not proof that a promised numbered list
+    # has delivered its remaining items. Keep this a review flag, not a rewrite.
+    promises=re.findall(r'\b(?:ada|berikut|terdapat)\s+([2-5]|dua|tiga|empat|lima)\s+(?:cara|langkah|alasan|hal|tips|prinsip)\b',text.lower())
+    nums={'dua':2,'tiga':3,'empat':4,'lima':5}
+    ordinals={1:r'pertama|kesatu',2:r'kedua',3:r'ketiga',4:r'keempat',5:r'kelima'}
+    for promised in promises:
+        count=nums.get(promised,int(promised) if promised.isdigit() else 0)
+        found=[i for i in range(1,count+1) if re.search(r'\b(?:'+ordinals[i]+r')\b',text.lower())]
+        if found and len(found)<count:
+            issues.append(f'Pembuka menjanjikan {count} rincian, tetapi penanda urutannya belum lengkap. Periksa jawaban sebelum menyetujui.')
     if clip['end'] - clip['start'] > max_duration + .05:
         issues.append(f'Durasi melewati batas pilihan {max_duration:g} detik.')
     source_tokens = {token(w['word']) for w in words}
