@@ -154,6 +154,7 @@ def execute(service,job):
                 plan['display_words']=cleaned
                 captions=make_plan(cleaned,cfg,clip.get('keywords',[]),anchors=caption_anchors(plan,cfg))
                 result=readability(captions,cfg)
+                result['selected_alignment']=plan.get('selected_alignment')
                 for phrase in result['phrases']:
                     span=next((s for s in plan['spans'] if s['start']<=phrase['start']<s['end']),None)
                     if span:phrase['source_start']=span['source_start']+phrase['start']-span['start']

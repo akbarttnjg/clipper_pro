@@ -51,7 +51,7 @@ def optical_factor(fonts_dir, family):
 def protected_pair(left, right):
     from .transcript_correction import PROTECTED
     a,b = token(left['word'].split()[-1]),token(right['word'].split()[0])
-    return (a in PROTECTED or (a,b) in {('stop','loss'),('take','profit'),('time','frame'),
+    return (a in PROTECTED or left['word'].endswith('-') or right['word'].startswith('-') or (a,b) in {('stop','loss'),('take','profit'),('time','frame'),
         ('risk','reward'),('drop','base'),('base','drop'),('rally','base'),('base','rally'),
         ('supply','demand'),('support','resistance'),('hari','ini'),('hari','itu'),
         ('saat','ini'),('saat','itu'),('kali','ini'),('oleh','karena'),
@@ -333,8 +333,11 @@ def display_units(words):
             decimal = bool(re.search(r'\d[.,]?$', a) and re.fullmatch(r'[.,]\d+[.,]?', b))
             suffix = bool(re.search(r'\d[.,]?$', a)) and token(b) in suffixes
             percent = b == '%' and bool(re.search(r'\d$', a))
-            if close and (currency or decimal or suffix or percent):
-                prior['word'] = (a.rstrip('.') if currency else a.rstrip('.,') if decimal else a) + ('' if currency or decimal or percent else ' ') + b
+            # Join only explicitly present hyphens, never invent reduplication.
+            hyphen = bool((a.endswith('-') and re.match(r'^[^\W\d_]',b)) or
+                          (re.search(r'[^\W\d_]$',a) and (b=='-' or re.fullmatch(r'-[^\W\d_][\w-]*[.,!?]?',b))))
+            if close and (currency or decimal or suffix or percent or hyphen):
+                prior['word'] = (a.rstrip('.') if currency else a.rstrip('.,') if decimal else a) + ('' if currency or decimal or percent or hyphen else ' ') + b
                 prior['end'] = max(prior['end'], w['end'])
                 prior['word_ids'] += w['word_ids']
                 prior['token_ids'] += w['token_ids']
@@ -347,6 +350,7 @@ def display_units(words):
 
 def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _phrases=None, _following=None):
     from .motion import frames
+    from .caption_geometry import metrics as ink_metrics, bounds as ink_bounds
     phrases = scene_groups(words, cfg, anchors) if _phrases is None else _phrases
     W, H = cfg.target_w, cfg.target_h
     plans = []
@@ -380,7 +384,8 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
             sizes = [round(fs*optical_factor(cfg.fonts_dir,families[i])*(accent_size*(1+.08*max(0.,min(1.,float(phrase[i].get('prosody_prominence',0.))))) if i in emphasis else 1.)) for i in range(len(phrase))]
             measures = [font(cfg.fonts_dir,sizes[i],families[i]).getlength(w['word']) for i,w in enumerate(phrase)]
             space = fs*.29
-            rows = balanced_rows(phrase, measures, space, usable_width, 2 if height<H*.2 else 3, emphasis)
+            directed=getattr(cfg,'_director',False)
+            rows = balanced_rows(phrase, measures, space, usable_width, 2 if directed or height<H*.2 else 3, emphasis)
             composition=getattr(cfg,'_composition',None)
             if composition=='focus':
                 from .caption_director import focus_rows
@@ -389,10 +394,15 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
                     rows=focused
             if rows is None:
                 continue
-            heights = [max(sizes[i] for i in row)*1.18 for row in rows]
-            if len(rows)<=3 and sum(heights)<=height*.88 and max(measures)<=width*.88:
+            ink=[ink_metrics(font(cfg.fonts_dir,sizes[i],families[i]),w['word'],measures[i]) for i,w in enumerate(phrase)]
+            padding=min(W,H)/1080*5 if cfg.caption_backdrop else min(W,H)/1080
+            gap=fs*.16
+            row_ink=[(min(ink[i][2][0] for i in row),max(ink[i][2][1] for i in row)) for row in rows]
+            heights=[bottom-top+gap for top,bottom in row_ink] if directed else [max(sizes[i] for i in row)*1.18 for row in rows]
+            measured_height=(sum(heights)-gap)*1.08+padding*2 if directed else sum(heights)
+            if len(rows)<=3 and measured_height<=height*.96 and max(measures)<=width*.88:
                 break
-        if rows is None or len(rows)>3 or max(measures)>usable_width or sum(heights)>height:
+        if rows is None or len(rows)>3 or max(measures)>usable_width or measured_height>height:
             raise ValueError('Frasa terlalu panjang. Pecah teks pada transkrip atau kurangi ukuran teks.')
         start = phrase[0]['start']
         following = phrases[idx+1][0]['start'] if idx+1<len(phrases) else phrase[-1]['end']+.12
@@ -401,9 +411,9 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
         end = max(start+.02,min(reading_end,following))
         if anchor:
             end = min(end, anchor.get('end', end))
-        cy = y+(height-sum(heights))*(.5 if side or use_anchor else .8)
+        cy = y+(height-(sum(heights)-gap if directed else sum(heights)))*(.5 if side or use_anchor else .8)
         placed=[]
-        for row,rh in zip(rows,heights):
+        for row_index,(row,rh) in enumerate(zip(rows,heights)):
             row_width=sum(measures[i] for i in row)+space*(len(row)-1)
             cx=row_left(x,width,row_width,alignment(cfg,pos))
             reveal=0. if getattr(cfg,'_whole_phrase',False) else max(0,min(phrase[i]['start'] for i in row)-start-.055)
@@ -411,24 +421,36 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
                 w=phrase[i]; size=sizes[i]
                 word_reveal = 0. if getattr(cfg,'_whole_phrase',False) else min(max(0,end-start-.65),max(reveal,w['start']-start-.06) if i in emphasis else reveal)
                 kind,samples=frames(cfg.caption_style,end-start,max(0,word_reveal),idx,i in emphasis,cfg,position=pos)
-                wx, wy = cx+measures[i]/2, cy+rh/2
+                baseline=cy-row_ink[row_index][0] if directed else cy+rh*.8
+                wx, wy = cx+measures[i]/2, baseline-ink[i][1] if directed else cy+rh/2
+                geometry={'x':wx,'y':wy,'width':measures[i],'size':size,
+                          **({'ink_box':ink[i][0],'ink_padding':padding} if directed else {})}
                 # Keep the entire animation inside the chosen empty-space panel.
                 for sample in samples:
-                    half_w = measures[i]*sample['scale']/2
-                    half_h = size*sample['scale']*.66
-                    sample['dx'] = round(max(x+half_w-wx, min(sample['dx'], x+width-half_w-wx)), 3)
-                    sample['dy'] = round(max(y+half_h-wy, min(sample['dy'], y+height-half_h-wy)), 3)
+                    if directed:
+                        # Reduce blur if its spread alone exceeds the panel.
+                        box=ink_bounds(geometry,{**sample,'dx':0.,'dy':0.})
+                        if box[2]>width or box[3]>height:sample['blur']=0.
+                        box=ink_bounds(geometry,{**sample,'dx':0.,'dy':0.})
+                        sample['dx']=round(max(x-box[0],min(sample['dx'],x+width-box[0]-box[2])),3)
+                        sample['dy']=round(max(y-box[1],min(sample['dy'],y+height-box[1]-box[3])),3)
+                    else:
+                        half_w = measures[i]*sample['scale']/2
+                        half_h = size*sample['scale']*.66
+                        sample['dx'] = round(max(x+half_w-wx, min(sample['dx'], x+width-half_w-wx)), 3)
+                        sample['dy'] = round(max(y+half_h-wy, min(sample['dy'], y+height-half_h-wy)), 3)
                 placed.append({'text':w['word'],'word_id':w.get('word_id'),'word_ids':w.get('word_ids',[]),
                     'token_ids':w.get('token_ids',[]),
-                    'start':w['start'],'end':w['end'],'x':round(cx+measures[i]/2,3),'y':round(cy+rh/2,3),
-                    'baseline':round(cy+rh*.8,3), **font_info(families[i]), 'size':size,
+                    'start':w['start'],'end':w['end'],'x':round(wx,3),'y':round(wy,3),
+                    'baseline':round(baseline,3), **font_info(families[i]), 'size':size,
+                    **({'ink_box':ink[i][0],'ink_padding':padding} if directed else {}),
                     'ass_size':sum(font(cfg.fonts_dir,size,families[i]).getmetrics()),'width':measures[i],
                     'emphasis':i in emphasis,
                     'motion':kind,'keyframes':samples})
                 cx+=measures[i]+space
             cy+=rh
         plans.append({'start':start,'end':end,'position':pos,'panel':list(panel_box),'alignment':alignment(cfg,pos),
-                      'composition':getattr(cfg,'_composition','legacy'),
+                      'composition':getattr(cfg,'_composition','legacy'),'measured_height':round(measured_height,3),
                       'placement_source':'auto' if cfg.caption_position == 'auto' else 'manual',
                       'protected': anchor.get('protected', []) if use_anchor else [], 'words':placed})
     return {'version':4,'timebase':'output_seconds','width':W,'height':H,'font':FONTS[cfg.font_main]['family'],

@@ -1,9 +1,9 @@
-import {mountBatch7} from './features/batch7.js?v=4.0.8';
+import {mountBatch7} from './features/batch7.js?v=4.0.10';
 import {mountSteps6,mountBrand6,mountEvaluation6} from './features/workspace6.js?v=4.0.6';
 import {mountAnalysis} from './features/analysis.js?v=4.0.3';
-import {mountTranscript3,approveFactChanges} from './features/transcript3.js?v=4.0.8';
+import {mountTranscript3,approveFactChanges} from './features/transcript3.js?v=4.0.10';
 import {mountRuntime} from './features/runtime.js?v=4.0.2a';
-import {mountStyle5} from './features/style5.js?v=4.0.8';
+import {mountStyle5} from './features/style5.js?v=4.0.10';
 import {mountVisual4} from './features/visual4.js?v=4.0.4';
 const $=q=>document.querySelector(q),main=$('#main');
 const S={doc:null,step:'source',clip:null,variant:'portrait',view:'source',page:null,baseRevision:0,styles:[],fonts:[],query:'',analysis:null,offset:0,dirty:new Map(),panels:new Map(),polling:false};

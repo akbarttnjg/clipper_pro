@@ -60,7 +60,7 @@ def available_asr_models():
     return result[:40]
 
 
-VERSION='4.0.7'
+VERSION='4.0.10'
 
 
 def alignment_options(value):
@@ -90,7 +90,7 @@ def local_alignment_model(path):
 def alignment_runtime(cfg, options):
     model = local_alignment_model(options.get('model_path') or cfg.alignment_model_path)
     from .runtime.state import read, runtime_root, safe_path
-    root = runtime_root(); pointer = read(root/'components/whisperx/active.json', {})
+    root = Path(cfg.visual_runtime_root) if cfg.visual_runtime_root else runtime_root(); pointer = read(root/'components/whisperx/active.json', {})
     if pointer.get('generation'):
         directory = safe_path(root/'generations', pointer['generation']); receipt = read(directory/'receipt.json', {})
         python = directory/'env'/('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
@@ -266,8 +266,10 @@ def run(kind, source, transcript, cfg, options):
     with tempfile.TemporaryDirectory(prefix='clipper-speech-') as tmp:
         request, result = Path(tmp)/'request.json', Path(tmp)/'result.json'
         request.write_text(json.dumps({'kind': kind, 'source': str(source), 'transcript': transcript, 'config': asdict(cfg), 'options': options}, ensure_ascii=False), encoding='utf-8')
-        process = subprocess.run([runtime['python'] if runtime else sys.executable, '-m', 'clipper.speech_jobs', str(request), str(result)],
-            capture_output=True, env=environment, cwd=str(Path(__file__).resolve().parent.parent), text=True, encoding='utf-8', errors='replace')
+        try:
+            process = subprocess.run([runtime['python'] if runtime else sys.executable, '-m', 'clipper.speech_jobs', str(request), str(result)],
+                capture_output=True, env=environment, cwd=str(Path(__file__).resolve().parent.parent), text=True, encoding='utf-8', errors='replace',timeout=600)
+        except subprocess.TimeoutExpired as exc:raise ValueError('Proses ucapan melampaui batas 600 detik; timing lama dipertahankan.') from exc
         if process.returncode or not result.is_file(): raise ValueError('Proses ucapan gagal. '+process.stderr[-2000:])
         data=json.loads(result.read_text(encoding='utf-8'))
         data['report'].update(producer_version=VERSION,model_used=options['model_path'] if kind=='alignment' else cfg.whisper_model,

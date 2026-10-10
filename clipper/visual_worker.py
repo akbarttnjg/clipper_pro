@@ -27,6 +27,24 @@ def frame_at(source,time):
 
 def run(request):
     key=request['component'];directory=Path(request['directory']);weights=directory/'weights';folder=Path(request['output_dir']);folder.mkdir(parents=True,exist_ok=True)
+    if key=='e5':
+        import numpy as np
+        import torch
+        from sentence_transformers import SentenceTransformer
+        items=request['items']
+        if not 2<=len(items)<=96 or len({i['id'] for i in items})!=len(items):raise ValueError('Anggaran/identitas kandidat E5 tidak valid.')
+        if any(not isinstance(i['text'],str) or not 1<=len(i['text'])<=12000 for i in items):raise ValueError('Kutipan E5 tidak valid.')
+        torch.set_num_threads(4)
+        model=SentenceTransformer(str(weights),device='cpu',local_files_only=True,trust_remote_code=False)
+        # The model card specifies query: for symmetric similarity, also in Indonesian.
+        vectors=model.encode(['query: '+i['text'] for i in items],batch_size=8,normalize_embeddings=True,convert_to_numpy=True,show_progress_bar=False)
+        if vectors.ndim!=2 or len(vectors)!=len(items) or not np.isfinite(vectors).all():raise ValueError('Embedding E5 tidak valid.')
+        scores=np.clip(vectors@vectors.T,-1,1);pairs=[];seen=set()
+        for a in range(len(items)):
+            for b in sorted((b for b in range(len(items)) if b!=a),key=lambda b:(-float(scores[a,b]),b))[:2]:
+                pair=tuple(sorted((a,b)))
+                if pair not in seen:pairs.append({'a':items[a]['id'],'b':items[b]['id'],'score':float(scores[a,b])});seen.add(pair)
+        return {'status':'ready','pairs':pairs,'device':'cpu','scope':'comparison_proposals_only; no_story_removal'}
     if key=='mediapipe':
         import cv2
         import numpy as np

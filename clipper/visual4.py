@@ -10,15 +10,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-import cv2
 import numpy as np
 from .contracts import fingerprint
 from .dependency_cache import content_id
 from .storage import read_json, write_json
 from . import placement
 
-VERSION = '4.0.9'
-OBSERVATION_VERSION = '4.0.9-text-area-grid'
+VERSION = '4.0.10'
+OBSERVATION_VERSION = '4.0.10-timestamped-area-grid'
 KINDS = ('speaker', 'podcast', 'board', 'screen', 'chart', 'graphic', 'unknown')
 
 
@@ -225,6 +224,7 @@ def analysis_folder(cfg):
 
 
 def collect(media,plan,cfg,info,sampler):
+    import cv2
     folder=analysis_folder(cfg);folder.mkdir(parents=True,exist_ok=True)
     intervals=[[s['source_start'],min(s['source_end'],info['duration'])] for s in plan['spans']]
     source_id=content_id(media)
@@ -317,6 +317,10 @@ def split_groups(groups,boundaries,cfg,active):
 def caption_envelopes(plan,cfg):
     """One safe envelope for every shot touched by a phrase, including motion."""
     if cfg.caption_position!='auto' or not cfg.safe_placement:return
+    if cfg.style_preset!='legacy':
+        placement.phrase_anchors(plan,cfg)
+        plan.setdefault('visual_summary',{})['phrase_safety']='measured_glyphs; bounded_phrase_conflicts'
+        return
     from .typography import groups
     for phrase in groups(plan.get('display_words',plan.get('words',[])),cfg):
         touching=[s for s in plan['shots'] if s['start']<phrase[-1]['end']+.16 and s['end']>phrase[0]['start']]
@@ -364,6 +368,7 @@ def describe(media,group,cfg,info,active,allow_vlm=True,source_bounds=None,obser
 
 
 def report(plan,media,cfg):
+    import cv2
     folder=analysis_folder(cfg);folder.mkdir(parents=True,exist_ok=True);shots=[]
     controls=cfg.visual_overrides or {};prompt_time=controls.get('sam_time')
     mask_index=next((i for i,s in enumerate(plan.get('shots',[])) if prompt_time is not None and s['source_start']<=prompt_time<s['source_end']),0 if prompt_time is None else None)

@@ -93,13 +93,18 @@ def semantic_groups(candidates, cfg):
     eligible=[(i,c) for i,c in enumerate(candidates) if c.get('main_claim')]
     if len(eligible)<2:
         return set(),[]
-    removed, decisions=set(),[]
+    from .semantic_rank import neighbors
+    proposed,e5_report=neighbors(eligible,cfg)
+    removed, decisions=set(),[e5_report]
     # Compare chapters in bounded batches; lexical source dedup handles the rest.
     anchors=[]
-    for offset in range(0,len(eligible),16):
-        chunk=[*anchors,*eligible[offset:offset+16]]
+    by_id=dict(eligible)
+    schedule=[[(a,by_id[a]),(b,by_id[b])] for a,b in proposed]
+    schedule.extend(eligible[offset:offset+16] for offset in range(0,len(eligible),16))
+    for batch in schedule:
+        chunk=list(dict([*anchors,*batch]).items())
         payload=[{'id':i,'kind':c.get('story_kind'),'quote':c['main_claim'],'ending':c.get('ending_evidence','')} for i,c in chunk]
-        key=hashlib.sha256(json.dumps([payload,cfg.model,'semantic-4.0.3'],sort_keys=True).encode()).hexdigest()[:24]
+        key=hashlib.sha256(json.dumps([payload,cfg.model,'semantic-4.0.10'],sort_keys=True).encode()).hexdigest()[:24]
         path=Path(cfg.work_dir)/'semantic-reviews'/(key+'.json')
         data=read_json(path)
         try:

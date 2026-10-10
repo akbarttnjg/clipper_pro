@@ -171,6 +171,7 @@ def analyze(media, plan, cfg, info):
         from .text_area import grid
         area_grid=grid(small)
         area_grid['source_size']=[W,H]
+        area_grid['time']=t
         return {'t': t, 'faces': faces, 'hist': hist, 'area': area, 'panel': panel, 'texts': texts,'ocr':ocr,'area_grid':area_grid,
                 'face_confidence':confidence,'face_detector':'yunet' if detector is not None else 'haar_heuristic' if haar is not None else 'none'}
     shots = []
