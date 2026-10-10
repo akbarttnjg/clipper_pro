@@ -3,12 +3,12 @@
 The text detector finds stroke geometry on light or dark backgrounds; it does
 not claim to read handwriting. Dense scenes get a separate caption band.
 """
-import cv2
 import numpy as np
 from . import framing
 
 
 def text_regions(frame):
+    import cv2
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 7))
@@ -92,8 +92,12 @@ def overlap(a, b):
     return max(0, min(x+w, bx+bw)-max(x, bx)) * max(0, min(y+h, by+bh)-max(y, by))
 
 
-def choose_panel(boxes, W, H, preferred=None, *, cfg=None, quality=()):
+def choose_panel(boxes, W, H, preferred=None, *, cfg=None, quality=(), phrases=()):
     if cfg is not None and (cfg.style_preset!='legacy' or getattr(cfg,'_director',False)):
+        if phrases:
+            from .caption_fit import choose as fit
+            measured=fit(phrases,cfg,boxes,preferred,quality)
+            if measured:return measured
         from .text_area import choose
         return choose(boxes,W,H,preferred,quality)
     portrait = H > W
@@ -132,10 +136,18 @@ def choose_panel(boxes, W, H, preferred=None, *, cfg=None, quality=()):
     return best[1], best[2], not best[0][0]
 
 
-def reserve_band(shot, cfg):
+def reserve_band(shot, cfg, phrases=()):
     W, H = cfg.target_w, cfg.target_h
     directed=cfg.style_preset!='legacy' or getattr(cfg,'_director',False)
-    shot['image_height'] = int(H*(.67 if directed else .79))//2*2
+    panel=None
+    if directed and phrases:
+        from .caption_fit import required_height
+        width=W*(.80 if H>W else .84)
+        height=required_height(phrases,cfg,width)
+        if height:
+            bottom=H*(.835 if H>W else .95)
+            panel=[W*.07,bottom-height,width,height]
+    shot['image_height'] = int(panel[1]-H*.015 if panel else H*(.67 if directed else .79))//2*2
     if shot['mode']=='fill':
         area=shot.get('active_area')
         if area:
@@ -149,14 +161,14 @@ def reserve_band(shot, cfg):
         shot['canvas_height']=shot['image_height']
         shot['material_image_height']=None
     shot['zoom_at']=None
-    shot['caption_panel']=[W*.07,H*.685,W*(.80 if H>W else .84),H*(.15 if H>W else .27)] if directed else [W*.08,H*.815,W*.78,H*.16]
+    shot['caption_panel']=panel or ([W*.07,H*.685,W*(.80 if H>W else .84),H*(.15 if H>W else .27)] if directed else [W*.08,H*.815,W*.78,H*.16])
     shot['position']='bottom'
     shot['protected_output']=protected_boxes(shot,W,H)
     shot['placement']={'mode':'reserved_band','detector':'sampled_faces_and_text_geometry',
-                       'regions':len(shot['protected_output'])}
+                       'regions':len(shot['protected_output']),'measured_phrase_height':bool(panel)}
 
 
-def place_shot(shot, cfg):
+def place_shot(shot, cfg, phrases=()):
     W, H = cfg.target_w, cfg.target_h
     shot['caption_profile']='editorial9' if cfg.style_preset!='legacy' else 'legacy'
     if cfg.caption_position!='auto' or not cfg.safe_placement:
@@ -164,9 +176,13 @@ def place_shot(shot, cfg):
         return
     boxes=protected_boxes(shot,W,H)
     from .text_area import output_quality
-    selected,pos,clear=choose_panel(boxes,W,H,shot.get('caption_panel'),cfg=cfg,quality=output_quality(shot,W,H))
+    selected,pos,clear=choose_panel(boxes,W,H,shot.get('caption_panel'),cfg=cfg,quality=output_quality(shot,W,H),phrases=phrases)
     if not clear:
-        reserve_band(shot,cfg)
+        if phrases and cfg.style_preset!='legacy':
+            shot.update(caption_panel=selected,position=pos,protected_output=boxes,
+                        placement={'mode':'pending_phrase_fit','regions':len(boxes)})
+            return
+        reserve_band(shot,cfg,phrases)
         return
     if shot.get('zoom_at') is not None:
         factor=1+cfg.zoom_amount
@@ -180,6 +196,8 @@ def place_shot(shot, cfg):
 
 def apply(plan, cfg):
     previous = None
+    from .typography import groups
+    phrases=groups(plan.get('display_words',plan.get('words',[])),cfg)
     for shot in plan['shots']:
         if previous and previous['mode'] == shot['mode'] and cfg.caption_position=='auto' and (not shot.get('caption_panel') or cfg.style_preset!='legacy'):
             # Prefer the previous position only when geometry remains similar.
@@ -187,7 +205,8 @@ def apply(plan, cfg):
             stable = overlap(a,b)/max(1,min(a[2]*a[3],b[2]*b[3])) > .8
             if stable:
                 shot['caption_panel'] = previous.get('caption_panel')
-        place_shot(shot, cfg)
+        touching=[p for p in phrases if p[0]['start']<shot['end'] and p[-1]['end']+.16>shot['start']]
+        place_shot(shot, cfg,touching)
         previous = shot
     plan['placement_summary'] = {
         'shots': len(plan['shots']),
@@ -231,6 +250,8 @@ def protect_broll(plan, cfg):
 
 
 def caption_anchors(plan, cfg=None):
+    if cfg and cfg.style_preset!='legacy' and cfg.caption_position=='auto' and cfg.safe_placement:
+        return phrase_anchors(plan,cfg)
     if cfg and cfg.caption_position=='auto' and cfg.safe_placement:
         from .typography import groups
         for phrase in groups(plan.get('display_words',plan.get('words',[])),cfg):
@@ -244,3 +265,59 @@ def caption_anchors(plan, cfg=None):
              'position':s['position'],'panel':s.get('caption_panel'),
              'protected':s.get('protected_output',[]),'has_material':s.get('has_material',False),
              'mode':s.get('mode')} for s in plan['shots']]
+
+
+def phrase_anchors(plan,cfg):
+    """One measured box per phrase; a conflict cannot resize unrelated footage."""
+    from copy import deepcopy
+    from .typography import groups
+    from .text_area import output_quality
+    phrases=groups(plan.get('display_words',plan.get('words',[])),cfg)
+    anchors=[];fps=plan.get('fps',cfg.output_fps)
+    for index,phrase in enumerate(phrases):
+        start=phrase[0]['start'];end=phrase[-1]['end']+.16
+        if index+1<len(phrases):end=min(end,phrases[index+1][0]['start'])
+        touching=[s for s in plan['shots'] if s['start']<end and s['end']>start]
+        if not touching:continue
+        boxes=[b for s in touching for b in protected_boxes(s,cfg.target_w,cfg.target_h)]
+        for s in touching:
+            if s.get('zoom_at') is not None:
+                z=1+cfg.zoom_amount
+                boxes.extend({'kind':b['kind'],'box':[cfg.target_w/2+(b['box'][0]-cfg.target_w/2)*z,
+                    cfg.target_h/2+(b['box'][1]-cfg.target_h/2)*z,b['box'][2]*z,b['box'][3]*z]}
+                    for b in protected_boxes(s,cfg.target_w,cfg.target_h))
+        quality=[t for s in touching for t in output_quality(s,cfg.target_w,cfg.target_h)]
+        selected,pos,clear=choose_panel(boxes,cfg.target_w,cfg.target_h,
+            anchors[-1]['panel'] if anchors else touching[0].get('caption_panel'),cfg=cfg,phrases=[phrase],quality=quality)
+        if not clear:
+            changed=[]
+            # Cover full output frames. Source offsets and fixed crop centres
+            # are preserved outside this phrase's reserved interval.
+            a=math_floor(start*fps)/fps;b=math_ceil(end*fps)/fps
+            for shot in plan['shots']:
+                if shot not in touching:changed.append(shot);continue
+                cuts=sorted({shot['start'],shot['end'],max(shot['start'],min(shot['end'],a)),max(shot['start'],min(shot['end'],b))})
+                for left,right in zip(cuts,cuts[1:]):
+                    if right-left<.5/fps:continue
+                    piece=deepcopy(shot);offset=left-shot['start']
+                    piece.update(start=left,end=right,start_frame=round(left*fps),duration_frames=round((right-left)*fps),
+                        source_start=shot['source_start']+offset,source_end=shot['source_start']+offset+right-left)
+                    if piece.get('zoom_at') is not None:piece['zoom_at']-=offset
+                    if left<b and right>a:
+                        reserve_band(piece,cfg,[phrase]);piece['placement']['reason']='phrase_conflict'
+                    changed.append(piece)
+            plan['shots']=changed
+            touching=[s for s in changed if s['start']<end and s['end']>start]
+            boxes=[b for s in touching for b in protected_boxes(s,cfg.target_w,cfg.target_h)]
+            selected,pos,clear=choose_panel(boxes,cfg.target_w,cfg.target_h,touching[0].get('caption_panel'),cfg=cfg,phrases=[phrase])
+        anchors.append({'time':(start+end)/2,'start':start,'end':end,'panel':selected,'position':pos,
+            'protected':boxes,'has_material':any(s.get('has_material') for s in touching),
+            'placement_method':'measured_phrase','clear':clear})
+    summary=plan.setdefault('placement_summary',{})
+    summary.update(shots=len(plan['shots']),reserved_band=sum(s.get('placement',{}).get('mode')=='reserved_band' for s in plan['shots']),
+        empty_space=sum(s.get('placement',{}).get('mode')=='empty_space' for s in plan['shots']),
+        phrase_count=len(anchors),strategy='glyph_measurement_before_band; bounded_phrase_conflicts')
+    return anchors
+
+
+from math import floor as math_floor,ceil as math_ceil

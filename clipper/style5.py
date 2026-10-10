@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import copy
 from dataclasses import replace
 
-VERSION='4.0.9'
+VERSION='4.0.10'
 PRESETS=(
     {'id':'rapi','name':'Rapi','description':'Frasa utuh, baseline stabil, aksen secukupnya.','settings':{'font_main':'dm_sans','font_accent':'dm_serif_italic','motion_intensity':'calm','caption_backdrop':True}},
     {'id':'ekspresif','name':'Ekspresif','description':'Hierarki dan arah gerak bervariasi dengan desain yang tersimpan.','settings':{'font_main':'dm_sans','font_accent':'dm_serif_italic','motion_intensity':'balanced','caption_backdrop':True}},
@@ -46,14 +47,22 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
         else:
             for w in local_words:w.pop('meaning_emphasis',None)
         following=parts[index+1][0]['start'] if index+1<len(parts) else max((a.get('end',phrase[-1]['end']+.12) for a in touching),default=phrase[-1]['end']+.12)
-        planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words],_following=following)['phrases'][0]
         if cfg.caption_composition=='auto' and composition=='focus':
-            from .caption_director import visible_cap
-            if min((visible_cap(w,cfg.fonts_dir,360,cfg.target_w) for w in planned['words']),default=14)<14:
+            from .caption_director import readable
+            # Decide composition at one canonical resolution. Pixel rounding in
+            # a 640px preview must not select a different design from Full HD.
+            reference=copy.copy(local)
+            reference.target_w,reference.target_h=(1080,1920) if cfg.target_h>cfg.target_w else (1920,1080)
+            reference._base_font=round(reference.target_w*(.0855 if reference.target_h>reference.target_w else .078)*cfg.caption_scale)
+            scale=reference.target_w/cfg.target_w
+            reference_anchors=[{**a,'panel':[v*scale for v in a['panel']] if a.get('panel') else None,
+                'protected':[{**b,'box':[v*scale for v in b['box']]} for b in a.get('protected',[])]} for a in anchors] if anchors else None
+            reference_plan=kinetic_plan(local_words,reference,keywords if cfg.semantic_emphasis else (),position,reference_anchors,_phrases=[local_words],_following=following)['phrases'][0]
+            if not readable(reference_plan['words'],reference):
                 # A separate focus row must not make its context unreadable.
                 # Keep source words and emphasis; use the inline composition.
                 composition='editorial';local._composition=composition;local._accent_ratio=1.12
-                planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words],_following=following)['phrases'][0]
+        planned=kinetic_plan(local_words,local,keywords if cfg.semantic_emphasis else (),position,anchors,_phrases=[local_words],_following=following)['phrases'][0]
         if index+1<len(parts):planned['end']=min(planned['end'],parts[index+1][0]['start'])
         if quiet or composition=='quote':
             # All words appear together; stable reading baseline and no bounce.
@@ -110,20 +119,22 @@ def readability(plan,cfg):
         if not cfg.caption_backdrop:issue('background_unknown','Kontras terhadap gambar bergerak belum dijamin.','Aktifkan latar/outline subtitle atau periksa frame sumber.')
         if min((contrast(w.get('color',cfg.base_hex)) for w in phrase['words']),default=21)<4.5:
             issue('contrast','Warna teks kurang kontras terhadap outline gelap.','Pilih putih atau aksen yang lebih terang.')
-        from .caption_director import visible_cap
+        from .caption_director import visible_cap,visible_lower
         caps=[visible_cap(w,cfg.fonts_dir,360,W) for w in phrase['words']]
-        row.update(display_width_px=360,min_visible_cap_px=round(min(caps,default=0),2),minimum_cap_px=14)
-        if min(caps,default=14)<14:
+        lowers=[visible_lower(w,cfg.fonts_dir,360,W) for w in phrase['words']]
+        row.update(display_width_px=360,min_visible_cap_px=round(min(caps,default=0),2),minimum_cap_px=14,
+                   min_visible_lower_px=round(min(lowers,default=0),2),minimum_lower_px=14)
+        if min(caps,default=14)<14 or min(lowers,default=14)<14:
             issue('small_text','Huruf mengecil untuk menampung frasa.','Pecah frasa panjang atau pilih area subtitle yang lebih luas.')
         boxes=[];collision=False;overflow=False
+        from .caption_geometry import bounds
         for word in phrase['words']:
             for sample in word.get('keyframes',[]) or [{'scale':1,'dx':0,'dy':0,'opacity':1}]:
                 if sample.get('opacity',1)<=.05:continue
-                hw=word['width']*sample['scale']/2;hh=word['size']*sample['scale']*.66
-                box=[word['x']+sample['dx']-hw,word['y']+sample['dy']-hh,2*hw,2*hh]
+                box=bounds(word,sample)
                 if box[0]<-.5 or box[1]<-.5 or box[0]+box[2]>W+.5 or box[1]+box[3]>H+.5:overflow=True
                 if any(_overlap(box,p['box'])>1 for p in phrase.get('protected',[])):collision=True
-            boxes.append([word['x']-word['width']/2,word['y']-word['size']*.50,word['width'],word['size']])
+            boxes.append(bounds(word))
         if collision:issue('protected_collision','Animasi menyentuh wajah atau materi.','Gunakan penempatan otomatis atau pindahkan subtitle.','error')
         if overflow:issue('frame_overflow','Sebagian animasi keluar frame.','Kurangi ukuran atau ganti posisi subtitle.','error')
         if any(_overlap(a,b)>min(a[2]*a[3],b[2]*b[3])*.10 for i,a in enumerate(boxes) for b in boxes[i+1:]):

@@ -9,7 +9,7 @@ from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
 _SCOPE=ContextVar('clipper_content_scope',default=None)
-VERSION='studio4-content-v9-caption-director'
+VERSION='studio4-content-v10-measured-phrases'
 
 
 @contextmanager
@@ -69,6 +69,12 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe','included')}
     from .caption_renderer import signature
     parts=[VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe,signature(cfg)]
+    if cfg.align_selected_clips and cfg.alignment_model_path:
+        from .runtime.state import signatures,runtime_root
+        root=Path(cfg.visual_runtime_root) if cfg.visual_runtime_root else runtime_root()
+        model=Path(cfg.alignment_model_path.strip().strip('\"\''))
+        parts.append(signatures(root,keys=('whisperx',)))
+        parts.append([(p.name,content_id(p,fresh=fresh)) for p in sorted(model.glob('*')) if p.is_file()])
     if cfg.illustration_mode!='off':
         from .explanation5 import STRUCTURES_VERSION
         parts.append(STRUCTURES_VERSION)

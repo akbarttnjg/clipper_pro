@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.9'
+RENDER_VERSION = '4.0.10'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -76,6 +76,8 @@ def clip_name(clip, i):
 
 def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
     """Use the same evidence and pause policy for review, preview and final."""
+    from .selected_alignment import prepare
+    words,alignment_report=prepare(media_path,words,clip,cfg)
     words=intelligence.annotate_words(words,clip,cfg,context_words=context_words)
     preserve=cfg.source_kind in ('board','screen','chart','graphic') and cfg.preserve_material_pauses
     plan=editplan.build(words,clip,replace(cfg,trim_silence=False) if preserve else cfg)
@@ -84,6 +86,7 @@ def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
         plan=editplan.build(words,clip,replace(cfg,trim_silence=False))
         composition.analyze(media_path,plan,cfg,info)
         plan['warnings'].append('Jeda materi dipertahankan; waktu menulis tidak dipangkas otomatis.')
+    plan['selected_alignment']=alignment_report
     return words,plan
 
 
@@ -143,6 +146,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     # SFX cues now follow the final acoustic/semantic caption decisions.
     mix=render.audio_stems(media_path,plan,cfg,work)
     plan['style_report']=readability(plan['captions'],cfg)
+    plan['style_report']['selected_alignment']=plan.get('selected_alignment')
     write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
     if plan['style_report']['issue_count']:plan['warnings'].append('Keterbacaan perlu ditinjau; lihat masalah per frasa di panel Gaya Tahap 5.')
     from . import caption_renderer

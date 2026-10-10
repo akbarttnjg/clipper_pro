@@ -103,6 +103,7 @@ class Config:
     asr_second_pass: bool = True
     asr_recheck_windows: int = 12
     alignment_model_path: str = os.environ.get('ALIGNMENT_MODEL_PATH','')
+    align_selected_clips: bool = os.environ.get('ALIGN_SELECTED_CLIPS','1') == '1'
     caption_backdrop: bool = True
     safe_placement: bool = True
 
@@ -236,6 +237,9 @@ def validate_overrides(form: dict) -> dict:
     if 'semantic_emphasis' in form:
         if type(form['semantic_emphasis']) is not bool:raise ValueError('Penekanan makna harus boolean')
         out['semantic_emphasis']=form['semantic_emphasis']
+    if 'align_selected_clips' in form:
+        if type(form['align_selected_clips']) is not bool:raise ValueError('Alignment klip harus boolean')
+        out['align_selected_clips']=form['align_selected_clips']
     for key, values in {'source_kind': ('auto','speaker','board','podcast','screen','chart','graphic'),
                         'search_depth': ('balanced','broad'),
                         'workflow': ('review','automatic'),

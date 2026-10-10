@@ -2,6 +2,7 @@
 def inspect_caption_plan(plan, cfg, expected_words=None):
     """Check settled positions and line edges against the requested placement."""
     issues = []
+    from .caption_geometry import bounds
     readability = []
     if expected_words and not plan.get('phrases'):
         issues.append('Subtitle kosong meskipun transkrip berisi kata.')
@@ -40,12 +41,10 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
             for frame in samples:
                 if frame.get('opacity',1)<.05:
                     continue
-                half_w = word['width']*frame.get('scale',1)/2
-                half_h = word['size']*frame.get('scale',1)*.66
-                cx,cy = word['x']+frame.get('dx',0), word['y']+frame.get('dy',0)
-                if not (-.5 <= cx-half_w and cx+half_w <= cfg.target_w+.5 and -.5 <= cy-half_h and cy+half_h <= cfg.target_h+.5):
+                bx,by,bw,bh=bounds(word,frame)
+                if not (-.5 <= bx and bx+bw <= cfg.target_w+.5 and -.5 <= by and by+bh <= cfg.target_h+.5):
                     issues.append('Animasi subtitle keluar dari batas gambar.')
-                if not (x-.5 <= cx-half_w and cx+half_w <= x+width+.5 and y-.5 <= cy-half_h and cy+half_h <= y+height+.5):
+                if not (x-.5 <= bx and bx+bw <= x+width+.5 and y-.5 <= by and by+bh <= y+height+.5):
                     issues.append('Animasi subtitle keluar dari area teks.')
             if cfg.caption_position == 'auto' and cfg.safe_placement:
                 # Caption validation only needs rectangle arithmetic, not the
@@ -56,10 +55,7 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
                 for frame in word.get('keyframes', [{'scale': 1, 'dx': 0, 'dy': 0, 'opacity': 1}]):
                     if frame.get('opacity', 1) < .05:
                         continue
-                    scale = frame.get('scale', 1)
-                    box = [word['x']+frame.get('dx', 0)-word['width']*scale/2,
-                           word['y']+frame.get('dy', 0)-word['size']*scale*.66,
-                           word['width']*scale, word['size']*scale*1.32]
+                    box = bounds(word,frame)
                     if any(overlap(box, item['box']) > .5 for item in phrase.get('protected', [])):
                         issues.append('Subtitle bertabrakan dengan area wajah/tulisan yang terdeteksi.')
         for row in lines.values():

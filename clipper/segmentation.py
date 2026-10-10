@@ -6,7 +6,7 @@ generations; rendering never downloads weights.
 """
 from pathlib import Path
 
-VERSION='segmentation-4.0.9'
+VERSION='segmentation-4.0.10'
 MODEL_URL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite'
 MODEL_SHA256='c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0'
 MODEL_BYTES=16371837
@@ -25,7 +25,11 @@ def enrich(media,plan,cfg):
         summary.update(status='unavailable',note='MediaPipe opsional belum dipasang dan lulus uji sampel; YuNet/OCR dan statistik gambar tetap dipakai.')
         return summary
     shots=plan.get('shots',[])
-    times=sorted(set(round(t,3) for s in shots for t in (s['source_start']+.02,(s['source_start']+s['source_end'])/2,max(s['source_start']+.02,s['source_end']-.04)) if t<s['source_end']))
+    # Request the exact frame used for image statistics. Never assign the
+    # midpoint mask to an earlier/later grid from a moving person.
+    times=sorted(set(round(t,3) for s in shots for t in
+        ([a['time'] for a in s.get('area_samples',[]) if isinstance(a.get('time'),(int,float))] or
+         [(s['source_start']+s['source_end'])/2]) if s['source_start']<=t<s['source_end']))
     if len(times)>8:times=[times[round(i*(len(times)-1)/7)] for i in range(8)]
     if not times:summary['status']='no_frames';return summary
     result=visual4.backend('mediapipe',{'source':str(Path(media).resolve()),'source_content_id':content_id(media),
@@ -36,13 +40,20 @@ def enrich(media,plan,cfg):
     if len(result.get('frames',[]))>8:raise ValueError('Backend segmentasi melampaui anggaran frame.')
     used=0
     for shot in shots:
+        for sample in shot.get('area_samples',[]):
+            sample.pop('categories',None);sample.pop('segmentation_time',None)
         frames=[f for f in result['frames'] if shot['source_start']<=f['time']<shot['source_end']]
         if not frames:continue
         used+=1
         for f in frames:
             shot.setdefault('protected_source',[]).extend(f['protected'])
         for sample in shot.get('area_samples',[]):
-            sample['categories']=min(frames,key=lambda f:abs(f['time']-(shot['source_start']+shot['source_end'])/2))['categories']
+            sample.pop('categories',None)
+            sample.pop('segmentation_time',None)
+            match=next((f for f in frames if isinstance(sample.get('time'),(int,float)) and abs(f['time']-sample['time'])<=.002),None)
+            if match:
+                sample['categories']=match['categories']
+                sample['segmentation_time']=match['time']
         shot['segmentation']={'status':'sampled','times':[f['time'] for f in frames],'generation':summary['generation'],
                               'policy':'face_hair_accessories_protected; plain_clothes_eligible'}
     summary.update(sampled_frames=len(result['frames']),sampled_shots=used,total_shots=len(shots),

@@ -65,6 +65,7 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
             origin_word_ids=origins,text=w['word'],source_start=w['start'],source_end=w['end'],
             correction_status='manual' if w.get('manually_edited') else w.get('correction','unchanged'),
             timing_status=w.get('timing_status','asr'),alignment_method=w.get('alignment_method'),
+            asr_probability=w.get('probability'),
             provenance={'reason':w.get('correction'),'before':w.get('raw_word'),'manual':bool(w.get('manually_edited'))},
             requires_alignment=alignment))
     queue=[]
