@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
+from .frozen_release import restore
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,7 +46,8 @@ class VerifiedOverlay(unittest.TestCase):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(data)
         with contextlib.redirect_stdout(io.StringIO()):
-            self.builder.build(self.package, '0' * 40)
+            self.sources=restore(self.folder/'frozen-source')
+            with patch.dict(self.builder.complete_build.__globals__,{'ROOT':self.sources}):self.builder.build(self.package, '0' * 40)
         self.work = self.target / 'work'
         self.work.mkdir()
         self.db = self.work / 'studio4.sqlite3'
@@ -118,8 +120,8 @@ class VerifiedOverlay(unittest.TestCase):
         (self.target / '.venv').symlink_to(Path(sys.prefix), target_is_directory=True)
         # Unchanged optional runtime assets are part of the application, not the
         # compact fixture; restore those from the checked source for this probe.
-        for source in ROOT.rglob('*'):
-            rel = source.relative_to(ROOT)
+        for source in self.sources.rglob('*'):
+            rel = source.relative_to(self.sources)
             if rel.parts[0] not in {'clipper', 'static'} or '__pycache__' in rel.parts:
                 continue
             dest = self.target / rel

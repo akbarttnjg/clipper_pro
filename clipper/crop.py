@@ -6,7 +6,6 @@ virtual camera glides instead of snapping on every head twitch.
 """
 from __future__ import annotations
 import subprocess
-import urllib.request
 from pathlib import Path
 
 import cv2
@@ -15,42 +14,26 @@ import numpy as np
 from .config import Config
 from .ffmpeg_util import even, ass_filter, encoder_args, final_audio_args
 
-# YuNet is the higher-quality detector but ships via Git LFS, so we download the real
-# binary from the media endpoint. If that fails for any reason we fall back to the Haar
-# cascade bundled inside opencv-python - no download, always available.
-_YUNET_URL = (
-    "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/"
-    "face_detection_yunet/face_detection_yunet_2023mar.onnx"
-)
+# Model installation is explicit. Render helpers only read prepared local files.
 _YUNET_PATH = Path(__file__).parent / "models" / "face_detection_yunet.onnx"
-_YUNET_DOWNLOAD_FAILED = False
 _DETECT_W = 640  # downscale frames to this width for face detection (speed)
 
 
 def _try_yunet(w: int, h: int):
-    """Return a YuNet detector, or None if the model can't be fetched/loaded."""
-    global _YUNET_DOWNLOAD_FAILED
+    """Return only prepared local weights; rendering never downloads a model."""
     try:
         if not _YUNET_PATH.exists() or _YUNET_PATH.stat().st_size < 10000:
-            if _YUNET_DOWNLOAD_FAILED:
-                return None
-            _YUNET_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with urllib.request.urlopen(_YUNET_URL, timeout=10) as response:
-                model = response.read()
-            if len(model) < 10000:
-                raise ValueError("Unduhan model wajah tidak lengkap.")
-            pending = _YUNET_PATH.with_suffix(".download")
-            pending.write_bytes(model)
-            pending.replace(_YUNET_PATH)
+            return None
         return cv2.FaceDetectorYN.create(str(_YUNET_PATH), "", (w, h), score_threshold=0.6)
     except Exception:
-        _YUNET_DOWNLOAD_FAILED = True
         return None
 
 
 def _haar():
     """opencv's built-in frontal-face cascade. Bundled with the pip package."""
-    return cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    if not hasattr(cv2,'CascadeClassifier') or not hasattr(cv2,'data'):return None
+    cascade=cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    return None if cascade.empty() else cascade
 
 
 def _make_detector(w: int, h: int):
@@ -63,6 +46,7 @@ def _make_detector(w: int, h: int):
 
 def _largest_center(detector, kind, frame):
     """Return (cx, cy) of the biggest detected face, or None."""
+    if detector is None:return None
     if kind == "yunet":
         _, faces = detector.detect(frame)
         if faces is None or not len(faces):
@@ -79,6 +63,7 @@ def _largest_center(detector, kind, frame):
 
 def _largest_box(detector, kind, frame):
     """Return (x, y, w, h) of the biggest detected face, or None."""
+    if detector is None:return None
     if kind == "yunet":
         _, faces = detector.detect(frame)
         if faces is None or not len(faces):

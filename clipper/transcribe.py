@@ -40,7 +40,7 @@ def _run(media_path, cfg):
     warnings = []
     def attempt(dev, dtype):
         model = WhisperModel(cfg.whisper_model, device=dev, compute_type=dtype,
-                             cpu_threads=max(1, min(8, os.cpu_count() or 4)), num_workers=1)
+                             cpu_threads=max(1, min(8, os.cpu_count() or 4)), num_workers=1,local_files_only=True)
         try:
             segments, info = model.transcribe(media_path,
                 language=None if cfg.language == 'auto' else cfg.language,
@@ -81,14 +81,17 @@ def _run(media_path, cfg):
                     'asr_corrections': corrections, 'second_pass': {'checked': checked, 'errors': errors},
                     'text': ' '.join(text), 'segments': sentences,
                     'duration': float(info.duration), 'language': info.language,
-                    'device': dev, 'warnings': warnings}
+                    'device': dev, 'warnings': warnings,
+                    'runtime_receipt':{'requested_device':cfg.whisper_device,'actual_device':dev,
+                        'requested_model':cfg.whisper_model,'actual_model':cfg.whisper_model,'actual_compute_type':dtype,
+                        'local_files_only':True,'fallback_reason':warnings[-1] if dev!=device and warnings else None}}
         finally:
             del model
             gc.collect()
     try:
         return attempt(device, compute)
     except RuntimeError as exc:
-        if device != 'cuda':
+        if device != 'cuda' or not cfg.allow_backend_fallback:
             raise
         warnings.append('Transkripsi beralih ke CPU: ' + str(exc)[:200])
         return attempt('cpu', 'int8')
@@ -100,7 +103,7 @@ def transcribe(media_path, cfg):
     from .runtime.bridge import managed_asr
     managed=managed_asr(cfg)
     worker_cfg=replace(cfg,whisper_model=managed['weights'],whisper_device=managed['recommended_device'] if cfg.whisper_device=='auto' else cfg.whisper_device) if managed else cfg
-    environment=os.environ.copy()
+    environment={**os.environ,'HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','TOKENIZERS_PARALLELISM':'false'}
     if managed:
         environment['PYTHONPATH']=str(Path(__file__).resolve().parent.parent)
         environment['PYTHONNOUSERSITE']='1'
@@ -113,7 +116,11 @@ def transcribe(media_path, cfg):
                            text=True, encoding='utf-8', errors='replace')
         if r.returncode or not result_path.exists():
             raise RuntimeError('Transkripsi gagal. ' + r.stderr[-2500:])
-        return json.loads(result_path.read_text(encoding='utf-8'))
+        result=json.loads(result_path.read_text(encoding='utf-8'))
+        receipt=result.setdefault('runtime_receipt',{})
+        receipt.update(requested_device=cfg.whisper_device,requested_model=cfg.whisper_model)
+        if managed:receipt['managed_generation']=managed['generation']
+        return result
 
 
 if __name__ == '__main__':

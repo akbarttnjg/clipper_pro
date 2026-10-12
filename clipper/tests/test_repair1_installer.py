@@ -90,8 +90,9 @@ class Installer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             report=builder.build(Path(tmp)/'release','0'*40)
             self.assertEqual(report['zip_crc'],'passed')
-            manifest,changes,_=installer.preflight(ROOT,Path(tmp)/'release',runtime=False,stopped=False)
-            self.assertEqual(manifest['version'],'4.0.7');self.assertEqual(changes,[])
+            # A historical 4.0.7 overlay must reject a future 4.0.11 source tree.
+            with self.assertRaisesRegex(ValueError,'Kode lokal berbeda'):
+                installer.preflight(ROOT,Path(tmp)/'release',runtime=False,stopped=False)
 
 
 if __name__=='__main__':unittest.main()

@@ -243,7 +243,8 @@ def test_sam_prompts_and_budget_are_validated(controls):
 def test_sam_uses_selected_source_shot_not_always_the_first(tmp_path,monkeypatch):
     calls=[]
     monkeypatch.setattr(visual4,'backend',lambda key,r,*args:calls.append(r) or {'status':'ready'})
-    monkeypatch.setattr(visual4.cv2,'VideoCapture',lambda *a:SimpleNamespace(set=lambda *a:None,read=lambda :(False,None),release=lambda :None))
+    import cv2
+    monkeypatch.setattr(cv2,'VideoCapture',lambda *a:SimpleNamespace(set=lambda *a:None,read=lambda :(False,None),release=lambda :None))
     shots=[{'source_start':a,'source_end':b,'start':a,'end':b,'visual':{'frame_times':[a+.2]}} for a,b in [(0,4),(4,8)]]
     cfg=Config(work_dir=str(tmp_path),visual_overrides={'sam_enabled':True,'sam_time':5,'sam_span':[4,7],'sam_box':[10,10,50,70]})
     result=visual4.report({'shots':shots,'source':{'width':640,'height':360}},'source',cfg)
@@ -271,7 +272,8 @@ def test_sam_sequence_maps_source_times_and_saves_masks_without_neural_claim(tmp
     import sys
     # Predictor outputs are deliberate fixtures, not scores from actual weights.
     monkeypatch.setitem(sys.modules,'torch',SimpleNamespace(inference_mode=nullcontext))
-    monkeypatch.setattr(visual4.cv2,'VideoCapture',lambda *a:SimpleNamespace(set=lambda *a:None,
+    import cv2
+    monkeypatch.setattr(cv2,'VideoCapture',lambda *a:SimpleNamespace(set=lambda *a:None,
         read=lambda :(True,np.zeros((200,400,3),dtype=np.uint8)),release=lambda :None))
     class Logits:
         def __getitem__(self,index):return self
@@ -310,7 +312,11 @@ def test_renewed_calibration_refreshes_selected_profile_not_project_override(tmp
         def result(self):return {}
     monkeypatch.setattr(tasks,'GPUMonitor',Monitor)
     monkeypatch.setattr(tasks,'gpu_snapshot',lambda :[])
-    def encode(cmd,**options):Path(cmd[-1]).write_bytes(b'encoded-fixture');return subprocess.CompletedProcess(cmd,0,'','')
+    real_run=subprocess.run
+    def encode(cmd,**options):
+        if cmd[0]!='ffmpeg':return real_run(cmd,**options)
+        target=Path(cmd[-1]);assert target.parent==runtime/'calibration'
+        target.write_bytes(b'encoded-fixture');return subprocess.CompletedProcess(cmd,0,'','')
     monkeypatch.setattr(tasks.subprocess,'run',encode)
     tasks.calibrate(manager,{'id':'test'})
     assert read(runtime/'selected-profile.json')['device']=='cuda'

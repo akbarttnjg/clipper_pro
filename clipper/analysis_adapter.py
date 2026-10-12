@@ -38,9 +38,9 @@ def asr_fingerprint(source_id,audio_stream_id,cfg,source_time_origin=0,alias_rev
     value=[VERSION,source_id,audio_stream_id,source_time_origin,
         {k:getattr(cfg,k,None) for k in DEPENDENCIES['asr'] if hasattr(cfg,k)},
         alias_revision if alias_revision is not None else signature(cfg)]
-    from .runtime.bridge import managed_asr
-    managed=managed_asr(cfg) if getattr(cfg,'whisper_isolate',True) else None
-    if managed:value.append({k:managed[k] for k in ('generation','model_commit','lock_hash','recommended_device')})
+    from .dependency_cache import asr_identity
+    value.append(asr_identity(cfg,fresh=True))
+    value.append({'allow_backend_fallback':cfg.allow_backend_fallback})
     return digest(value)
 
 

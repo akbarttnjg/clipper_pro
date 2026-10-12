@@ -49,9 +49,13 @@ def probe_generation(manager,job,directory,receipt,*,sample):
     if item['kind']=='node':return node_probe(manager,job,directory,sample=sample)
     py=interpreter(directory) if item['kind'] in ('pip','source') else Path(sys.executable)
     if not py.is_file():raise ValueError('Interpreter lingkungan komponen tidak tersedia')
-    device=job['options'].get('device','cpu')
+    requested_device=job['options'].get('device','cpu');device=requested_device
     if sample and device=='cuda' and not gpu_snapshot():device='cpu'
-    request=dict(component=key,directory=str(directory),repo=str(manager.repo),sample=sample,device=device,source=job['options'].get('source'),resolution=job['options'].get('resolution',336))
+    required=bool(job['options'].get('required',False))
+    if required and device!=requested_device:
+        raise ValueError('Device yang diwajibkan tidak tersedia; probe tidak memakai fallback.')
+    request=dict(component=key,directory=str(directory),repo=str(manager.repo),sample=sample,device=device,
+        audio_stream_index=job['options'].get('audio_stream_index',-1),source=job['options'].get('source'),resolution=job['options'].get('resolution',336))
     request_file=manager.root/'requests'/(jid+'.json');response_file=request_file.with_suffix('.result.json');write(request_file,request)
     environment={**os.environ,'PYTHONNOUSERSITE':'1','HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','TOKENIZERS_PARALLELISM':'false','OMP_NUM_THREADS':'4'}
     if key=='pyannote':environment['HF_HUB_CACHE']=str(directory/'hf-cache');environment['HUGGINGFACE_HUB_CACHE']=str(directory/'hf-cache')
@@ -63,7 +67,7 @@ def probe_generation(manager,job,directory,receipt,*,sample):
         environment['PATH']=os.pathsep.join(dlls+[environment.get('PATH','')])
     attempts=[]
     with GPULease(manager.root,'komponen '+key,canceled=lambda:manager.canceled(jid),waiting=lambda:manager.update(jid,message='Menunggu GPU: model lain masih bekerja')):
-        for selected in [device]+(['cpu'] if device=='cuda' else []):
+        for selected in [device]+(['cpu'] if device=='cuda' and not required else []):
             request['device']=selected;write(request_file,request);response_file.unlink(missing_ok=True)
             started=time.monotonic()
             with GPUMonitor() as monitor:
@@ -76,6 +80,11 @@ def probe_generation(manager,job,directory,receipt,*,sample):
             # Retry only device/runtime failures, not a missing model or a faulty algorithm.
             if not any(s in result.get('detail','').lower() for s in ('cuda','out of memory','cudnn','cublas','gpu')):break
     if len(attempts)>1:result['fallback']={'from':'cuda','to':'cpu','reason':attempts[0].get('detail'),'failed_attempt_memory':attempts[0].get('memory')}
+    result.update(requested_device=job['options'].get('device','cpu'),actual_device=result.get('device'),required=required)
+    if required and result.get('passed') and result['actual_device']!=result['requested_device']:
+        result.update(passed=False,detail='Backend wajib tidak terpenuhi: diminta '+str(result['requested_device'])+', aktual '+str(result['actual_device'])+'.')
+    if result['requested_device']!=result['actual_device'] and 'fallback' not in result:
+        result['fallback']={'from':result['requested_device'],'to':result['actual_device'],'reason':'Device yang diminta tidak tersedia pada preflight.'}
     result['tested_at']=time.time();return result
 
 

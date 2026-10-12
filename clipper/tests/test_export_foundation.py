@@ -265,7 +265,7 @@ def test_bundle_returns_honest_independent_editor_status(package,tmp_path,monkey
     root,result=package;plan=read_json(result['plan_path'])
     plan['broll']=[];plan['audio']['mix']=plan['audio']['stems']['speech']
     plan['subtitle_path']=str(root/'Media/01-captions.ass');write_json(result['plan_path'],plan)
-    monkeypatch.setattr(render,'video',lambda source,plan,cfg,ass,target,audio,progress:Path(target).write_bytes(b'unit-clean-render'))
+    monkeypatch.setattr(render,'video',lambda source,plan,cfg,ass,target,audio,progress,**kwargs:Path(target).write_bytes(b'unit-clean-render'))
     monkeypatch.setattr(qc,'inspect',lambda *a,**kw:dict(passed=True))
     if failed_editor:
         def fail(*args,**kwargs):raise ValueError('Simulated '+failed_editor+' failure')

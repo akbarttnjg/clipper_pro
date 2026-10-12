@@ -2,12 +2,12 @@ import {mountBatch7} from './features/batch7.js?v=4.0.10';
 import {mountSteps6,mountBrand6,mountEvaluation6} from './features/workspace6.js?v=4.0.6';
 import {mountAnalysis} from './features/analysis.js?v=4.0.3';
 import {mountTranscript3,approveFactChanges} from './features/transcript3.js?v=4.0.10';
-import {mountRuntime} from './features/runtime.js?v=4.0.2a';
+import {mountRuntime} from './features/runtime.js?v=4.0.11-m0';
 import {mountStyle5} from './features/style5.js?v=4.0.10';
 import {mountVisual4} from './features/visual4.js?v=4.0.4';
 const $=q=>document.querySelector(q),main=$('#main');
 const S={doc:null,step:'source',clip:null,variant:'portrait',view:'source',page:null,baseRevision:0,styles:[],fonts:[],query:'',analysis:null,offset:0,dirty:new Map(),panels:new Map(),polling:false};
-$('#runtime').onclick=()=>mountRuntime($('#dialog'),api,toast,S.doc?.source?.path||'').catch(e=>toast(e.message,true));
+$('#runtime').onclick=()=>mountRuntime($('#dialog'),api,toast,S.doc?.source?.path||'',S.doc?.settings?.audio_stream_index??-1).catch(e=>toast(e.message,true));
 try{S.dirty=new Map(JSON.parse(localStorage.getItem('clipper4-drafts')||'[]'))}catch{}
 const saveDrafts=()=>localStorage.setItem('clipper4-drafts',JSON.stringify([...S.dirty]));
 const scope=()=>[S.doc?.project_id,S.clip,S.variant].join('|');

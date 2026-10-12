@@ -130,16 +130,16 @@ def test_full_mode_skips_ollama(tmp_path,monkeypatch):
 
 def test_offline_face_model_falls_back_once(tmp_path,monkeypatch):
     from clipper import crop
+    import urllib.request
     calls=[]
     monkeypatch.setattr(crop,'_YUNET_PATH',tmp_path/'missing.onnx')
-    monkeypatch.setattr(crop,'_YUNET_DOWNLOAD_FAILED',False)
     def offline(url,timeout):
         calls.append(timeout)
         raise TimeoutError('offline')
-    monkeypatch.setattr(crop.urllib.request,'urlopen',offline)
+    monkeypatch.setattr(urllib.request,'urlopen',offline)
     assert crop._try_yunet(640,360) is None
     assert crop._try_yunet(640,360) is None
-    assert calls==[10]
+    assert calls==[]
 
 
 def test_short_silent_audio_normalization(tmp_path):

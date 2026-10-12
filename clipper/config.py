@@ -33,6 +33,7 @@ class Config:
     whisper_model: str = os.environ.get("WHISPER_MODEL", "medium")
     whisper_compute: str = os.environ.get("WHISPER_COMPUTE", "int8_float16")
     whisper_device: str = os.environ.get("WHISPER_DEVICE", "auto")  # auto|cuda|cpu
+    allow_backend_fallback: bool = True
 
     # --- Clip selection ---
     num_clips: int = _env_int("NUM_CLIPS", 0)  # 0 = all verified, distinct stories
@@ -240,6 +241,9 @@ def validate_overrides(form: dict) -> dict:
     if 'align_selected_clips' in form:
         if type(form['align_selected_clips']) is not bool:raise ValueError('Alignment klip harus boolean')
         out['align_selected_clips']=form['align_selected_clips']
+    if 'allow_backend_fallback' in form:
+        if type(form['allow_backend_fallback']) is not bool:raise ValueError('Izin fallback harus boolean')
+        out['allow_backend_fallback']=form['allow_backend_fallback']
     for key, values in {'source_kind': ('auto','speaker','board','podcast','screen','chart','graphic'),
                         'search_depth': ('balanced','broad'),
                         'workflow': ('review','automatic'),

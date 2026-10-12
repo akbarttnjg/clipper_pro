@@ -435,10 +435,13 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
                         sample['dx']=round(max(x-box[0],min(sample['dx'],x+width-box[0]-box[2])),3)
                         sample['dy']=round(max(y-box[1],min(sample['dy'],y+height-box[1]-box[3])),3)
                     else:
-                        half_w = measures[i]*sample['scale']/2
-                        half_h = size*sample['scale']*.66
-                        sample['dx'] = round(max(x+half_w-wx, min(sample['dx'], x+width-half_w-wx)), 3)
-                        sample['dy'] = round(max(y+half_h-wy, min(sample['dy'], y+height-half_h-wy)), 3)
+                        # Legacy plans must include the blur spread used by the
+                        # validator, rather than clamping only nominal glyph size.
+                        box=ink_bounds(geometry,{**sample,'dx':0.,'dy':0.})
+                        if box[2]>width or box[3]>height:sample['blur']=0.
+                        box=ink_bounds(geometry,{**sample,'dx':0.,'dy':0.})
+                        sample['dx']=round(max(x-box[0],min(sample['dx'],x+width-box[0]-box[2])),3)
+                        sample['dy']=round(max(y-box[1],min(sample['dy'],y+height-box[1]-box[3])),3)
                 placed.append({'text':w['word'],'word_id':w.get('word_id'),'word_ids':w.get('word_ids',[]),
                     'token_ids':w.get('token_ids',[]),
                     'start':w['start'],'end':w['end'],'x':round(wx,3),'y':round(wy,3),

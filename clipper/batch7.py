@@ -45,6 +45,8 @@ def _snapshot(service,doc,*,fresh=False,mode=None,require_ready=False):
 
 
 def export_project(service,job):
+    from .studio_worker import claimed_job
+    job=claimed_job(service,job)
     from pathlib import Path
     from . import projects
     from .dependency_cache import content_id, fresh_scope
@@ -56,7 +58,8 @@ def export_project(service,job):
         with fresh_scope():return validate()
     def validate():
         doc=service.store.get(pid)
-        if service.queue.get(job['id'])['status']=='cancel_requested':raise StaleJob('Paket dibatalkan.')
+        active=service.queue.get(job['id'])
+        if active['status'] in ('cancel_requested','canceled') or active.get('owner')!=job.get('owner') or active.get('lease_token')!=job.get('lease_token'):raise StaleJob('Paket dibatalkan atau lease berubah.')
         current=snapshot(service,doc,fresh=True,mode=mode,require_ready=True)
         if expected!=current['dependency']:raise StaleJob('Pilihan klip atau hasil final berubah; buat paket kembali.')
         if doc['source'].get('requires_analysis') or not Path(doc['source']['path']).is_file() or content_id(doc['source']['path'],fresh=True)!=doc['source']['source_id']:
@@ -68,7 +71,7 @@ def export_project(service,job):
         result=copy.deepcopy(service.variant(doc,cid,vid)['result'])
         result.update(clip_id=cid,variant_id=vid,title=doc['clips'][cid]['title']+' ['+('9x16' if vid=='portrait' else '16x9')+']')
         results.append(result)
-    def progress(value,message):service.queue.update(job['id'],progress=int(value),message=message)
+    def progress(value,message):service.queue.update_owned(job,progress=int(value),message=message)
     result=projects.export_bundle(results,service.config(doc),progress,mode=mode)
     if result['timelines']!=state['timelines']:raise ValueError('Jumlah timeline tidak sesuai klip dan rasio yang dipilih.')
     result.update(variant_id='both',clip_ids=list(dict.fromkeys(t['clip_id'] for t in state['targets'])),
@@ -76,13 +79,15 @@ def export_project(service,job):
                   dependency=expected,input_revision=doc['revision'],package_content_id=content_id(result['zip'],fresh=True))
     result['url']=service.register_file(pid,result['zip'])
     def publish(current):
+        check()
         if snapshot(service,current,fresh=True,mode=mode,require_ready=True)['dependency']!=expected:raise StaleJob('Hasil final berubah sebelum paket tersimpan.')
         current.setdefault('exports',[]).append(result)
     for attempt in range(5):
         current,_=check()
         try:
-            saved=service.store.mutate(pid,current['revision'],job['id']+'-publish',{'dependency':expected},publish,'Paket seluruh klip · dua rasio');break
+            saved=service.store.mutate(pid,current['revision'],job['id']+'-publish',{'dependency':expected},publish,'Paket seluruh klip · dua rasio',
+                                      job_guard=job,job_result=result);break
         except Conflict:
             if attempt==4:raise
-    service.queue.update(job['id'],status='completed',progress=100,message=f"Paket {len(results)} timeline tersimpan · revisi {saved['revision']}",result=result)
+    service.queue.update_owned(job,message=f"Paket {len(results)} timeline tersimpan · revisi {saved['revision']}")
     return result

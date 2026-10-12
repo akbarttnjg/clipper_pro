@@ -3,7 +3,7 @@ const labels={queued:'Antre',running:'Berjalan',cancel_requested:'Membatalkan',c
 const size=n=>n==null?'belum diukur':(n/1024**3).toFixed(1)+' GB';
 function el(tag,text,cls){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node}
 
-export async function mountRuntime(dialog,api,toast,sourcePath=''){
+export async function mountRuntime(dialog,api,toast,sourcePath='',selectedAudioIndex=-1){
   dialog.replaceChildren();dialog.classList.add('runtime-dialog');
   const head=el('div',undefined,'runtime-head row spread');head.append(el('h2','Komponen & perangkat'));
   const headActions=el('div',undefined,'row'),content=el('div',undefined,'runtime-content');head.append(headActions);dialog.append(head,content);
@@ -13,7 +13,9 @@ export async function mountRuntime(dialog,api,toast,sourcePath=''){
   const pathLabel=el('label','Sumber untuk uji audio / video'),path=el('input');path.value=sourcePath||'';path.placeholder='Path video lokal, contoh C:\\Video\\sumber.mp4';pathLabel.append(path);
   const modelLabel=el('label','Bobot faster-whisper'),model=el('select');for(const id of ['small','medium']){const option=el('option',id);option.value=id;model.append(option)}modelLabel.append(model);
   const deviceLabel=el('label','Perangkat uji'),device=el('select');for(const [id,text] of [['cpu','CPU (awal)'],['cuda','CUDA (ukur & fallback CPU)']]){const option=el('option',text);option.value=id;device.append(option)}deviceLabel.append(device);
-  controls.append(pathLabel,modelLabel,deviceLabel);content.append(controls,summary,jobs,body);
+  const audioLabel=el('label','Index track suara (-1: pertama)'),audio=el('input');audio.type='number';audio.min='-1';audio.step='1';audio.value=String(selectedAudioIndex);audioLabel.append(audio);
+  const requiredLabel=el('label','Wajib gunakan perangkat pilihan'),required=el('input');required.type='checkbox';requiredLabel.append(required);
+  controls.append(pathLabel,modelLabel,deviceLabel,audioLabel,requiredLabel);content.append(controls,summary,jobs,body);
   let closed=false,polling=false,timer=null,lastSignature='',lastData=null,selectedLog=null,logRequest=0;
   const jobNodes=new Map();
   function button(parent,text,fn){const b=el('button',text);b.type='button';b.onclick=async()=>{if(b.disabled)return;b.dataset.busy='1';b.disabled=true;try{await fn();await refresh(true)}catch(e){toast(e.message,true)}finally{delete b.dataset.busy;b.disabled=false;if(lastData)syncActions(lastData)}};parent.append(b);return b}
@@ -24,7 +26,7 @@ export async function mountRuntime(dialog,api,toast,sourcePath=''){
   });cancelActive.classList.add('danger');cancelActive.disabled=true;
   const cancelQueued=button(headActions,'Batalkan antrean menunggu',async()=>{const result=await api('/runtime/jobs/cancel-queued',{});toast(result.canceled+' pekerjaan menunggu dibatalkan; berkas unduhan tetap disimpan')});cancelQueued.classList.add('danger');cancelQueued.disabled=true;
   headActions.append(close);
-  async function queue(component,action){const options={model:model.value,device:device.value};if(action==='sample'&&path.value.trim())options.source=path.value.trim();await api('/runtime/jobs',{component,action,options});toast('Proses ditambahkan ke antrean komponen')}
+  async function queue(component,action){const options={model:model.value,device:device.value,required:required.checked};if(action==='sample'&&path.value.trim()){const index=Number(audio.value);if(!Number.isInteger(index)||index< -1)throw new Error('Index track harus integer -1 atau lebih besar');options.source=path.value.trim();options.audio_stream_index=index}await api('/runtime/jobs',{component,action,options});toast('Proses ditambahkan ke antrean komponen')}
   const top=el('div',undefined,'row');content.insertBefore(top,controls);
   button(top,'Kalibrasi perangkat',()=>queue('hardware','calibrate'));
   button(top,'Muat ulang status',()=>refresh(true));
