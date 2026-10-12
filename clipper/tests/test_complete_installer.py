@@ -15,7 +15,7 @@ def module(name):
     spec=importlib.util.spec_from_file_location(name,ROOT/'tools'/f'{name}.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 
-installer=module('complete_installer');builder=module('build_typography9_release')
+installer=module('complete_installer');builder=module('build_m0_release')
 sha=lambda data:hashlib.sha256(data).hexdigest()
 
 
@@ -66,10 +66,10 @@ class CompleteInstaller(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             report=builder.build(Path(tmp)/'complete','0'*40)
             manifest,changes,_=installer.preflight(ROOT,Path(tmp)/'complete',runtime=False,stopped=False)
-            self.assertEqual(manifest['version'],'4.0.9');self.assertEqual(changes,[])
+            self.assertEqual(manifest['version'],'4.0.11');self.assertEqual(changes,[])
             self.assertEqual(report['zip_crc'],'passed')
-            names={r['path'] for r in manifest['files']};self.assertIn('static/features/batch7.js',names)
-            self.assertIn('clipper/framing.py',names);self.assertIn('clipper/batch7.py',names)
+            names={r['path'] for r in manifest['files']};self.assertIn('clipper/artifact_store.py',names)
+            self.assertIn('clipper/caption_readability.py',names);self.assertIn('clipper/batch7.py',names)
 
 
 if __name__=='__main__':unittest.main()

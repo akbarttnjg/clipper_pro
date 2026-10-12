@@ -9,8 +9,11 @@ work/
 clips/
 _smoketest/
 
-# Auto-downloaded model (YuNet) — fetched on first run
+# Prepared local detector models; rendering does not download them
 clipper/models/
+
+# Reproducible baseline archive generated from the pinned git commit
+/docs/releases/m0_fixture.zip
 
 # Per-user saved brand kit
 brand.json

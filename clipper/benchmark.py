@@ -19,7 +19,7 @@ def distance(a,b):
     return row[-1]
 
 
-def tokens(text):return re.findall(r"[\w]+(?:[.,]\d+)?",text.casefold())
+def tokens(text):return re.findall(r"[+-]?\d+(?:[.,]\d+)*|[\w]+|[%$€£]",text.casefold())
 
 
 def union_length(ranges):
@@ -32,13 +32,15 @@ def union_length(ranges):
 def evaluate(reference,hypothesis):
     original=tokens(reference.get('text',''));heard=tokens(hypothesis.get('text',''))
     if not original:raise ValueError('Transkrip acuan manusia diperlukan; nilai akurasi tidak boleh ditebak')
-    negations={'tidak','bukan','jangan','belum','tak','not','never','no'}
-    protected=lambda words:[w for w in words if w in negations or any(c.isdigit() for c in w)]
+    from .stage3 import PROTECTED,UNIT_ALIASES,fact_signature
+    protected=lambda words:[w for w in words if w in PROTECTED or w in UNIT_ALIASES or w in {'%','$','€','£'} or any(c.isdigit() for c in w)]
     terms=[{'term':t,'present':any(heard[i:i+len(tokens(t))]==tokens(t) for i in range(len(heard)))} for t in reference.get('terms',[])]
     refs=[(c['start'],c['end']) for c in reference.get('clips',[])];clips=[(c['start'],c['end']) for c in hypothesis.get('clips',[])]
     matched=sum(any(max(0,min(b,y)-max(a,x))/max(.001,b-a)>=.7 for x,y in clips) for a,b in refs)
     report={'schema_version':1,'wer':distance(original,heard)/len(original),'cer':distance(' '.join(original),' '.join(heard))/len(' '.join(original)),
-        'protected_tokens_exact':protected(original)==protected(heard),'terms':terms,'story_reference_count':len(refs),
+        'protected_tokens_exact':protected(original)==protected(heard) and fact_signature(reference.get('text',''))==fact_signature(hypothesis.get('text','')),
+        'critical_facts':{'reference':fact_signature(reference.get('text','')),'hypothesis':fact_signature(hypothesis.get('text',''))},
+        'terms':terms,'story_reference_count':len(refs),
         'story_coverage':matched/len(refs) if refs else None,'clip_count':len(clips),'unique_source_seconds':union_length(clips),
         'duplicate_seconds':sum(max(0,b-a) for a,b in clips)-union_length(clips),'native_editor_status':'not_tested'}
     report['gates']={'protected_tokens':report['protected_tokens_exact'],'approved_terms':all(t['present'] for t in terms),

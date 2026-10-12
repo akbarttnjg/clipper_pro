@@ -159,7 +159,10 @@ def test_temporal_overlap_does_not_delete_distinct_claims_or_facts():
     first={'start':0,'end':60,'main_claim':'Contoh pertama yang benar','story_kind':'example'}
     other={**first,'main_claim':'Jawaban lain yang lengkap'}
     assert not story.duplicate(first,other,[])
-    assert not story.duplicate({'start':0,'end':60},{'start':0,'end':59.9,'main_claim':'tidak 10 gram'},words('10 kg'))
+    # Claim metadata cannot invent a different fact for identical source footage.
+    assert story.duplicate({'start':0,'end':60},{'start':0,'end':59.9,'main_claim':'tidak 10 gram'},words('10 kg'))
+    actual=[*words('10 kg'),{'word':'tidak 10 gram','start':59.91,'end':60.}]
+    assert not story.duplicate({'start':0,'end':60},{'start':0,'end':59.9},actual)
 
 
 def test_coverage_exposes_pending_tail_and_excludes_silence():

@@ -55,7 +55,8 @@ def prepare(source,words,clip,cfg):
     except (ValueError,OSError,TypeError) as exc:
         report.update(status='unavailable',reason=str(exc));return words,report
     model=Path(runtime['model_path'])
-    signature=[(p.name,content_id(p)) for p in sorted(model.iterdir()) if p.is_file()]
+    from .dependency_cache import model_identity
+    signature=model_identity(model,fresh=True)
     key=fingerprint([VERSION,content_id(source),words,clip['start'],clip['end'],ids,runtime,signature,cfg.language])
     path=Path(cfg.audio_cache_dir or cfg.work_dir)/'selected-alignment'/(key+'.json')
     response=read_json(path);reused=response is not None

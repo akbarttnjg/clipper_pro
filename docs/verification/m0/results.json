@@ -1,0 +1,77 @@
+{
+  "baseline": {
+    "tests": 806,
+    "failures": 69,
+    "errors": 0,
+    "skipped": 22,
+    "passed": 715,
+    "seconds": 33.348,
+    "timestamp": "2026-10-12T09:18:54.680751-06:00",
+    "skip_reasons": {
+      "Full source 4.0.4 fixture not present beside checkout; run from release QA workspace": 11,
+      "Full source 4.0.5 fixture not present beside checkout; run from release QA workspace": 11
+    }
+  },
+  "final": {
+    "tests": 846,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 22,
+    "passed": 824,
+    "seconds": 43.535,
+    "timestamp": "2026-10-12T15:51:36.941732-04:00",
+    "skip_reasons": {
+      "Full source 4.0.4 fixture not present beside checkout; run from release QA workspace": 11,
+      "Full source 4.0.5 fixture not present beside checkout; run from release QA workspace": 11
+    }
+  },
+  "m0_cases": {
+    "tests": 40,
+    "failed": 0,
+    "skipped": 0,
+    "case_ids": [
+      "clipper.tests.test_m0::test_effective_dependency_ignores_selection_count_but_tracks_caption",
+      "clipper.tests.test_m0::test_model_bytes_nested_active_and_inactive",
+      "clipper.tests.test_m0::test_enqueue_freezes_snapshot_and_conflict_adds_no_job",
+      "clipper.tests.test_m0::test_named_asr_weights_invalidate_enqueue_identity",
+      "clipper.tests.test_m0::test_unresolved_asr_identity_cannot_reuse_transcript_cache",
+      "clipper.tests.test_m0::test_manual_timing_survives_cleanup_and_unknown_confidence[flag0]",
+      "clipper.tests.test_m0::test_manual_timing_survives_cleanup_and_unknown_confidence[flag1]",
+      "clipper.tests.test_m0::test_manual_timing_survives_cleanup_and_unknown_confidence[flag2]",
+      "clipper.tests.test_m0::test_automatic_alignment_cannot_replace_manual_shared_or_local",
+      "clipper.tests.test_m0::test_empty_bounds_rejected_and_intersections_undo_together",
+      "clipper.tests.test_m0::test_cancel_claim_interleavings_never_hide_running_owner",
+      "clipper.tests.test_m0::test_guarded_commit_and_lease_fence",
+      "clipper.tests.test_m0::test_complete_job_and_project_pointer_commit_together",
+      "clipper.tests.test_m0::test_prepared_plan_assets_survive_cleanup_of_original_work",
+      "clipper.tests.test_m0::test_failed_staging_and_crash_never_change_prior_set",
+      "clipper.tests.test_m0::test_duplicate_and_order_are_logical_not_membership",
+      "clipper.tests.test_m0::test_faint_caption_cannot_pass_readiness",
+      "clipper.tests.test_m0::test_clear_intervals_respect_renderer_interpolation",
+      "clipper.tests.test_m0::test_critical_metric_preserves_negation_sign_currency_unit[minus -5 persen-minus 5 persen]",
+      "clipper.tests.test_m0::test_critical_metric_preserves_negation_sign_currency_unit[5 persen-5 rupiah]",
+      "clipper.tests.test_m0::test_critical_metric_preserves_negation_sign_currency_unit[tidak naik 5%-naik 5%]",
+      "clipper.tests.test_m0::test_critical_metric_preserves_negation_sign_currency_unit[Rp 5 juta-Rp 5]",
+      "clipper.tests.test_m0::test_critical_metric_preserves_negation_sign_currency_unit[5%-5]",
+      "clipper.tests.test_m0::test_real_decode_rejects_wrong_fps_and_truncated_faststart",
+      "clipper.tests.test_m0_installer::test_m0_actual_upgrade_imports_backup_idempotence_and_rollback",
+      "clipper.tests.test_m0_installer::test_m0_disk_failure_mid_copy_rolls_back_every_file",
+      "clipper.tests.test_m0_installer::test_m0_unknown_local_code_and_corrupt_package_rejected_before_backup",
+      "clipper.tests.test_m0_integration::test_real_two_ratios_cache_publication_and_failed_retry",
+      "clipper.tests.test_m0_integration::test_doctor_extracts_selected_second_audio_stream",
+      "clipper.tests.test_m0_integration::test_missing_local_detector_never_downloads",
+      "clipper.tests.test_m0_integration::test_asr_local_only_and_required_backend_fail_closed",
+      "clipper.tests.test_m0_integration::test_cancel_before_launch_starts_no_process",
+      "clipper.tests.test_m0_integration::test_running_cancel_terminates_worker_and_child[False]",
+      "clipper.tests.test_m0_integration::test_running_cancel_terminates_worker_and_child[True]",
+      "clipper.tests.test_m0_runtime::test_real_supervised_worker_publishes_and_records_resources",
+      "clipper.tests.test_m0_runtime::test_expired_live_owner_keeps_serial_slot_until_exit",
+      "clipper.tests.test_m0_runtime::test_runtime_options_accept_selected_stream_and_strict_device",
+      "clipper.tests.test_m0_runtime::test_empty_asr_sample_cannot_be_a_pass",
+      "clipper.tests.test_m0_runtime::test_required_cuda_preflight_cannot_report_cpu_pass",
+      "clipper.tests.test_m0_runtime::test_required_backend_cannot_pass_when_worker_reports_another_device"
+    ]
+  },
+  "baseline_sha": "6682f0b4e633af6ca830e63754ac3d46fc100bbf",
+  "scope": "Linux CPU, real FFmpeg/SQLite/worker and process tree; controlled backend fixtures; target acceptance pending"
+}

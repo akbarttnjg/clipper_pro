@@ -172,7 +172,7 @@ def _recheck(source, transcript, cfg, options):
             'errors': errors, 'device': dev, 'ranges': evidence, 'warnings': warnings, 'basis': 'Targeted ASR; bukan forced alignment.'}}
     try: return attempt(device, compute)
     except RuntimeError as exc:
-        if device != 'cuda': raise
+        if device != 'cuda' or not cfg.allow_backend_fallback: raise
         warnings.append('ASR beralih ke CPU: '+str(exc)[:200]); return attempt('cpu', 'int8')
 
 

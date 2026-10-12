@@ -132,13 +132,12 @@ def analyze(media, plan, cfg, info):
         if crop._YUNET_PATH.is_file():
             try:detector=cv2.FaceDetectorYN.create(str(crop._YUNET_PATH),'',(sw,sh))
             except (cv2.error,RuntimeError):pass
-    elif detector is None:detector = crop._try_yunet(sw, sh)
     # Some OpenCV 5 wheels omit the old cascade API. Preserve the frame if
     # neither detector is available; explicit source regions still work.
     haar = None
-    if detector is None and hasattr(cv2, 'CascadeClassifier'):
+    if cfg.visual_enabled and detector is None and hasattr(cv2, 'CascadeClassifier'):
         haar = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    if detector is None and haar is None:
+    if cfg.visual_enabled and detector is None and haar is None:
         plan['warnings'].append('Detektor wajah tidak tersedia; gunakan komposisi utuh atau tandai area pembicara.')
     def sample(t):
         cap.set(cv2.CAP_PROP_POS_MSEC, max(0, t) * 1000)

@@ -72,7 +72,7 @@ class Batch(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):cls.media.cleanup()
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory();self.svc=StudioService(self.temp.name,Config(use_nvenc=False),autostart=False)
+        self.temp=tempfile.TemporaryDirectory();self.svc=StudioService(self.temp.name,Config(work_dir='work',out_dir='clips',use_nvenc=False),autostart=False)
         self.doc=self.svc.create(self.source);self.pid=self.doc['project_id']
         self.svc.store.save_transcript(self.pid,{'words':words('Pembahasan pertama dan pembahasan kedua.',start=0)},'batch-take')
         def initialize(d):

@@ -104,6 +104,8 @@ def probe_runtime(target, after=False):
             code += 'import clipper.caption_director,clipper.text_area,clipper.segmentation; '
         if (target/'clipper/caption_fit.py').is_file():
             code += 'import clipper.caption_fit,clipper.caption_geometry,clipper.selected_alignment,clipper.semantic_rank; '
+    if after and (target/'clipper/artifact_store.py').is_file():
+        code += 'import clipper.artifact_store,clipper.caption_readability,clipper.studio_worker; '
     code += "print(json.dumps({'python':sys.version.split()[0],'core_modules':'available','work_dir':str((Path(sys.argv[1])/Config().work_dir).resolve())}))"
     process = subprocess.run([str(python), '-I', '-c', code, str(target)], cwd=target,
                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
@@ -119,7 +121,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10'):
+    if data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     for key in ('files', 'guards'):
         rows = data.get(key)

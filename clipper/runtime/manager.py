@@ -66,7 +66,10 @@ class RuntimeManager:
         else:component='hardware'
         if options is not None and not isinstance(options,dict):raise ValueError('Pilihan proses harus berupa objek')
         options=dict(options or {})
-        if set(options)-{'source','model','device'}:raise ValueError('Pilihan proses tidak dikenal')
+        if set(options)-{'source','model','device','audio_stream_index','required'}:raise ValueError('Pilihan proses tidak dikenal')
+        if type(options.get('required',False)) is not bool:raise ValueError('Pilihan backend wajib harus boolean')
+        if type(options.get('audio_stream_index',-1)) is not int or options.get('audio_stream_index',-1)<-1:
+            raise ValueError('Index track suara harus integer -1 atau lebih besar')
         if options.get('model','small') not in ('small','medium'):raise ValueError('Model uji harus small atau medium')
         if options.get('device','cpu') not in ('cpu','cuda'):raise ValueError('Perangkat uji harus CPU atau CUDA')
         if options.get('source'):

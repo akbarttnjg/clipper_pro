@@ -265,7 +265,7 @@ def duplicate(c, prior, words):
     actual_a,actual_b=source_words(c),source_words(prior)
     actual_text_a=' '.join(w['word'] for w in actual_a)
     actual_text_b=' '.join(w['word'] for w in actual_b)
-    if share>.93 and fact_signature(actual_text_a)==fact_signature(actual_text_b):return True
+    if actual_a and actual_b and share>.93 and fact_signature(actual_text_a)==fact_signature(actual_text_b):return True
     if fact_signature(actual_text_a)!=fact_signature(actual_text_b):return False
     ca,cb=[token(t) for t in c.get('main_claim','').split()],[token(t) for t in prior.get('main_claim','').split()]
     def contains(a,b):return bool(b) and any(a[i:i+len(b)]==b for i in range(len(a)-len(b)+1))

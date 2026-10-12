@@ -169,13 +169,15 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'
     script = target.with_suffix('.filter.txt')
     script.write_text(';\n'.join(graph), encoding='utf-8')
     codec = cfg.video_codec
+    if cfg.use_nvenc and not cfg.allow_backend_fallback and codec!='h264_nvenc':
+        raise RuntimeError('NVENC diwajibkan tetapi belum tersedia; CPU fallback tidak dipakai.')
     command = ['ffmpeg', '-hide_banner', '-v', 'warning', '-y', '-ss', str(seek), '-t', str(end - seek), '-i', str(source),
         '-i', str(mix), *extra_inputs, '-filter_complex_threads', '2', *filter_file_args(script),
         '-map', '[out]', '-map', '1:a', '-t', str(plan['duration']), '-r', str(fps),
         '-c:v', codec, *encoder_args(codec), '-pix_fmt', 'yuv420p', '-threads', '6',
         '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', str(pending)]
     try:
-        actual, warnings = encode(command, codec, target.with_suffix('.render.log'), on_progress, plan['duration'])
+        actual, warnings = encode(command, codec, target.with_suffix('.render.log'), on_progress, plan['duration'],allow_fallback=cfg.allow_backend_fallback)
         pending.replace(target)
     finally:
         pending.unlink(missing_ok=True)
