@@ -11,6 +11,7 @@ import zipfile
 import tempfile
 import unittest
 from unittest.mock import patch
+from .frozen_release import restore
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -26,7 +27,7 @@ class FullOverlay(unittest.TestCase):
         self.target=self.folder/'machine';self.package=self.folder/'upgrade'
         self.installer=module('complete_installer');self.builder=module('build_typography9_release')
         # Portable fixture: no local-only commit ID or full git history needed.
-        shutil.copytree(ROOT,self.target,ignore=shutil.ignore_patterns('.git','.venv','work','clips','__pycache__','.pytest_cache'))
+        restore(self.target)
         baseline=json.loads((ROOT/'docs/releases/typography9_base_hashes.json').read_text())
         with zipfile.ZipFile(ROOT/'docs/releases/typography9_fixture.zip') as archive:
             provenance=json.loads(archive.read('__provenance__.json'))
@@ -37,7 +38,8 @@ class FullOverlay(unittest.TestCase):
                 data=archive.read(name)
                 self.assertEqual(hashlib.sha256(data.replace(b'\r\n',b'\n')).hexdigest(),expected)
                 dest=self.installer.safe_path(self.target,name);dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
-        self.builder.build(self.package,'0'*40)
+        sources=restore(self.folder/'frozen-source')
+        with patch.dict(self.builder.complete_build.__globals__,{'ROOT':sources}):self.builder.build(self.package,'0'*40)
         self.work=self.target/'work';self.work.mkdir();self.db=self.work/'studio4.sqlite3'
         with sqlite3.connect(self.db) as db:db.execute('CREATE TABLE edits(note TEXT)');db.execute("INSERT INTO edits VALUES('before')")
         self.env=self.target/'.env';self.env.write_text('WORK_DIR=work\nLOCAL_MARKER=keep-this\n')

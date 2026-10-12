@@ -128,7 +128,13 @@ def readability(plan,cfg):
             issue('small_text','Huruf mengecil untuk menampung frasa.','Pecah frasa panjang atau pilih area subtitle yang lebih luas.')
         boxes=[];collision=False;overflow=False
         from .caption_geometry import bounds
+        from .caption_readability import clear_time
+        clear=[]
         for word in phrase['words']:
+            measured=clear_time(word,duration,interpolation=plan.get('keyframe_interpolation','hold'))
+            clear.append({'token':word['text'],**measured})
+            if measured['longest_contiguous_clear']<min(.25,duration*.4):
+                issue('clear_hold','Waktu baca kontinu terlalu singkat.','Kurangi blur/fade/gerak atau perpanjang hold.','error')
             for sample in word.get('keyframes',[]) or [{'scale':1,'dx':0,'dy':0,'opacity':1}]:
                 if sample.get('opacity',1)<=.05:continue
                 box=bounds(word,sample)
@@ -139,6 +145,7 @@ def readability(plan,cfg):
         if overflow:issue('frame_overflow','Sebagian animasi keluar frame.','Kurangi ukuran atau ganti posisi subtitle.','error')
         if any(_overlap(a,b)>min(a[2]*a[3],b[2]*b[3])*.10 for i,a in enumerate(boxes) for b in boxes[i+1:]):
             issue('word_collision','Kotak kata saling bertumpuk.','Kurangi skala atau pecah frasa.','error')
+        row['clear_time_metrics']=clear
         rows.append(row)
     return {'version':VERSION,'status':'needs_review' if issues else 'passed','issue_count':len(issues),
             'phrases':rows,'issues':issues,'scope':'measured_layout_reading_speed_animation_envelope',

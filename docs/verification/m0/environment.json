@@ -1,0 +1,26 @@
+{
+  "python": "3.12.14",
+  "platform": "Linux",
+  "machine": "x86_64",
+  "packages": {
+    "pytest": "8.4.2",
+    "fastapi": "0.143.0",
+    "starlette": "1.7.0",
+    "opencv-python-headless": "5.0.0.93",
+    "numpy": "2.3.5",
+    "pillow": "12.3.0",
+    "fonttools": "4.61.1",
+    "requests": "2.34.2",
+    "httpx": "0.28.1",
+    "pycapcut": "0.0.3",
+    "python-dotenv": "1.2.4",
+    "python-multipart": "0.0.32"
+  },
+  "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "ffprobe": "ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers",
+  "gpu_inference": "not_executed",
+  "native_editors": "not_executed",
+  "original_source_asr": "not_executed",
+  "test_storage": "isolated temporary work/out roots",
+  "test_command": "python -m pytest -q --tb=short --junitxml=m0-delivery.xml"
+}

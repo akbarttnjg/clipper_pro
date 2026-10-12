@@ -41,10 +41,12 @@ def records(plan,result,document,clip_id,variant_id,cfg,media):
     captions=envelope('CaptionPlan',source_id,{'variant_id':variant_id,'timeline_revision':revision,'fps':fps,
         'phrases':phrases,'qc':plan['caption_checks'],'animation_timebase':'seconds_relative_to_phrase'},key,producer=adapter.VERSION)
     manifest=envelope('RenderManifest',source_id,{'output_id':result['output_content_id'],'variant_id':variant_id,'revision':revision,
+        'requested_revision':document['revision'],'encode_provenance':result.get('encode_provenance',{}),
         'renderer_version':result['render_version'],'file':result['absolute_file'],'qc':result['qc'],'status':'validated',
         'dependency_hashes':{'render':key,'project_inputs':result['dependency'],'source':source_id,'working_source':media['payload']['working_content_id'],
             'assets':{e['asset']['path']:asset_id(e['asset']['path'],fresh=True) for e in plan.get('broll',[])},
             'fonts':{p.name:content_id(p) for p in Path(cfg.fonts_dir).glob('*.ttf')}},
         'compatible_editor_evidence':{'status':'not_tested_in_native_editors','structural_report':'Created during project export'}},key,producer='B-4')
-    return {'media_context':media,'edit_timeline':timeline,'caption_plan':captions,
+    return {'input_revision':document['revision'],'dependency':result['dependency'],
+        'encode_provenance':result.get('encode_provenance',{}),'media_context':media,'edit_timeline':timeline,'caption_plan':captions,
         'scene_analysis':adapter.scene_analysis(plan,media,input_fingerprint=key),'render_manifest':manifest}

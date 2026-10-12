@@ -28,7 +28,7 @@ class WorkspaceTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):cls.media.cleanup()
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.svc=StudioService(self.root,Config(use_nvenc=False),autostart=False)
+        self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name);self.svc=StudioService(self.root,Config(work_dir='work',out_dir='clips',use_nvenc=False),autostart=False)
         self.doc=self.svc.create(self.source);self.pid=self.doc['project_id']
         self.svc.store.save_transcript(self.pid,{'words':[{'word_id':1,'word':'jangan','start':0.,'end':.5},{'word_id':2,'word':'berhenti','start':.5,'end':1.}]},'fixture')
         def initial(d):
@@ -58,7 +58,7 @@ class WorkspaceTests(unittest.TestCase):
     def test_complete_active_brand_is_valid(self):
         values={k:v for k,v in asdict(Config()).items() if k in BRAND_FIELDS};self.assertEqual(brand_values(values),values)
     def test_brand_kit_persists_across_projects_and_restart(self):
-        kit=self.kit();another=StudioService(self.root,Config(),autostart=False,recover=False)
+        kit=self.kit();another=StudioService(self.root,Config(work_dir='work',out_dir='clips'),autostart=False,recover=False)
         self.assertEqual(another.workspace.kit(kit['id'])['settings'],kit['settings'])
     def test_stale_brand_kit_update_is_rejected(self):
         kit=self.kit();self.svc.workspace.save_kit({**kit,'expected_revision':0,'name':'New'})

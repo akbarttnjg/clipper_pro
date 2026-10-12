@@ -160,11 +160,18 @@ def source_ids(words):
     return list(dict.fromkeys(i for w in words for i in w.get('source_word_ids', [w.get('word_id')]) if i is not None))
 
 
+def known_probability(word):
+    import math
+    value=word.get('probability')
+    return value if type(value) in (int,float) and math.isfinite(value) and 0<=value<=1 else None
+
+
 def suspect_reason(word):
     if word.get('manually_edited'):
         return ''
     token = norm(word['word'])
-    if word.get('probability', 1) < .5:
+    probability=known_probability(word)
+    if probability is not None and probability < .5:
         return 'Keyakinan audio rendah'
     aliases = {norm(a) for canonical, variants in BUILTINS.items() for a in variants if norm(a) != norm(canonical)}
     if token in aliases:
@@ -197,7 +204,7 @@ def recheck_ranges(words, duration, limit=12):
     if limit <= 0:
         return []
     suspects = sorted((w for w in words if suspect_reason(w) and len(norm(w['word'])) > 2
-                       and not re.search(r'\d', w['word'])), key=lambda w: w.get('probability', 1))
+                       and not re.search(r'\d', w['word'])), key=lambda w: known_probability(w) if known_probability(w) is not None else float('inf'))
     ranges = []
     for word in suspects:
         a, b = max(0, word['start']-3), min(duration, word['end']+3)
@@ -228,8 +235,10 @@ def merge_recheck(words, heard):
         old, new = old_span[0], new_span[0]
         if any(w.get('manually_edited') for w in old_span):
             continue
-        old_p = sum(w.get('probability', 1) for w in old_span) / len(old_span)
-        new_p = min(w.get('probability', 0) for w in new_span)
+        probabilities=[known_probability(w) for w in old_span+new_span]
+        if any(p is None for p in probabilities):continue
+        old_p = sum(known_probability(w) for w in old_span) / len(old_span)
+        new_p = min(known_probability(w) for w in new_span)
         if old_p >= .75 or new_p < max(.80, old_p+.20):
             continue
         before = ' '.join(w['word'] for w in old_span)

@@ -19,7 +19,7 @@ class StyleService(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):cls.media_temp.cleanup()
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory();self.svc=StudioService(self.temp.name,Config(use_nvenc=False),autostart=False)
+        self.temp=tempfile.TemporaryDirectory();self.svc=StudioService(self.temp.name,Config(work_dir='work',out_dir='clips',use_nvenc=False),autostart=False)
         self.doc=self.svc.create(self.source)
         self.take='asr-fixture';rows=[{'word':'kata','word_id':i,'start':i*.5,'end':(i+1)*.5} for i in range(12)]
         self.svc.store.save_transcript(self.doc['project_id'],{'words':rows},self.take)
@@ -60,9 +60,9 @@ class StyleService(unittest.TestCase):
         self.assertTrue(self.svc.public(self.doc['project_id'])['clips'][self.cid]['variants']['portrait']['style_report']['stale'])
     def test_model_generation_changes_dependency(self):
         cfg=self.svc.config(self.doc,self.cid,'portrait');old=self.svc.dependency(self.doc,self.cid,'portrait')
-        root=Path(cfg.visual_runtime_root);generation=root/'generations/motion-fixture';generation.mkdir(parents=True)
+        root=Path(cfg.visual_runtime_root);generation=root/'generations/yunet-fixture';generation.mkdir(parents=True)
         (generation/'receipt.json').write_text(json.dumps({'installed':True,'test':{'passed':True,'level':'build'}}))
-        active=root/'components/motion-canvas/active.json';active.parent.mkdir(parents=True);active.write_text(json.dumps({'generation':'motion-fixture'}))
+        active=root/'components/yunet/active.json';active.parent.mkdir(parents=True);active.write_text(json.dumps({'generation':'yunet-fixture'}))
         self.assertNotEqual(old,self.svc.dependency(self.doc,self.cid,'portrait'))
 
 

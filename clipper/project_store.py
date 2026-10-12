@@ -19,6 +19,9 @@ class Conflict(ValueError):
         self.revision=revision;self.paths=list(paths)
 
 
+class JobLeaseLost(ValueError):pass
+
+
 def dumps(value):
     return json.dumps(value,ensure_ascii=False,allow_nan=False,separators=(',',':'))
 
@@ -94,7 +97,7 @@ class ProjectStore:
         return [{'project_id':r['id'],'revision':r['revision'],'updated':r['updated'],
                  'name':json.loads(r['document']).get('name','Proyek'),'clips':len(json.loads(r['document']).get('clips',{}))} for r in rows]
 
-    def mutate(self,project_id,expected_revision,operation_id,request,change,label='Sunting proyek'):
+    def mutate(self,project_id,expected_revision,operation_id,request,change,label='Sunting proyek',*,job_guard=None,job_result=None):
         if type(expected_revision) is not int or expected_revision<0:raise ValueError('Revisi proyek harus disertakan')
         if not isinstance(operation_id,str) or not 8<=len(operation_id)<=160:raise ValueError('ID operasi diperlukan')
         request_hash=fingerprint(request)
@@ -108,6 +111,12 @@ class ProjectStore:
                 row=db.execute('SELECT revision,document FROM projects WHERE id=?',(project_id,)).fetchone()
                 if row is None:raise KeyError('Proyek tidak ditemukan')
                 if expected_revision!=row['revision']:raise Conflict(row['revision'])
+                if job_guard:
+                    owned=db.execute('SELECT status,owner,lease_token,lease_expires FROM jobs WHERE id=?',(job_guard['id'],)).fetchone()
+                    if (not owned or owned['status']!='running' or owned['owner']!=job_guard['owner']
+                            or owned['lease_token']!=job_guard['lease_token']
+                            or not owned['lease_expires'] or owned['lease_expires']<=time.time()):
+                        raise JobLeaseLost('Proses dibatalkan atau lease berubah; hasil tidak dipublikasikan.')
                 before=json.loads(row['document']);after=copy.deepcopy(before)
                 extra=change(after) or {};patch=differences(before,after)
                 revision=row['revision']+1
@@ -115,6 +124,12 @@ class ProjectStore:
                 db.execute('INSERT INTO history VALUES(?,?,?,?,?)',(project_id,revision,label,dumps(patch),time.time()))
                 response={**extra,'status':'ready','project_id':project_id,'revision':revision,'operation_id':operation_id}
                 db.execute('INSERT INTO operations VALUES(?,?,?,?)',(project_id,operation_id,request_hash,dumps(response)))
+                if job_guard:
+                    db.execute("UPDATE jobs SET status='completed',progress=100,result=?,message=?,updated=?,lease_expires=NULL WHERE id=?",
+                        (dumps(job_result),'Selesai dan tersimpan pada revisi '+str(revision),time.time(),job_guard['id']))
+                    if job_result and job_result.get('kind') in ('render','preview'):
+                        db.execute('INSERT INTO artifacts VALUES(?,?,?,?,?,?,?,?)',('artifact-'+uuid.uuid4().hex,project_id,
+                            job_guard.get('clip_id'),job_guard.get('variant_id'),job_result['kind'],job_result['fingerprint'],dumps(job_result),time.time()))
                 db.commit();return response
             except BaseException:db.rollback();raise
 

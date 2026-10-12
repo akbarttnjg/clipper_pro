@@ -4,7 +4,8 @@ from .state import read, runtime_root, safe_path, digest
 
 
 def managed_asr(cfg):
-    root=runtime_root();pointer=read(root/'components/faster-whisper/active.json',{})
+    root=Path(cfg.visual_runtime_root) if cfg.visual_runtime_root else runtime_root()
+    pointer=read(root/'components/faster-whisper/active.json',{})
     if not pointer.get('enabled'):return None
     try:
         directory=safe_path(root/'generations',pointer['generation']);receipt=read(directory/'receipt.json',{})

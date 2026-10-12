@@ -61,12 +61,12 @@ def _encode_attempt(command, on_progress=None, duration=0):
         return code, error.read().decode('utf-8', 'replace')
 
 
-def encode(command, codec, log_path, on_progress=None, duration=0):
+def encode(command, codec, log_path, on_progress=None, duration=0,*,allow_fallback=True):
     """Keep the diagnostic; never disguise a filter/argument error as GPU failure."""
     command = [str(x) for x in command]
     code, log = _encode_attempt(command, on_progress, duration)
     warnings = []
-    if code and codec == "h264_nvenc" and encoder_failure(log):
+    if code and allow_fallback and codec == "h264_nvenc" and encoder_failure(log):
         warnings.append("NVENC gagal saat render; hasil ini menggunakan CPU. Lihat render.log.")
         pos = command.index("h264_nvenc")
         command[pos:pos + 1 + len(encoder_args(codec))] = ["libx264", *encoder_args("libx264")]

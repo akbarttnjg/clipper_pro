@@ -188,6 +188,10 @@ class StudioService:
         path=Path(result.get('absolute_file',''))
         if not path.is_file():
             return {'status':'missing','action':'render','message':'Berkas final tidak tersedia. Render ulang klip ini.'}
+        if result.get('artifact_manifest_path'):
+            from .artifact_store import verify
+            if not verify(result,fresh=fresh):
+                return {'status':'changed','action':'render','message':'Kumpulan video/sidecar final berubah atau tidak lengkap. Render ulang.'}
         dependency=dependency or self.dependency(doc,clip_id,variant_id,fresh=fresh)
         if result.get('dependency')!=dependency:
             return {'status':'stale','action':'render','message':'Pengaturan atau bahan klip berubah. Render final revisi aktif dahulu, lalu buat paket editor.',
@@ -230,6 +234,17 @@ class StudioService:
         return {**page,'revision':doc['revision'],'transcript_id':doc['transcript_id'],'transcript_revision':doc['transcript_revision']}
 
     def dependency(self,doc,clip_id=None,variant_id=None,*,fresh=False,kind='render'):
+        if clip_id and kind in ('render','preview','export','evaluation','style_review','visual_review'):
+            from .dependency_cache import render_key,fresh_scope
+            from .studio_exchange import render_words
+            with fresh_scope():
+                cfg=self.config(doc,clip_id,variant_id)
+                clip={k:v for k,v in doc['clips'][clip_id].items() if k!='variants'}
+                variant=self.variant(doc,clip_id,variant_id)
+                clip['_broll_recipe']=variant.get('recipe') or {}
+                if variant.get('timeline'):clip['manual_keep_spans']=variant['timeline']['keep_spans']
+                words=render_words(self.transcript(doc,clip_id),doc,clip,cfg) if doc.get('transcript_id') else []
+                return render_key(doc['source']['path'],words,clip,cfg,fresh=fresh)
         source=doc['source'];source_hash=asset_id(source['path'],fresh=fresh)
         base=[DEPENDENCY_VERSION,source_hash,source['source_id'],doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections'),doc.get('alignment_overrides',{}).get('shared')]
         if not clip_id:
@@ -240,7 +255,10 @@ class StudioService:
                 source_base=[DEPENDENCY_VERSION,source_hash,source['source_id']]
                 if kind in ('correction','discovery'):
                     source_base+=[doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections'),doc.get('alignment_overrides',{}).get('shared')]
-                elif kind=='analyze':source_base+=[doc.get('aliases')]
+                elif kind=='analyze':
+                    from .dependency_cache import asr_identity
+                    cfg=self.config(doc)
+                    source_base+=[doc.get('aliases'),asr_identity(cfg,fresh=fresh),{'allow_backend_fallback':cfg.allow_backend_fallback}]
                 return fingerprint(source_base+[scoped,kind])
             return fingerprint(base+[doc['settings'],kind])
         variant=self.variant(doc,clip_id,variant_id);clip=doc['clips'][clip_id]
@@ -253,6 +271,9 @@ class StudioService:
         candidate={k:v for k,v in clip.items() if k not in ('variants','revision','result','preview','included')}
         from .caption_renderer import signature
         parts=base+[candidate,settings,recipe,assets,fonts,doc.get('clip_corrections',{}).get(clip_id),doc.get('alignment_overrides',{}).get('clips',{}).get(clip_id),variant.get('timeline',{}),signature(cfg)]
+        if kind=='asr_recheck':
+            from .dependency_cache import asr_identity
+            parts.append(asr_identity(cfg,fresh=fresh))
         if cfg.illustration_mode!='off':
             from .explanation5 import STRUCTURES_VERSION
             parts.append(STRUCTURES_VERSION)
@@ -392,6 +413,13 @@ class StudioService:
                     if not all(math.isfinite(n) for n in (a,b)) or not 0<=a<b<=duration+.05:raise ValueError('Rentang klip harus di dalam sumber')
                     if kind=='manual_clip':self.add_candidates(doc,[{'start':a,'end':b,'title':str(op.get('title','Klip manual'))[:160],'selection_source':'manual','keywords':[],'reason':'Dipilih pengguna','boundary_pin':{'start':a,'end':b,'source':'manual'}}])
                     else:
+                        for target_vid,variant in doc['clips'][cid]['variants'].items():
+                            spans=variant.get('timeline',{}).get('keep_spans')
+                            if spans:
+                                reconciled=[[max(a,float(x)),min(b,float(y))] for x,y in spans if min(b,float(y))>max(a,float(x))]
+                                if not reconciled:raise ValueError('Batas baru tidak beririsan dengan potongan timeline. Reset potongan atau pilih batas lain.')
+                                variant['timeline']={'keep_spans':reconciled}
+                            touched.add((cid,target_vid))
                         doc['clips'][cid].update(start=a,end=b,selection_source='reviewed',boundary_pin={'start':a,'end':b,'source':'manual'});doc['clips'][cid]['revision']+=1
                 elif kind=='restore_rejected':
                     row=next((r for r in stage3.rejection_rows(doc.get('discovery',{})) if r['rejection_id']==op.get('rejection_id')),None)
@@ -489,7 +517,8 @@ class StudioService:
             if {w['word_id'] for w in rows}!=set(options['origin_word_ids']):raise ValueError('Identitas kata untuk proses ucapan tidak cocok dengan transkrip aktif')
             if clip_id and any(w['end']<=doc['clips'][clip_id]['start'] or w['start']>=doc['clips'][clip_id]['end'] for w in rows):raise ValueError('Kata untuk proses ucapan berada di luar klip aktif')
         target={'clip_id':clip_id,'variant_id':variant_id}
-        request={'dependency':self.dependency(doc,clip_id,variant_id,fresh=True,kind=kind),'options':options or {}}
+        request={'dependency':self.dependency(doc,clip_id,variant_id,fresh=True,kind=kind),'options':options or {},
+                 'snapshot':copy.deepcopy(doc),'input_revision':doc['revision']}
         if kind=='export':
             readiness=self.export_readiness(doc,clip_id,variant_id,dependency=request['dependency'],fresh=True)
             if readiness['status']!='ready':raise ValueError(readiness['message'])
@@ -503,7 +532,7 @@ class StudioService:
             pair,_=artifact_pair(self,project_id,options or {})
             if (options or {}).get('category') not in CATEGORIES:raise ValueError('Pilih kategori evaluasi.')
             if any(p[0]['clip_id']!=clip_id or p[0]['variant_id']!=variant_id for p in pair):raise ValueError('Hasil pembanding harus dari klip dan rasio aktif.')
-        return self.queue.enqueue(project_id,kind,target,request)
+        return self.queue.enqueue_many(project_id,[(kind,target,request)],doc['revision'])[0]
 
     def enqueue_batch(self,project_id,expected_revision):
         from .dependency_cache import fresh_scope
@@ -520,7 +549,7 @@ class StudioService:
             cid=t['clip_id'];vid=t['variant_id'];self.variant(doc,cid,vid)
             dep=self.dependency(doc,cid,vid,fresh=True)
             if self.export_readiness(doc,cid,vid,dependency=dep,fresh=True)['status']=='ready':skipped.append(t);continue
-            jobs.append(('render',t,{'dependency':dep,'options':{}}))
+            jobs.append(('render',t,{'dependency':dep,'options':{},'snapshot':copy.deepcopy(doc),'input_revision':doc['revision']}))
         queued=self.queue.enqueue_many(project_id,jobs,doc['revision'])
         return {'jobs':queued,'skipped':skipped,'timelines':len(rows),'selected_clips':len(rows)//2}
 

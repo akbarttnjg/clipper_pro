@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.10'
+RENDER_VERSION = '4.0.11-m0'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -19,11 +19,15 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
     started = time.monotonic()
     work = Path(cfg.work_dir)
     work.mkdir(parents=True, exist_ok=True)
-    key = source_key(media_path, cfg)
+    from .dependency_cache import asr_identity,fresh_scope
+    with fresh_scope():
+        model_identity=asr_identity(cfg,fresh=True)
+        key=source_key(media_path,cfg)
     preparation_seconds = time.monotonic() - started
     asr_started = time.monotonic()
     cached = read_json(work / 'asr-cache.json', {})
-    if key and cached.get('key') == key:
+    reused=bool(key and cached.get('key')==key and cached.get('model_identity_verified') and model_identity['status']=='verified')
+    if reused:
         transcript = cached['transcript']
         on_progress(30, 'Transkrip tersimpan dipakai kembali')
     else:
@@ -32,7 +36,7 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
         on_progress(8, 'Transkripsi lokal; model dilepas sebelum tahap pemilihan topik')
         transcript = transcribe.transcribe(media_path, cfg)
         if key:
-            write_json(work / 'asr-cache.json', {'key': key, 'transcript': transcript})
+            write_json(work / 'asr-cache.json', {'key': key, 'transcript': transcript,'model_identity_verified':model_identity['status']=='verified'})
     if not transcript['words']:
         raise RuntimeError('Tidak ada percakapan yang terdeteksi.')
     asr_seconds = time.monotonic() - asr_started
@@ -63,7 +67,7 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
         'selection_seconds': round(time.monotonic() - selection_started, 2),
         'analysis_total_seconds': round(time.monotonic() - started, 2),
         'scope': 'analysis_only; rendering and editor export excluded',
-        'cache_reused': bool(key and cached.get('key') == key)}
+        'cache_reused': reused}
     write_json(work / 'transcript.json', transcript)
     on_progress(100, f'{len(clips)} kandidat siap diperiksa')
     return transcript, clips
@@ -91,6 +95,57 @@ def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
 
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
+    """Build a complete immutable core set before returning any new file URLs."""
+    import uuid
+    from .artifact_store import ArtifactSet,rebase,capture_plan_files
+    from .runtime.state import write
+    from .dependency_cache import content_id
+    from urllib.parse import unquote
+    txn=ArtifactSet(library_paths.project_root(cfg)/'artifact-sets',{'kind':'core_render','clip_revision':clip.get('revision',0)})
+    local=replace(cfg,out_dir=str(txn.staging),job_id='',
+                  work_dir=str(Path(cfg.work_dir)/'attempts'/uuid.uuid4().hex))
+    try:
+        value=_render_clip(media_path,words,clip,name,local,on_progress,context_words=context_words)
+        media_file=txn.staging/value['file']
+        value['absolute_file']=str(media_file.resolve())
+        value['output_content_id']=content_id(media_file,fresh=True)
+        plan=read_json(value['plan_path'])
+        for role in ('mix','voice','music','sfx'):
+            original=plan.get('audio',{}).get(role)
+            if isinstance(original,str) and Path(original).is_file():
+                member=Path('audio')/(role+Path(original).suffix)
+                (txn.staging/member).parent.mkdir(parents=True,exist_ok=True)
+                shutil.copy2(original,txn.staging/member)
+                plan['audio'][role]=str(txn.final/member)
+        plan=capture_plan_files(txn,plan,local.work_dir)
+        subtitle=next(iter(txn.staging.glob('*.ass')),None)
+        if subtitle:plan['subtitle_path']=str(txn.final/subtitle.relative_to(txn.staging))
+        plan['runtime_receipt']={'requested_encoder':'h264_nvenc' if cfg.use_nvenc else 'libx264',
+                                'actual_encoder':plan.get('encoder'),
+                                'caption_renderer':plan.get('caption_renderer'),
+                                'selected_alignment':plan.get('selected_alignment'),
+                                'visual_summary':plan.get('visual_summary',plan.get('visual_analysis',{}))}
+        if plan['runtime_receipt']['requested_encoder']!=plan.get('encoder'):
+            plan['runtime_receipt']['encoder_fallback_reason']=next((w for w in plan.get('warnings',[]) if 'NVENC' in str(w)),
+                'NVENC belum lulus pemeriksaan ketersediaan; encode aktual memakai CPU.')
+        write(txn.staging/'runtime-receipt.json',plan['runtime_receipt'])
+        plan=rebase(plan,txn.staging,txn.final)
+        write(txn.staging/'edit-plan.json',plan)
+        value['plan_path']=str(txn.final/'edit-plan.json')
+        value['plan_content_id']=content_id(txn.staging/'edit-plan.json',fresh=True)
+        value=rebase(value,txn.staging,txn.final)
+        txn.metadata['required_members']=[p.relative_to(txn.staging).as_posix() for p in txn.staging.rglob('*') if p.is_file()]
+        value['file']=library_paths.relative(cfg,txn.final/media_file.relative_to(txn.staging))
+        value['url']=library_paths.url(value['file'])
+        for field in ('ass_url','srt_url','credits_url'):
+            relative=unquote(value[field].removeprefix('/clips/'))
+            value[field]=library_paths.url(library_paths.relative(cfg,txn.final/relative))
+        value.update(txn.seal())
+        return value
+    except BaseException as exc:txn.abort(exc);raise
+
+
+def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
     started = time.monotonic()
     name = name + f"-r{clip.get('revision', 0)}-v40"
     work = Path(cfg.work_dir) / 'renders' / name
@@ -129,7 +184,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         from .visual4 import caption_envelopes
         caption_envelopes(plan,cfg)
     plan['subtitle_cleanup'] = {'mode': cfg.caption_cleanup, 'changes': changes, 'review': notices}
-    if notices:
+    if any(n.get('severity')!='info' for n in notices):
         plan['warnings'].append('Ada angka atau waktu kata yang perlu didengarkan kembali; lihat laporan subtitle.')
     write_json(report_base.with_suffix('.subtitle-review.json'), plan['subtitle_cleanup'])
     from .typography import make_plan
@@ -160,6 +215,8 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
     write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
     if plan['caption_renderer'].get('status')=='fallback':plan['warnings'].append(plan['caption_renderer']['reason'])
     plan['caption_checks'] = qc.inspect_caption_plan(plan['captions'], cfg, expected_words=display)
+    if not plan['caption_checks']['passed']:
+        raise ValueError('Caption belum memenuhi QC keterbacaan; periksa waktu baca dan pengaturan.')
     for event in plan.get('broll', []):
         event['image_height'] = min(s.get('image_height') or cfg.target_h for s in plan['shots']
             if s['start'] < event['end'] and s['end'] > event['start'])
@@ -193,7 +250,7 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         plan['audio_quality'] = audio_quality.inspect(rendered, cfg)
         checked['audio_quality'] = plan['audio_quality']
         plan['warnings'].extend(plan['audio_quality'].get('issues', []))
-        checked['editorial'] = {'status': 'needs_review' if notices or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',
+        checked['editorial'] = {'status': 'needs_review' if any(n.get('severity')!='info' for n in notices) or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',
             'subtitle_flags': len(notices), 'boundary': clip.get('boundary_review', {}),
             'intelligence': clip.get('intelligence', {}),
             'note': 'QC teknis bukan penilaian kelengkapan cerita atau prediksi retensi.'}

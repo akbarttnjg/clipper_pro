@@ -64,7 +64,8 @@ def validate_alignment(text, words, start, end, *, method='manual'):
         a, b = row.get('start'), row.get('end')
         if type(a) not in (int, float) or type(b) not in (int, float) or not all(math.isfinite(x) for x in (a, b)) or not previous <= a < b <= end:
             raise ValueError('Timing kata harus berurutan, tidak tumpang tindih, dan berada dalam rentang audio.')
-        if method == 'whisperx' and (type(row.get('score')) not in (int, float) or not math.isfinite(row['score']) or not 0 < row['score'] <= 1):
+        # A numerical evidence floor is not a calibrated accuracy threshold.
+        if method == 'whisperx' and (type(row.get('score')) not in (int, float) or not math.isfinite(row['score']) or not .001 <= row['score'] <= 1):
             raise ValueError('Alignment belum mempunyai bukti skor untuk setiap kata; hasil parsial tidak diterapkan.')
         result.append({k: row[k] for k in ('word', 'start', 'end', 'score') if k in row}); previous = b
     if ' '.join(w['word'].strip() for w in result).split() != str(text).split():
@@ -81,6 +82,7 @@ def apply_alignments(words, document, clip_id=None):
         ids = row.get('source_word_ids', [row.get('word_id')])
         for patch in shared + local:
             if patch.get('transcript_id') != take or patch.get('origin_word_ids') != ids or patch.get('text') != row['word']: continue
+            if row.get('alignment_method')=='manual' and patch.get('method')!='manual':continue
             try: aligned = validate_alignment(row['word'], patch['words'], patch['audio_start'], patch['audio_end'], method=patch['method'])
             except (KeyError, ValueError, TypeError): continue
             row.update(aligned_words=aligned, alignment_method=patch['method'], alignment_provenance=patch.get('provenance', {}))
@@ -98,9 +100,14 @@ def alignment_window(word, all_words, duration):
 
 
 def store_alignment(group,patch):
+    if patch.get('method') != 'manual' and any(
+            old.get('method') == 'manual' and old['transcript_id'] == patch['transcript_id']
+            and set(old['origin_word_ids']) & set(patch['origin_word_ids']) for old in group.values()):
+        return False
     for key,old in list(group.items()):
         if old['transcript_id']==patch['transcript_id'] and set(old['origin_word_ids'])&set(patch['origin_word_ids']):del group[key]
     group[fingerprint([patch['transcript_id'],patch['origin_word_ids']])]=patch
+    return True
 
 
 def expand_aligned(words):
@@ -114,7 +121,7 @@ def expand_aligned(words):
             for token in aligned:
                 result.append({**row, **token, 'aligned_words': None, 'timing_status': 'manual' if row.get('alignment_method') == 'manual' else 'aligned'})
         else:
-            status='phrase_span' if len(row['word'].split())>1 or len(row.get('source_word_ids',[]))>1 else 'inherited_span' if row.get('correction') or row.get('manually_edited') else 'asr'
+            status='manual' if row.get('timing_status')=='manual' or row.get('alignment_method')=='manual' else 'phrase_span' if len(row['word'].split())>1 or len(row.get('source_word_ids',[]))>1 else 'inherited_span' if row.get('correction') or row.get('manually_edited') else 'asr'
             result.append({**row, 'timing_status':status})
     return result
 

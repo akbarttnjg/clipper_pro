@@ -34,12 +34,20 @@ def excerpt(request, directory):
     source=request.get('source')
     if not source:raise ValueError('Uji ini membutuhkan sumber video/audio. Pilih proyek atau isi path pada panel komponen.')
     audio=directory/'sample.wav'
-    command(['ffmpeg','-nostdin','-v','error','-y','-i',source,'-t','6','-vn','-ar','16000','-ac','1',audio])
+    info=json.loads(command(['ffprobe','-v','error','-show_streams','-of','json',source]))
+    tracks=[s for s in info.get('streams',[]) if s.get('codec_type')=='audio']
+    selected=request.get('audio_stream_index',-1)
+    if type(selected) is not int:raise ValueError('Index track suara harus integer.')
+    track=next((s for s in tracks if s['index']==selected),None) if selected>=0 else next(iter(tracks),None)
+    if not track:raise ValueError('Track suara yang dipilih tidak tersedia.')
+    command(['ffmpeg','-nostdin','-v','error','-y','-i',source,'-map','0:'+str(track['index']),'-t','6','-vn','-ar','16000','-ac','1',audio])
     import wave
     import numpy as np
     with wave.open(str(audio)) as stream:
         values=np.frombuffer(stream.readframes(stream.getnframes()),dtype=np.int16).astype(np.float32)/32768
     if not len(values):raise ValueError('Cuplikan sumber tidak mempunyai audio')
+    request['_audio_receipt']={'source':str(Path(source).resolve()),'selected_audio_stream_index':track['index'],
+                               'sample_rate':16000,'channels':1,'decoded_frames':len(values)}
     return audio,values
 
 
@@ -126,11 +134,13 @@ def infer(request):
     import numpy as np
     if key in ('faster-whisper','stable-ts','whisperx','silero-vad','pyannote','auto-editor'):
         audio,values=excerpt(request,sample_dir)
+        result['source_receipt']=request['_audio_receipt']
         if key=='faster-whisper':
             from faster_whisper import WhisperModel
-            model=WhisperModel(str(weights),device=device,compute_type='int8' if device=='cpu' else 'int8_float16',num_workers=1)
+            model=WhisperModel(str(weights),device=device,compute_type='int8' if device=='cpu' else 'int8_float16',num_workers=1,local_files_only=True)
             segments,info=model.transcribe(str(audio),word_timestamps=True,vad_filter=True,beam_size=1)
             segments=list(segments);words=[dict(word=w.word,start=float(w.start),end=float(w.end)) for seg in segments for w in seg.words or []]
+            if not words:raise ValueError('ASR belum menghasilkan kata pada cuplikan ini; sampel inference ucapan belum dapat dinyatakan lulus.')
             payload={'language':info.language,'text':' '.join(s.text for s in segments),'words':words}
         elif key=='stable-ts':
             import stable_whisper

@@ -9,7 +9,7 @@ from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
 _SCOPE=ContextVar('clipper_content_scope',default=None)
-VERSION='studio4-content-v10-measured-phrases'
+VERSION='studio4-content-v11-m0-artifact-sets'
 
 
 @contextmanager
@@ -54,27 +54,80 @@ def asset_id(path,*,fresh=False):
     return content_id(p,fresh=fresh) if p.is_file() else 'missing:'+str(p)
 
 
+def model_identity(path, *, fresh=False):
+    """Recursive content identity: filenames and generation labels are insufficient."""
+    root=Path(path)
+    if root.is_file():return [('model',content_id(root,fresh=fresh))]
+    if not root.is_dir():return [('missing',str(root))]
+    return [(p.relative_to(root).as_posix(),content_id(p,fresh=fresh))
+            for p in sorted(root.rglob('*')) if p.is_file()]
+
+
+def asr_identity(cfg,*,fresh=False):
+    from .runtime.bridge import managed_asr
+    managed=managed_asr(cfg) if cfg.whisper_isolate else None
+    root=Path(managed['weights']) if managed else Path(cfg.whisper_model).expanduser()
+    if not root.is_dir() or not (root/'model.bin').is_file():
+        try:
+            from .speech_jobs import _asr_model_path
+            root=Path(_asr_model_path(cfg.whisper_model))
+        except (ImportError,ValueError,OSError,RuntimeError):
+            return {'status':'unresolved','requested_model':cfg.whisper_model}
+    if not root.is_dir() or not (root/'model.bin').is_file():return {'status':'unresolved','requested_model':cfg.whisper_model}
+    result={'status':'verified','weights':model_identity(root,fresh=fresh)}
+    if managed:result['managed']={k:managed[k] for k in ('generation','model_commit','lock_hash','recommended_device')}
+    return result
+
+
+def alignment_identity(cfg, *, fresh=False):
+    if not cfg.align_selected_clips:return []
+    from .runtime.state import signatures,runtime_root,read,safe_path
+    root=Path(cfg.visual_runtime_root) if cfg.visual_runtime_root else runtime_root()
+    identity=list(signatures(root,keys=('whisperx',)))
+    model=cfg.alignment_model_path.strip().strip('\"\'')
+    if model:identity.append(['selected_model',model_identity(model,fresh=fresh)])
+    active=read(root/'components/whisperx/active.json',{}) or {}
+    if active.get('generation'):
+        directory=safe_path(root/'generations',active['generation'])
+        identity.append(['generation_weights',model_identity(directory/'weights',fresh=fresh)])
+    return identity
+
+
+def component_identity(root,keys,*,fresh=False):
+    """Active local weights participate even when receipt and mtimes stay unchanged."""
+    from .runtime.state import signatures,read,safe_path
+    root=Path(root);items=list(signatures(root,keys=keys))
+    for key in keys:
+        active=read(root/'components'/key/'active.json',{}) or {}
+        if active.get('generation'):
+            folder=safe_path(root/'generations',active['generation'])
+            items.append([key,'weights',model_identity(folder/'weights',fresh=fresh)])
+    return items
+
+
 def render_key(media,words,clip,cfg,*,fresh=False):
     settings=asdict(cfg)
     irrelevant={'out_dir','work_dir','pexels_key','job_id','ollama_url','model','whisper_model','whisper_device',
         'whisper_compute','whisper_isolate','ollama_timeout','ollama_num_gpu','ollama_num_ctx','num_clips','search_depth',
         'analysis_window_s','analysis_overlap_s','selection_floor','discovery_extra_windows','asr_recheck_windows',
-        'asr_second_pass','auto_export','workflow','audio_cache_dir','visual_cache_dir'}
+        'asr_second_pass','auto_export','workflow','audio_cache_dir','visual_cache_dir','cache_limit_gb',
+        'variant_id','visual_runtime_signature','source_content_id','audio_stream_id'}
+    if not cfg.align_selected_clips:irrelevant.add('alignment_model_path')
+    if not cfg.use_nvenc:irrelevant.add('allow_backend_fallback')
     for key in irrelevant:settings.pop(key,None)
     fonts=[(p.name,content_id(p,fresh=fresh)) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
     assets=[asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
     recipe=active_recipe(clip.get('_broll_recipe',{}),cfg)
     for scene in recipe.get('scenes',[]):assets.append(asset_id(scene.get('asset',{}).get('path'),fresh=fresh))
     # Runtime metadata and result paths do not affect rendered pixels.
-    candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe','included')}
+    candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe','included','revision','variants')}
     from .caption_renderer import signature
     parts=[VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe,signature(cfg)]
-    if cfg.align_selected_clips and cfg.alignment_model_path:
+    parts.append(alignment_identity(cfg,fresh=fresh))
+    if cfg.visual_enabled:
         from .runtime.state import signatures,runtime_root
         root=Path(cfg.visual_runtime_root) if cfg.visual_runtime_root else runtime_root()
-        model=Path(cfg.alignment_model_path.strip().strip('\"\''))
-        parts.append(signatures(root,keys=('whisperx',)))
-        parts.append([(p.name,content_id(p,fresh=fresh)) for p in sorted(model.glob('*')) if p.is_file()])
+        parts.append(component_identity(root,('yunet','rapidocr','talknet','smolvlm','qwen3-vl','sam2','mediapipe'),fresh=fresh))
     if cfg.illustration_mode!='off':
         from .explanation5 import STRUCTURES_VERSION
         parts.append(STRUCTURES_VERSION)

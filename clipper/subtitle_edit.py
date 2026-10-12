@@ -1,4 +1,5 @@
 """Conservative display-only cleanup. Source words and audio are never rewritten."""
+import math
 import re
 
 HESITATIONS = {'eee', 'eeee', 'emm', 'emmm', 'hmm', 'hmmm', 'uh', 'umm'}
@@ -26,7 +27,13 @@ def clean(words, mode='safe', punctuation='original', cfg=None):
             changes.append({'word_id': word.get('word_id'), 'text': text, 'start': word['start'],
                             'end': word['end'], 'reason': 'hesitation' if norm in HESITATIONS else 'repeated_filler'})
             continue
-        if word.get('probability', 1) < .5 and not word.get('correction') and not word.get('manually_edited'):
+        probability = word.get('probability')
+        known_probability = (type(probability) in (int, float) and math.isfinite(probability)
+                             and 0 <= probability <= 1)
+        if 'probability' in word and not known_probability:
+            warnings.append({'word_id': word.get('word_id'), 'text': text, 'start': word['start'],
+                             'reason': 'Keyakinan transkripsi belum diketahui.', 'confidence_status': 'unknown','severity':'info'})
+        elif known_probability and probability < .5 and not word.get('correction') and not word.get('manually_edited'):
             warnings.append({'word_id': word.get('word_id'), 'text': text, 'start': word['start'],
                              'reason': 'Keyakinan transkripsi rendah; dengarkan kata ini.'})
         if punctuation == 'minimal':
@@ -55,7 +62,9 @@ def clean(words, mode='safe', punctuation='original', cfg=None):
             if not re.search(r'\d', text):
                 warnings.append({'word_id':word.get('word_id'), 'text':text, 'start':word['start'],
                     'reason':'Durasi satu kata terlalu panjang; periksa waktu ucapan.'})
-            if mode == 'safe':
+            timing_locked = (word.get('timing_status') == 'manual' or word.get('alignment_method') == 'manual'
+                             or word.get('timing_locked') is True)
+            if mode == 'safe' and not timing_locked:
                 # A suspicious ASR word must not stay on screen through a long silence.
                 changes.append({'word_id':word.get('word_id'), 'text':text, 'start':word['start'],
                     'end':word['end'], 'reason':'display_duration_capped', 'display_end':word['start']+2.8})

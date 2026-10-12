@@ -153,7 +153,7 @@ def test_semantic_comparison_can_detect_paraphrase_but_retains_new_story_type(tm
     a=dict(start=0,end=30,title='Latihan',story_kind='explanation',main_claim='Latihan setiap hari meningkatkan kemampuan kerja')
     b=dict(start=60,end=90,title='Belajar',story_kind='explanation',main_claim='Keterampilan membaik melalui praktik setiap hari')
     removed,report=discovery.semantic_groups([a,b],cfg)
-    assert removed=={1} and report[0]['source']=='local_semantic_review' and calls
+    assert removed=={1} and report[0]['source']=='local_e5' and calls
     b['story_kind']='example'
     assert discovery.semantic_groups([a,b],cfg)[0]==set()
 

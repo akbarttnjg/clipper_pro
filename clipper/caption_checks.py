@@ -1,15 +1,27 @@
 """A-owned caption validator; B qc.py may delegate through C0."""
+from collections import Counter
+import math
+from .caption_readability import clear_time
+
+
+def logical_ids(word):
+    return word.get('token_ids') or [word.get('token_id',word.get('word_id'))]
+
+
 def inspect_caption_plan(plan, cfg, expected_words=None):
     """Check settled positions and line edges against the requested placement."""
     issues = []
     from .caption_geometry import bounds
     readability = []
+    measurements=[]
     if expected_words and not plan.get('phrases'):
         issues.append('Subtitle kosong meskipun transkrip berisi kata.')
     if isinstance(expected_words,list):
-        expected={i for w in expected_words for i in w.get('source_word_ids',[w.get('word_id')]) if i is not None}
-        actual={i for p in plan.get('phrases',[]) for w in p['words'] for i in w.get('word_ids',[w.get('word_id')]) if i is not None}
-        if expected-actual:issues.append('Sebagian kata/frasa yang seharusnya tampil tidak ada di rencana subtitle.')
+        expected=[i for w in expected_words for i in logical_ids(w) if i is not None]
+        actual=[i for p in plan.get('phrases',[]) for w in p['words'] if not w.get('decorative')
+                for i in logical_ids(w) if i is not None]
+        if Counter(expected)!=Counter(actual):issues.append('Coverage atau jumlah kata/frasa subtitle tidak sesuai transkrip; kata tidak ada, berlebih, atau duplikat.')
+        elif expected!=actual:issues.append('Urutan kata/frasa subtitle berbeda dari transkrip.')
     if plan.get('title'):
         issues.append('Judul pembuka seharusnya tidak dirender.')
     for phrase in plan.get('phrases', []):
@@ -24,6 +36,7 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
             issues.append('Perataan subtitle berbeda dari pengaturan.')
         x, y, width, height = phrase['panel']
         duration = phrase['end']-phrase['start']
+        if not math.isfinite(duration) or duration<=0:raise ValueError('Durasi frasa subtitle harus positif dan finite.')
         cps = sum(len(w['text'])+1 for w in phrase['words'])/max(.01,duration)
         if cps > 24:
             readability.append({'start':phrase['start'],'end':phrase['end'],'reason':'Ucapan cepat; pertimbangkan memperpanjang batas atau menyederhanakan teks secara manual','characters_per_second':round(cps,1)})
@@ -33,11 +46,12 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
             if not (0 <= word['x']-word['width']/2 < word['x']+word['width']/2 <= cfg.target_w):
                 issues.append('Subtitle keluar dari lebar gambar.')
             samples = word.get('keyframes', [{'scale':1,'dx':0,'dy':0,'opacity':1}])
-            stable=[f.get('t',0) for f in samples if f.get('opacity',1)>=.98 and f.get('blur',0)<=.5
-                    and abs(f.get('scale',1)-1)<=.025]
-            hold=max(stable)-min(stable) if len(stable)>1 else duration if not word.get('keyframes') else 0
+            measured=clear_time(word,duration,interpolation=plan.get('keyframe_interpolation','hold'))
+            measurements.append({'start':phrase['start'],'token':word['text'],**measured})
+            hold=measured['longest_contiguous_clear']
             if hold<min(.25,duration*.4):
-                readability.append({'start':phrase['start'],'token':word['text'],'reason':'Waktu diam terbaca singkat','visible_hold_seconds':round(hold,3)})
+                readability.append({'start':phrase['start'],'token':word['text'],'reason':'Waktu diam terbaca singkat',
+                                    'visible_hold_seconds':round(hold,3),'severity':'blocker',**measured})
             for frame in samples:
                 if frame.get('opacity',1)<.05:
                     continue
@@ -67,7 +81,11 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
                 issues.append('Tepi baris subtitle belum sejajar.')
     if issues:
         raise ValueError('Pemeriksaan posisi subtitle gagal: ' + ' '.join(dict.fromkeys(issues)))
-    return {'passed': True, 'phrases': len(plan.get('phrases', [])),
+    blocked=any(row.get('severity')=='blocker' for row in readability)
+    return {'passed': not blocked,'geometry_passed':True,'inspection_state':'completed',
+            'status':'needs_review' if blocked else 'pass','validator_version':'caption-qc-m0-1',
+            'phrases': len(plan.get('phrases', [])),
             'requested_position': cfg.caption_position, 'requested_alignment': cfg.caption_align,
-            'readability':readability,'contrast_protection':bool(cfg.caption_backdrop),
+            'readability':readability,'clear_time_metrics':measurements,
+            'contrast_protection':bool(cfg.caption_backdrop),'raster_contrast_status':'not_measured',
             'checks': ['manual_position', 'line_alignment', 'horizontal_bounds', 'vertical_bounds', 'animation_envelope', 'reading_speed', 'detected_region_collision', 'no_title_overlay']}
