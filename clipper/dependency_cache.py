@@ -9,7 +9,7 @@ from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
 _SCOPE=ContextVar('clipper_content_scope',default=None)
-VERSION='studio4-content-v11-m0-artifact-sets'
+VERSION='studio4-content-v13-m2-reviewed-source-tracks'
 
 
 @contextmanager
@@ -64,6 +64,21 @@ def model_identity(path, *, fresh=False):
 
 
 def asr_identity(cfg,*,fresh=False):
+    provider=getattr(cfg,'asr_provider','faster_whisper')
+    if provider=='http':
+        import os
+        return {'status':'unresolved','provider':'http','endpoint_digest':fingerprint(os.environ.get('CLIPPER_ASR_ENDPOINT','')),'requested_model':cfg.whisper_model}
+    if provider=='whisperx':
+        from .speech_m2 import _runtime
+        try:
+            runtime=_runtime(cfg,'whisperx');root=Path(cfg.whisper_model)
+            if not (root/'model.bin').is_file():
+                root=Path(runtime.get('directory',''))/'weights'
+                if runtime.get('receipt',{}).get('model_choice')!=cfg.whisper_model:raise ValueError('Model mismatch')
+            if not (root/'model.bin').is_file():raise ValueError('Missing local weights')
+            return {'status':'verified','provider':provider,'weights':model_identity(root,fresh=fresh),'generation':runtime['generation'],
+                'alignment':model_identity(cfg.alignment_model_path,fresh=fresh)}
+        except (ImportError,ValueError,OSError):return {'status':'unresolved','provider':provider,'requested_model':cfg.whisper_model}
     from .runtime.bridge import managed_asr
     managed=managed_asr(cfg) if cfg.whisper_isolate else None
     root=Path(managed['weights']) if managed else Path(cfg.whisper_model).expanduser()
@@ -107,7 +122,7 @@ def component_identity(root,keys,*,fresh=False):
 
 def render_key(media,words,clip,cfg,*,fresh=False):
     settings=asdict(cfg)
-    irrelevant={'out_dir','work_dir','pexels_key','job_id','ollama_url','model','whisper_model','whisper_device',
+    irrelevant={'asr_provider','vad_policy','output_language','diarization_model_path','out_dir','work_dir','pexels_key','job_id','ollama_url','model','whisper_model','whisper_device',
         'whisper_compute','whisper_isolate','ollama_timeout','ollama_num_gpu','ollama_num_ctx','num_clips','search_depth',
         'analysis_window_s','analysis_overlap_s','selection_floor','discovery_extra_windows','asr_recheck_windows',
         'asr_second_pass','auto_export','workflow','audio_cache_dir','visual_cache_dir','cache_limit_gb',

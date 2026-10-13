@@ -40,11 +40,15 @@ class InstallerCase(unittest.TestCase):
     def setUpClass(cls):
         cls.package_temp = tempfile.TemporaryDirectory()
         cls.package = Path(cls.package_temp.name) / 'M1-test-package'
+        from .frozen_release import restore_m1
+        cls.producer=restore_m1(Path(cls.package_temp.name)/'frozen-m1-producer')
+        cls.builder_patch=patch.object(build_m1_release,'ROOT',cls.producer);cls.builder_patch.start()
         with contextlib.redirect_stdout(io.StringIO()):
             cls.report = build_m1_release.build(cls.package, '0'*40)
 
     @classmethod
     def tearDownClass(cls):
+        cls.builder_patch.stop()
         cls.package_temp.cleanup()
 
     def setUp(self):

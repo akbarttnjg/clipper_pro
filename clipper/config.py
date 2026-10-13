@@ -116,6 +116,11 @@ class Config:
     out_dir: str = os.environ.get("OUT_DIR", "clips")
 
     # Pro Local: stable typography and a sequential 4 GB VRAM profile.
+    asr_provider: str = 'faster_whisper'
+    vad_policy: str = 'silero'
+    output_language: str = 'source'
+    diarization_model_path: str = ''
+    source_media_kind: str = 'video'
     language: str = os.environ.get("TRANSCRIPT_LANGUAGE", "id")
     processing_mode: str = "auto"
     workflow: str = 'review'  # Saved sessions keep their previous review workflow.
@@ -215,6 +220,16 @@ LENGTHS: dict[str, tuple[float, float]] = {
 def validate_overrides(form: dict) -> dict:
     """Whitelist + clamp UI form fields into Config overrides. Bad values are dropped."""
     out: dict = {}
+    for key, choices in {'asr_provider': ('faster_whisper','whisperx','http'), 'vad_policy': ('silero','off')} .items():
+        if key in form:
+            if form[key] not in choices: raise ValueError(key+' tidak valid')
+            out[key]=form[key]
+    if 'output_language' in form:
+        from .transcript_tracks import language
+        out['output_language']='source' if form['output_language']=='source' else language(form['output_language'])
+    if 'diarization_model_path' in form:
+        if not isinstance(form['diarization_model_path'],str) or len(form['diarization_model_path'])>2000:raise ValueError('Lokasi model diarization tidak valid')
+        out['diarization_model_path']=form['diarization_model_path'].strip()
     for key, choices in {'style_preset':('legacy','rapi','ekspresif','adaptif'),
                          'caption_renderer':('ass','auto','remotion'),
                          'caption_template_policy':('auto','manual'),
@@ -271,7 +286,7 @@ def validate_overrides(form: dict) -> dict:
         out["caption_position"] = form["caption_position"]
     if form.get('caption_align') in ('auto', 'left', 'center', 'right'):
         out['caption_align'] = form['caption_align']
-    if form.get("language") in ("id", "en", "auto"):
+    if form.get("language") in ("id", "en", "auto", "zh", "ja", "ko", "ar", "es", "fr", "de", "pt", "hi", "ru"):
         out["language"] = form["language"]
     if form.get("length") in LENGTHS:
         out["min_clip_s"], out["max_clip_s"] = LENGTHS[form["length"]]
@@ -341,6 +356,7 @@ def validate_overrides(form: dict) -> dict:
         typed[key]=value
     out.update(validate_settings(typed))
     if 'audio_stream_index' in form:
+        if isinstance(form['audio_stream_index'],bool) or isinstance(form['audio_stream_index'],float) and not form['audio_stream_index'].is_integer():raise ValueError('Audio stream index harus bilangan bulat')
         value=int(form['audio_stream_index'])
         if not -1<=value<=128:raise ValueError('Track audio tidak valid')
         out['audio_stream_index']=value

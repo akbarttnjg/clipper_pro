@@ -130,6 +130,7 @@ def sync_evidence(service,doc,path):
 def filmstrip(service,doc,cid,vid,count):
     if type(count) is not int or not 2<=count<=24:
         raise ValueError('Filmstrip harus memuat 2–24 frame')
+    if doc['source']['info'].get('kind')=='audio':return {'revision':doc['revision'],'frames':[],'status':'not_applicable','reason':'Gunakan waveform sumber audio'}
     variant=service.variant(doc,cid,vid)
     clock=ec.build_clock(ec.segments_for(doc['clips'][cid],variant),service.config(doc,cid,vid).output_fps)
     base=source_path(doc);digest=fingerprint([clock['digest'],content_id(base),doc.get('editor_cameras'),count])
@@ -197,6 +198,9 @@ def prepare(service,doc,cid,vid,source,words,clip,cfg,progress=lambda *_:None):
     variant=service.variant(doc,cid,vid);editor=variant.get('editor',{})
     if not editor:
         return source,words,clip,cfg,None
+    if cfg.source_media_kind=='audio':
+        from .audio_project import edited_source
+        return edited_source(service,doc,cid,vid,source,words,clip,cfg,progress)
     clock=ec.build_clock(ec.segments_for(doc['clips'][cid],variant),cfg.output_fps)
     tracks=ec.track_state(editor)
     if not editor.get('segments') and not any(editor.get('curves',{}).values()) and not editor.get('hidden_caption_word_ids') and all(r['enabled'] for r in tracks.values()):

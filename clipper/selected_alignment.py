@@ -33,7 +33,7 @@ def apply_patches(words,patches,clip):
             # Keep one-to-one lineage. Multiword units remain measured spans
             # and are expanded only by the existing transcript adapter.
             word.update(start=aligned[0]['start'],end=aligned[-1]['end'],
-                        alignment_method='whisperx',timing_status='aligned',
+                        alignment_method='whisperx',timing_status='weak_alignment' if min(w.get('score',1) for w in aligned)<.5 else 'aligned',alignment_confidence=min(w.get('score',1) for w in aligned),
                         alignment_provenance=patch.get('provenance',{}))
             if len(aligned)>1:word['aligned_words']=aligned
             applied+=1;break

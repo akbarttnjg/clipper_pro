@@ -1,5 +1,6 @@
 """HTTP boundary for Studio 4. All mutations carry revisions or queue ownership."""
 import functools
+import subprocess
 import uuid
 from pathlib import Path
 from fastapi import APIRouter,Body,File,UploadFile,HTTPException
@@ -14,7 +15,7 @@ def guarded(fn):
         try:return fn(*args,**kwargs)
         except Conflict as exc:return JSONResponse({'status':'conflict','revision':exc.revision,'message':str(exc),'paths':exc.paths},status_code=409)
         except KeyError as exc:raise HTTPException(404,str(exc)) from exc
-        except (ValueError,OSError,TypeError) as exc:raise HTTPException(400,str(exc)) from exc
+        except (ValueError,OSError,TypeError,subprocess.SubprocessError) as exc:raise HTTPException(400,str(exc)) from exc
     return call
 
 
@@ -24,6 +25,8 @@ def create_router(service):
     router.include_router(runtime_router(service))
     from .api_editor import router as editor_router
     router.include_router(editor_router(service,guarded))
+    from .api_ingest import router as ingest_router
+    router.include_router(ingest_router(service,guarded))
     @router.get('/style-presets')
     def style_presets():
         from .style5 import PRESETS,VERSION
@@ -38,11 +41,19 @@ def create_router(service):
     @router.post('/upload')
     async def upload(file:UploadFile=File(...)):
         suffix=Path(file.filename or '').suffix.lower()
-        if suffix not in ('.mp4','.mkv','.mov','.webm','.avi','.m4v'):raise HTTPException(400,'Pilih berkas video')
+        from .source_imports import MEDIA_SUFFIXES,DEFAULT_MAX_BYTES
+        if suffix not in MEDIA_SUFFIXES:raise HTTPException(400,'Pilih berkas video atau audio')
         folder=service.root/'uploads';folder.mkdir(parents=True,exist_ok=True);target=folder/(uuid.uuid4().hex+suffix)
         try:
+            received=0
             with target.open('wb') as stream:
-                while block:=await file.read(4*1024*1024):stream.write(block)
+                while block:=await file.read(4*1024*1024):
+                    received+=len(block)
+                    if received>DEFAULT_MAX_BYTES:raise HTTPException(400,'Berkas melebihi batas 20 GB')
+                    stream.write(block)
+            from .media_context import inspect
+            try:inspect(target)
+            except (ValueError,subprocess.SubprocessError) as exc:raise HTTPException(400,'Media tidak dapat dibaca') from exc
             return {'path':str(target),'name':Path(file.filename or 'Video').stem}
         except BaseException:target.unlink(missing_ok=True);raise
         finally:await file.close()
@@ -53,7 +64,7 @@ def create_router(service):
 
     @router.get('/projects/{pid}/words')
     @guarded
-    def words(pid:str,clip_id:str|None=None,offset:int=0,limit:int=150,q:str='',whole:bool=False,search_mode:str='display'):return service.page(pid,clip_id,offset=offset,limit=limit,q=q,whole=whole,search_mode=search_mode)
+    def words(pid:str,clip_id:str|None=None,offset:int=0,limit:int=150,q:str='',whole:bool=False,search_mode:str='display',variant_id:str|None=None):return service.page(pid,clip_id,offset=offset,limit=limit,q=q,whole=whole,search_mode=search_mode,variant_id=variant_id)
 
     @router.post('/changes')
     @guarded
@@ -211,10 +222,11 @@ def install(app,root,base,states,resource_lock):
             if known.intersection(request.url.path.split('/')):return JSONResponse({'detail':'Proyek telah memakai revisi Studio 4. Muat ulang editor; draf tab lama jangan ditutup sebelum disalin.'},status_code=409)
         return await call_next(request)
     @app.on_event('startup')
-    def start():service.queue.start()
+    def start():service.queue.start();service.imports.start()
     @app.on_event('shutdown')
     def stop():
         service.queue.close()
+        if 'imports' in service.__dict__:service.imports.close()
         if 'runtime' in service.__dict__:service.runtime.close()
     app.state.studio=service
     return service

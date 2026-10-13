@@ -86,6 +86,8 @@ def apply_alignments(words, document, clip_id=None):
             try: aligned = validate_alignment(row['word'], patch['words'], patch['audio_start'], patch['audio_end'], method=patch['method'])
             except (KeyError, ValueError, TypeError): continue
             row.update(aligned_words=aligned, alignment_method=patch['method'], alignment_provenance=patch.get('provenance', {}))
+            if patch['method']=='whisperx':
+                row['alignment_confidence']=min(w['score'] for w in aligned);row['alignment_review_status']='needs_review' if row['alignment_confidence']<.5 else 'measured_not_corpus_validated'
     return result
 
 
@@ -119,10 +121,10 @@ def expand_aligned(words):
             except (KeyError, ValueError, TypeError): aligned = None
         if aligned:
             for token in aligned:
-                result.append({**row, **token, 'aligned_words': None, 'timing_status': 'manual' if row.get('alignment_method') == 'manual' else 'aligned'})
+                result.append({**row, **token, 'aligned_words': None, 'timing_status': 'manual' if row.get('alignment_method') == 'manual' else 'weak_alignment' if token.get('score',1)<.5 else 'aligned', 'alignment_confidence':token.get('score')})
         else:
             status='manual' if row.get('timing_status')=='manual' or row.get('alignment_method')=='manual' else 'phrase_span' if len(row['word'].split())>1 or len(row.get('source_word_ids',[]))>1 else 'inherited_span' if row.get('correction') or row.get('manually_edited') else 'asr'
-            result.append({**row, 'timing_status':status})
+            result.append({**row, 'timing_status':row.get('timing_status') if row.get('timing_status') in ('manual_source_time','cue_unaligned','weak_alignment','imported_unmeasured','partial_word_needs_review') else status})
     return result
 
 

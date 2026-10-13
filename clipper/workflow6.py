@@ -14,7 +14,7 @@ VERSION = '4.0.6'
 BRAND_FIELDS = frozenset({'style_preset','caption_template_policy','caption_composition','font_main','font_accent','accent_hex','base_hex',
     'caption_style','caption_position','caption_align','caption_scale','caption_backdrop',
     'motion_intensity','layout','material_share','semantic_emphasis','safe_placement'})
-SOURCE_FIELDS = frozenset({'language','audio_stream_index','whisper_model','whisper_device',
+SOURCE_FIELDS = frozenset({'asr_provider','vad_policy','output_language','diarization_model_path','language','audio_stream_index','whisper_model','whisper_device',
     'whisper_compute','whisper_isolate','asr_second_pass','asr_recheck_windows','alignment_model_path',
     'audience','glossary','transcript_correction','model','ollama_num_ctx','ollama_num_gpu',
     'processing_mode','source_kind','min_clip_s','max_clip_s','search_depth','num_clips',

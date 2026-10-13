@@ -369,6 +369,7 @@ def describe(media,group,cfg,info,active,allow_vlm=True,source_bounds=None,obser
 
 
 def report(plan,media,cfg):
+    if cfg.source_media_kind=='audio':return {'status':'not_applicable','shots':[],'reason':'Sumber audio: tidak menjalankan deteksi wajah/ruang gambar'}
     folder=analysis_folder(cfg);folder.mkdir(parents=True,exist_ok=True);shots=[]
     controls=cfg.visual_overrides or {};prompt_time=controls.get('sam_time')
     mask_index=next((i for i,s in enumerate(plan.get('shots',[])) if prompt_time is not None and s['source_start']<=prompt_time<s['source_end']),0 if prompt_time is None else None)

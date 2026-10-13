@@ -167,7 +167,9 @@ def probe(path: str) -> dict:
         capture_output=True, text=True, check=True,
     ).stdout
     data = json.loads(out)
-    vstream = next(s for s in data["streams"] if s["codec_type"] == "video")
+    vstream = next((s for s in data["streams"] if s["codec_type"] == "video" and not s.get("disposition",{}).get("attached_pic")), None)
+    if vstream is None:
+        return {"width":0,"height":0,"fps":30.,"duration":float(data["format"]["duration"]),"has_audio":any(s["codec_type"]=="audio" for s in data["streams"]),"kind":"audio"}
     num, den = (vstream.get("r_frame_rate", "30/1").split("/") + ["1"])[:2]
     fps = float(num) / float(den or 1)
     return {

@@ -126,11 +126,19 @@ def _execute(service,job):
     elif kind=='source_evidence':
         report=evidence.scan(source,cfg,media['payload']['duration'],progress,input_fingerprint=media['input_fingerprint'])
         result={'evidence':report};updates['evidence_summary']={k:v for k,v in report.items() if k not in ('frames','audio')}
+    elif kind=='proxy':
+        result=media_context.proxy(doc['source']['path'],cfg,progress);updates['m2_proxy']=result
+    elif kind=='diarization':
+        from .speech_m2 import run_isolated
+        result=run_isolated('diarization',source,cfg);updates['diarization']={**result,'transcript_id':doc['transcript_id']}
+    elif kind=='translation':
+        data={**job['request']['options'],'expected_revision':doc['revision']}
+        result=service.transcripts.translation_review(pid,data,owned_worker=True)
     elif kind=='waveform':
         from .audio_quality import waveform
         result=waveform(source,media['payload']['duration']);updates['waveform']=result
     else:
-        transcript=service.transcript(doc,cid);words=transcript['words']
+        transcript=service.transcript(doc,cid,vid);words=transcript['words']
         if kind=='correction':
             transcript['ocr_suggestions']=evidence.suggestions(words,evidence.load(cfg))
             refined=transcript_correction.refine(transcript,cfg)
@@ -144,8 +152,8 @@ def _execute(service,job):
         elif kind=='asr_recheck':
             from . import speech_jobs
             original=service.store.transcript(doc['transcript_id']);heard=copy.deepcopy(original.get('heard_words',original.get('raw_words',original['words'])))
-            groups=[doc.get('shared_corrections',{}),*doc.get('clip_corrections',{}).values()]
-            protected={i for group in groups for patch in group.values() if patch['transcript_id']==doc['transcript_id'] for i in patch['origin_word_ids']}
+            from .transcript_service import all_patches
+            protected={i for patch in all_patches(doc) if patch['transcript_id']==doc['transcript_id'] for i in patch['origin_word_ids']}
             for word in heard:
                 if set(transcript_correction.source_ids([word]))&protected:word['manually_edited']=True
             payload={**original,'words':heard};options=copy.deepcopy(job['request'].get('options',{}))
@@ -223,6 +231,7 @@ def _execute(service,job):
             clip={k:v for k,v in doc['clips'][cid].items() if k!='variants'};variant=service.variant(doc,cid,vid)
             from .studio_exchange import render_words,records
             words=render_words(transcript,doc,clip,cfg)
+            if transcript.get('m2_translation') and transcript['m2_translation']['display_mode']=='bilingual':clip['_m2_translation']=transcript['m2_translation']
             clip['revision']=variant.get('timeline_revision',0)+doc['transcript_revision']
             clip['_broll_recipe']=variant.get('recipe') or {'scenes':[],'notes':['Siapkan ilustrasi untuk memilih aset.']}
             if variant.get('timeline'):clip['manual_keep_spans']=variant['timeline']['keep_spans']
@@ -307,6 +316,10 @@ def _execute(service,job):
         old_audio=current['source'].get('media_context',{}).get('payload',{}).get('audio_stream_id')
         current['source'].update(source_id=media['source_id'],media_context=media,info={k:v for k,v in media['payload'].items() if k!='working_content_id'})
         current.update(updates)
+        if kind=='proxy':current['source']['edit_proxy']=result;current.pop('m2_proxy',None)
+        if kind=='translation':
+            result['approval_revision']=publish_revision
+            current.setdefault('translation_proposals',[]).append(copy.deepcopy(result))
         if kind in ('analyze','discovery'):
             if old_take and (current['source'].get('requires_analysis') or old_source!=media['source_id'] or old_audio and old_audio!=media['payload']['audio_stream_id']):
                 current.setdefault('archived_clips',[]).append({'source_id':old_source,'transcript_id':old_take,'clips':current['clips']})
@@ -325,6 +338,12 @@ def _execute(service,job):
                 current['transcript_lineage']={'from':old_take,'to':current['transcript_id'],
                     'manual_patches_preserved':compatible,'basis':'identical_source_audio_and_raw_words' if compatible else 'new_asr_evidence'}
             if compatible:
+                from .transcript_service import all_patches
+                for patch in all_patches(current):
+                    if patch['transcript_id']==old_take:patch['transcript_id']=current['transcript_id']
+                for patch in current.get('manual_speakers',{}).values():
+                    if patch['transcript_id']==old_take:patch['transcript_id']=current['transcript_id']
+                if current.get('diarization',{}).get('transcript_id')==old_take:current['diarization']['transcript_id']=current['transcript_id']
                 for group in [current.get('shared_corrections',{}),*current.get('clip_corrections',{}).values()]:
                     for patch in group.values():
                         if patch['transcript_id']==old_take:patch['transcript_id']=current['transcript_id']
@@ -350,7 +369,7 @@ def _execute(service,job):
                 keep=current['clips'][cid]['variants'];current['clips'][cid].update(reviewed);current['clips'][cid]['variants']=keep
         if kind=='export':current.setdefault('exports',[]).append(result)
     for attempt in range(5):
-        current=check()
+        current=check();publish_revision=current['revision']+1
         try:
             saved=service.store.mutate(pid,current['revision'],job['id']+'-publish',{'job_id':job['id'],'dependency':dependency},publish,'Selesai: '+kind,
                 job_guard={**job,'clip_id':cid,'variant_id':vid},job_result=result);break

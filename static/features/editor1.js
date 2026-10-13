@@ -1,5 +1,5 @@
-import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.12-m1';
-import {settingsDelta} from './editor_state.js?v=4.0.12-m1';
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.13-m2';
+import {settingsDelta} from './editor_state.js?v=4.0.13-m2';
 
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
 const button=(parent,text,fn)=>{const n=node('button',text);n.type='button';n.onclick=async()=>{n.disabled=true;try{await fn()}catch(error){let status=parent.querySelector('[role="status"]');if(!status){status=node('p','','help');status.setAttribute('role','status');parent.append(status)}status.textContent=error.message}finally{n.disabled=false}};parent.append(n);return n};

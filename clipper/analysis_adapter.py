@@ -40,7 +40,7 @@ def asr_fingerprint(source_id,audio_stream_id,cfg,source_time_origin=0,alias_rev
         alias_revision if alias_revision is not None else signature(cfg)]
     from .dependency_cache import asr_identity
     value.append(asr_identity(cfg,fresh=True))
-    value.append({'allow_backend_fallback':cfg.allow_backend_fallback})
+    value.append({'allow_backend_fallback':cfg.allow_backend_fallback,'asr_provider':cfg.asr_provider,'vad_policy':cfg.vad_policy})
     return digest(value)
 
 
@@ -48,6 +48,13 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
                         clip_span=None):
     if not transcript_id or type(revision) is not int or revision<0:raise ValueError('ID/revisi transkrip diperlukan')
     refined=transcript_correction.refine(transcript,cfg)
+    for row in refined['words']:
+        same=next((w for w in transcript['words'] if transcript_correction.source_ids([w])==transcript_correction.source_ids([row])),None)
+        if same:
+            for key in ('speaker_id','speaker_status','speaker_provenance','alignment_confidence','confidence_kind','timing_status'):
+                if key in same:row[key]=same[key]
+            if same.get('timing_status')=='manual_source_time':row.update(start=same['start'],end=same['end'],manually_edited=True)
+
     heard=[dict(w) for w in refined['raw_words']]
     identifiers=[w.get('word_id') for w in heard]
     if any(i is None for i in identifiers) or len(set(identifiers))!=len(identifiers):
@@ -65,7 +72,7 @@ def transcript_snapshot(transcript,cfg,*,source_id,transcript_id,revision,input_
             origin_word_ids=origins,text=w['word'],source_start=w['start'],source_end=w['end'],
             correction_status='manual' if w.get('manually_edited') else w.get('correction','unchanged'),
             timing_status=w.get('timing_status','asr'),alignment_method=w.get('alignment_method'),
-            asr_probability=w.get('probability'),
+            asr_probability=w.get('probability'),speaker_id=w.get('speaker_id'),speaker_status=w.get('speaker_status'),alignment_confidence=w.get('alignment_confidence'),
             provenance={'reason':w.get('correction'),'before':w.get('raw_word'),'manual':bool(w.get('manually_edited'))},
             requires_alignment=alignment))
     queue=[]
@@ -119,6 +126,7 @@ def candidate_set(candidates,report,*,source_id,input_fingerprint,legacy=False):
 
 
 def scene_analysis(plan,media_context,*,input_fingerprint):
+    if media_context['payload'].get('kind')=='audio':return envelope('SceneAnalysis',media_context['source_id'],input_fingerprint,'empty',shots=[],reason='audio_only_no_face_or_visual_space')
     require_v1(media_context)
     data=media_context['payload']
     if data.get('coordinate_space')!='canonical_source_pixels' or data.get('geometry_status')!='ready':

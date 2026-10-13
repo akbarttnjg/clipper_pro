@@ -30,12 +30,16 @@ def origins(word):
     return word.get('source_word_ids',word.get('origin_word_ids',[word['word_id']]))
 
 
-def apply_corrections(words,document,clip_id=None):
+def apply_corrections(words,document,clip_id=None,variant_id=None):
     rows=copy.deepcopy(words);take=document.get('transcript_id')
     shared=list(document.get('shared_corrections',{}).values())
-    manual=list(document.get('clip_corrections',{}).get(clip_id,{}).values())
-    manual_ids={i for r in manual if r['transcript_id']==take for i in r['origin_word_ids']}
-    for change in [r for r in shared if not set(r['origin_word_ids'])&manual_ids]+manual:
+    layers=[shared,list(document.get('clip_corrections',{}).get(clip_id,{}).values()),
+        list(document.get('variant_corrections',{}).get(clip_id,{}).get(variant_id,{}).values())]
+    selected=[]
+    for index,layer in enumerate(layers):
+        higher={i for group in layers[index+1:] for r in group if r['transcript_id']==take for i in r['origin_word_ids']}
+        selected += [r for r in layer if not set(r['origin_word_ids'])&higher]
+    for change in selected:
         if change['transcript_id']!=take:continue
         ids=set(change['origin_word_ids']);positions=[i for i,w in enumerate(rows) if set(origins(w))&ids]
         if not positions:continue
@@ -50,6 +54,16 @@ def apply_corrections(words,document,clip_id=None):
 
 
 class StudioService:
+    @cached_property
+    def imports(self):
+        from .source_imports import SourceImports
+        return SourceImports(self)
+
+    @cached_property
+    def transcripts(self):
+        from .transcript_service import TranscriptService
+        return TranscriptService(self)
+
     @cached_property
     def workspace(self):
         from .workflow6 import Workspace
@@ -108,7 +122,7 @@ class StudioService:
         values.update(work_dir=str(self.work/doc['project_id']),out_dir=self.base.out_dir,job_id=doc['project_id'],
             fonts_dir=self.base.fonts_dir,
             approved_aliases=doc.get('aliases',[]),source_content_id=doc.get('source',{}).get('source_id',''),
-            audio_stream_id=media.get('audio_stream_id',''),preview_seconds=0.,title_card=False)
+            audio_stream_id=media.get('audio_stream_id',''),source_media_kind=doc.get('source',{}).get('info',{}).get('kind','video'),preview_seconds=0.,title_card=False)
         from .runtime.state import runtime_root,signatures
         visual_runtime=runtime_root(self.root,self.work)
         values.update(visual_cache_dir=str(self.work/doc['project_id']/'visual4'),visual_runtime_root=str(visual_runtime),visual_runtime_signature=signatures(visual_runtime))
@@ -124,9 +138,9 @@ class StudioService:
     def create(self,path,settings=None,name=None):
         from .media_context import inspect
         path=Path(path).expanduser().resolve()
-        if not path.is_file():raise ValueError('Sumber video tidak ditemukan')
+        if not path.is_file():raise ValueError('Sumber video/audio tidak ditemukan')
         info=inspect(path)
-        if not info['audio_tracks']:raise ValueError('Video harus mempunyai track suara')
+        if not info['audio_tracks']:raise ValueError('Sumber harus mempunyai track suara')
         settings={**self.workspace.preference().get('settings',{}),**validate_overrides(settings or {})}
         document={'name':str(name or path.stem)[:160],'settings':{**{k:v for k,v in asdict(self.base).items() if k not in PRIVATE},**settings},
             'source':{'path':str(path),'source_id':content_id(path,fresh=True),'info':info},
@@ -154,6 +168,11 @@ class StudioService:
         working=source.get('media_context',{}).get('payload',{}).get('working_path',source['path'])
         source['url']=self.register_file(project_id,working if Path(working).is_file() else source['path'])
         source['changed']=source['available'] and asset_id(source['path'])!=source['source_id']
+        proxy=source.get('edit_proxy',{})
+        expected_audio=doc['settings'].get('audio_stream_index',-1)
+        if expected_audio<0:expected_audio=source['info']['audio_tracks'][0]['index']
+        if proxy.get('status')=='ready' and source['available'] and not source['changed'] and source['source_id']==proxy.get('source_id') and expected_audio==proxy.get('selected_audio_index') and Path(proxy.get('path','')).is_file() and content_id(proxy['path'])==proxy.get('content_id'):
+            source['canonical_url']=source['url'];source['url']=self.register_file(project_id,proxy['path']);source['proxy_used']=True
         for cid,clip in out['clips'].items():
             for vid,variant in clip['variants'].items():
                 variant['effective_settings']={k:v for k,v in asdict(self.config(doc,cid,vid)).items() if k not in PRIVATE}
@@ -207,13 +226,21 @@ class StudioService:
         return {'status':'ready','action':'export','message':'Final sesuai bahan dan pengaturan aktif. Paket editor dapat dibuat.',
             'input_revision':result.get('input_revision')}
 
-    def transcript(self,doc,clip_id=None):
+    def transcript(self,doc,clip_id=None,variant_id=None):
         if not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia; jalankan analisis sumber')
         data=self.store.transcript(doc['transcript_id'])
-        data['words']=apply_corrections(data['words'],doc,clip_id)
+        data['words']=apply_corrections(data['words'],doc,clip_id,variant_id)
+        from .transcript_service import project_words
+        data['words']=project_words(data['words'],doc,clip_id,variant_id)
+        if clip_id and variant_id:
+            display=self.variant(doc,clip_id,variant_id).get('transcript_display',{'mode':'source'})
+            if display.get('mode')!='source':
+                tid=display.get('track_id');track=doc.get('translation_tracks',{}).get(tid)
+                if not track or not track['approved'] or track['source_take']!=doc['transcript_id'] or track['source_revision']!=doc['transcript_revision']:raise ValueError('Terjemahan usang; tinjau ulang atau pilih track sumber')
+                data['m2_translation']={**self.store.transcript(tid),'display_mode':display['mode'],'track_id':tid}
         return data
 
-    def page(self,project_id,clip_id=None,*,offset=0,limit=150,q='',whole=False,search_mode='display'):
+    def page(self,project_id,clip_id=None,*,offset=0,limit=150,q='',whole=False,search_mode='display',variant_id=None):
         doc=self.store.get(project_id)
         if not doc.get('transcript_id'):return dict(words=[],total=0,next_offset=None,revision=doc['revision'])
         if clip_id and not whole and clip_id not in doc['clips']:raise KeyError('Klip tidak ditemukan')
@@ -221,17 +248,17 @@ class StudioService:
         effective_clip=None if whole else clip_id
         key=fingerprint({'project':project_id,'take':doc['transcript_id'],'scope':effective_clip,
             'shared':doc.get('shared_corrections',{}),'clip':doc.get('clip_corrections',{}).get(effective_clip,{}),
-            'alignment':doc.get('alignment_overrides',{}),'projection_version':1})
+            'alignment':doc.get('alignment_overrides',{}),'m2':[doc.get('variant_corrections'),doc.get('source_timing_overrides'),doc.get('clip_source_timing_overrides'),doc.get('variant_source_timing_overrides'),doc.get('manual_speakers'),doc.get('diarization'),variant_id],'projection_version':2})
         def projection():
             transcript=self.store.transcript(doc['transcript_id'])
             heard={dumps(w['word_id']):w['word'] for w in transcript['raw_words']}
-            rows=apply_corrections(transcript['words'],doc,effective_clip)
+            rows=self.transcript(doc,effective_clip,variant_id)['words']
             for row in rows:
                 row['heard']=' '.join(heard.get(dumps(i),'') for i in origins(row)).strip() or row.get('raw_word',row['word'])
                 row['group_edit']=False
                 row['group_origin_word_ids']=origins(row)
             return rows
-        page=self.store.effective_words_page(project_id,doc['transcript_id'],effective_clip or 'source',key,projection,
+        page=self.store.effective_words_page(project_id,doc['transcript_id'],(effective_clip or 'source')+(':'+variant_id if variant_id else ''),key,projection,
             offset=offset,limit=limit,q=q,search_mode=search_mode,start=clip['start'] if clip else None,end=clip['end'] if clip else None)
         return {**page,'revision':doc['revision'],'transcript_id':doc['transcript_id'],'transcript_revision':doc['transcript_revision']}
 
@@ -245,8 +272,10 @@ class StudioService:
                 variant=self.variant(doc,clip_id,variant_id)
                 clip['_broll_recipe']=variant.get('recipe') or {}
                 if variant.get('timeline'):clip['manual_keep_spans']=variant['timeline']['keep_spans']
-                words=render_words(self.transcript(doc,clip_id),doc,clip,cfg) if doc.get('transcript_id') else []
+                words=render_words(self.transcript(doc,clip_id,variant_id),doc,clip,cfg) if doc.get('transcript_id') else []
                 base_key=render_key(doc['source']['path'],words,clip,cfg,fresh=fresh)
+                if variant.get('transcript_display',{}).get('mode')!='source' and variant.get('transcript_display'):
+                    base_key=fingerprint([base_key,variant['transcript_display'],doc.get('translation_tracks'),doc['transcript_revision']])
                 from .editor_contract import render_inputs
                 inputs=render_inputs(variant.get('editor',{}))
                 if inputs:
@@ -294,12 +323,12 @@ class StudioService:
         if op.get('transcript_revision')!=doc.get('transcript_revision'):raise Conflict(doc.get('revision',0),'Koreksi transkrip berubah; muat halaman terbaru')
         text=op.get('after')
         if not isinstance(text,str) or not text.strip() or len(text)>120:raise ValueError('Teks koreksi harus 1–120 karakter')
-        if op.get('scope','clip') not in ('clip','shared_utterance'):raise ValueError('Cakupan koreksi tidak valid')
-        if not clip_id and op.get('scope')!='shared_utterance':raise ValueError('Koreksi sumber penuh memakai cakupan ucapan bersama')
+        if op.get('scope','clip') not in ('clip','shared_utterance','project','variant','phrase'):raise ValueError('Cakupan koreksi tidak valid')
+        if not clip_id and op.get('scope') not in ('shared_utterance','project'):raise ValueError('Koreksi sumber penuh memakai cakupan ucapan bersama')
         if op.get('op')=='correct_phrase':
             ids=op.get('origin_word_ids')
             if not isinstance(ids,list) or not ids or len(set(ids))!=len(ids):raise ValueError('Identitas frasa harus lengkap dan unik')
-            rows=self.transcript(doc,clip_id)['words'];positions=[i for i,w in enumerate(rows) if set(origins(w))&set(ids)]
+            rows=self.transcript(doc,clip_id,op.get('variant_id'))['words'];positions=[i for i,w in enumerate(rows) if set(origins(w))&set(ids)]
             if not positions or positions!=list(range(positions[0],positions[-1]+1)) or set(i for w in rows[positions[0]:positions[-1]+1] for i in origins(w))!=set(ids):
                 raise ValueError('Frasa sudah berubah atau tidak berurutan; tinjau transkrip terbaru')
             selected=rows[positions[0]:positions[-1]+1];before=' '.join(w['word'] for w in selected)
@@ -308,7 +337,7 @@ class StudioService:
                 raise ValueError('Frasa berada di luar klip aktif')
         elif 'word_id' in op:
             self.store.word(doc['transcript_id'],op['word_id'])
-            word=next((w for w in self.transcript(doc,clip_id)['words'] if op['word_id'] in origins(w)),None)
+            word=next((w for w in self.transcript(doc,clip_id,op.get('variant_id'))['words'] if op['word_id'] in origins(w)),None)
             if word is None:raise ValueError('Kata tidak ditemukan pada transkrip aktif')
             ids=origins(word)
             if clip_id:
@@ -318,7 +347,7 @@ class StudioService:
             before=word['word']
         else:
             if op.get('source_id')!=doc['source']['source_id']:raise ValueError('Identitas sumber tidak cocok')
-            snapshot=self.analysis_snapshot({'project_id':doc['project_id'],'clip_id':clip_id,'variant_id':'portrait'},document=doc)['data']['transcript']['payload']
+            snapshot=self.analysis_snapshot({'project_id':doc['project_id'],'clip_id':clip_id,'variant_id':op.get('variant_id','portrait')},document=doc)['data']['transcript']['payload']
             token=next((t for t in snapshot['display_tokens'] if t['token_id']==op.get('token_id')),None)
             if not token or token['origin_word_ids']!=op.get('origin_word_ids') or token['text']!=op.get('before'):raise ValueError('Token berubah atau tidak ada pada snapshot aktif')
             if token.get('requires_alignment'):raise ValueError('Koreksi melintasi batas klip; perbaiki batas dahulu')
@@ -336,7 +365,7 @@ class StudioService:
         reviews=[]
         for index,op in enumerate(operations):
             if op.get('op') not in ('correct_word','correct_token','correct_phrase'):continue
-            ids,before,after=self._correction_target(doc,op.get('clip_id',request.get('clip_id')),op)
+            ids,before,after=self._correction_target(doc,op.get('clip_id',request.get('clip_id')),{**op,'variant_id':op.get('variant_id',request.get('variant_id'))})
             review=self._editor_text_review(doc,before,after,op)
             reviews.append({**review,'operation_index':index,'before':before,'after':after,
                 'confirmation_stamp':stage3.approval_stamp(doc['transcript_id'],doc['transcript_revision'],ids,before,after)})
@@ -362,7 +391,7 @@ class StudioService:
         change={'transcript_id':doc['transcript_id'],'origin_word_ids':ids,'after':text.strip(),'provenance':'user_approval'}
         if review['requires_confirmation']:change['fact_approval']={**review,'before':before,'after':text,'stamp':stamp}
         key=fingerprint([doc['transcript_id'],ids])
-        group=doc.setdefault('shared_corrections',{}) if op.get('scope')=='shared_utterance' else doc.setdefault('clip_corrections',{}).setdefault(clip_id,{})
+        group=doc.setdefault('shared_corrections',{}) if op.get('scope') in ('shared_utterance','project') else (doc.setdefault('variant_corrections',{}).setdefault(clip_id,{}).setdefault(op.get('variant_id','portrait'),{}) if op.get('scope') in ('variant','phrase') else doc.setdefault('clip_corrections',{}).setdefault(clip_id,{}))
         # Replacing a merged token must not leave competing patches for its origins.
         for old in list(group):
             if group[old]['transcript_id']==doc['transcript_id'] and set(group[old]['origin_word_ids'])&set(ids):del group[old]
@@ -387,7 +416,9 @@ class StudioService:
             from .editor_service import apply_editor_command, check_lock
             check_lock(self,doc,cid,vid,op)
             kind=op.get('op')
-            handled=apply_editor_command(self,doc,cid,vid,op,revision=request["expected_revision"])
+            from .transcript_service import apply_command
+            handled=apply_command(self,doc,cid,vid,op,request['expected_revision'])
+            if handled is None:handled=apply_editor_command(self,doc,cid,vid,op,revision=request["expected_revision"])
             if handled is not None:
                 touched.update(handled.get('touched',[]));transcript_changed|=handled.get('transcript_changed',False)
                 continue
@@ -396,7 +427,7 @@ class StudioService:
                 if selected not in doc['clips'] or type(op.get('included')) is not bool:raise ValueError('Pilihan klip tidak valid.')
                 doc['clips'][selected]['included']=op['included']
             elif kind in ('correct_word','correct_token','correct_phrase'):
-                self._correct(doc,cid,op);transcript_changed=True
+                self._correct(doc,cid,{**op,'variant_id':vid});transcript_changed=True
             elif kind in ('alias_upsert','alias_remove'):
                 from .correction_memory import propose_change
                 doc['aliases']=propose_change(doc.get('aliases',[]),op)
@@ -584,11 +615,18 @@ class StudioService:
             state=snapshot(self,doc,fresh=True,mode=mode,require_ready=True)
             return self.queue.enqueue_many(project_id,[(kind,{'clip_id':None,'variant_id':'both'},
                 {'dependency':state['dependency'],'options':{'mode':mode}})],doc['revision'])[0]
-        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation'):raise ValueError('Tahap tidak dikenal')
-        if kind in ('analyze','source_evidence','correction','discovery','waveform'):clip_id=None
+        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation'):raise ValueError('Tahap tidak dikenal')
+        if kind in ('analyze','source_evidence','correction','discovery','waveform','proxy','diarization','translation'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
         if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation') and not clip_id:raise ValueError('Pilih klip dahulu')
-        if kind not in ('analyze','source_evidence','waveform') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
+        if kind not in ('analyze','source_evidence','waveform','proxy') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
+        if kind=='translation':
+            from .transcript_tracks import language
+            options={'provider':'ollama','target_language':language((options or {}).get('target_language','en'))}
+        if kind=='diarization':
+            from .speech_m2 import _runtime
+            cfg=self.config(doc);_runtime(cfg,'pyannote')
+            if not Path(cfg.diarization_model_path.strip().strip('"\'')).is_file():raise ValueError('Pilih model YAML diarization lokal')
         if kind=='asr_recheck':
             from .speech_jobs import recheck_options
             options=recheck_options(options or {})
@@ -662,7 +700,7 @@ class StudioService:
                     source_id=doc['source']['source_id'],transcript_id=doc['transcript_id'],revision=doc['transcript_revision'],
                     input_fingerprint=fingerprint(words),audio_stream_id=cfg.audio_stream_id or 'audio:0',clip_span=(clip['start'],clip['end']))
             from .discovery import context
-            data['boundary_context']=context(clip,self.transcript(doc,cid))
+            data['boundary_context']=context(clip,self.transcript(doc,cid,vid))
         if variant.get('asset_proposals'):
             proposals=copy.deepcopy(variant['asset_proposals']);by_id={s['id']:s for s in variant.get('recipe',{}).get('scenes',[])}
             for p in proposals['payload']['proposals']:

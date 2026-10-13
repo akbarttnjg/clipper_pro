@@ -1,5 +1,6 @@
 """Isolated ASR process releases CUDA memory before Ollama starts."""
 import gc
+import time
 import json
 import os
 import subprocess
@@ -36,15 +37,18 @@ def _run(media_path, cfg):
     from faster_whisper import WhisperModel
     from .typography import valid_words
     from .transcript_correction import prompt, recheck_ranges, merge_recheck
+    from .speech_m2 import vad_input, normalize, memory_receipt
+    vad_audio, clips, vad = vad_input(media_path,cfg)
+    started=time.monotonic()
     device, compute = _resolve_device(cfg)
     warnings = []
     def attempt(dev, dtype):
         model = WhisperModel(cfg.whisper_model, device=dev, compute_type=dtype,
                              cpu_threads=max(1, min(8, os.cpu_count() or 4)), num_workers=1,local_files_only=True)
         try:
-            segments, info = model.transcribe(media_path,
+            segments, info = model.transcribe(vad_audio,
                 language=None if cfg.language == 'auto' else cfg.language,
-                task='transcribe', word_timestamps=True, vad_filter=True, beam_size=5,
+                task='transcribe', word_timestamps=True, vad_filter=False, clip_timestamps=clips, beam_size=5,
                 condition_on_previous_text=False, initial_prompt=prompt(cfg) or None)
             words, text, sentences = [], [], []
             for seg in segments:
@@ -80,7 +84,7 @@ def _run(media_path, cfg):
             return {'words': heard_words, 'raw_words': raw_words, 'heard_words': heard_words,
                     'asr_corrections': corrections, 'second_pass': {'checked': checked, 'errors': errors},
                     'text': ' '.join(text), 'segments': sentences,
-                    'duration': float(info.duration), 'language': info.language,
+                    'duration': float(info.duration), 'language': info.language, 'language_probability':getattr(info,'language_probability',None),
                     'device': dev, 'warnings': warnings,
                     'runtime_receipt':{'requested_device':cfg.whisper_device,'actual_device':dev,
                         'requested_model':cfg.whisper_model,'actual_model':cfg.whisper_model,'actual_compute_type':dtype,
@@ -88,16 +92,28 @@ def _run(media_path, cfg):
         finally:
             del model
             gc.collect()
+    if not clips:
+        return normalize({'words':[],'duration':len(vad_audio)/16000,'language':cfg.language,'segments':[],
+            'vad':vad,'runtime_receipt':{'provider':'faster_whisper','inference_performed':False,'actual_device':None,'actual_model':None,'reason':'no_speech_detected'}},cfg)
     try:
-        return attempt(device, compute)
+        result=attempt(device, compute)
     except RuntimeError as exc:
         if device != 'cuda' or not cfg.allow_backend_fallback:
             raise
         warnings.append('Transkripsi beralih ke CPU: ' + str(exc)[:200])
-        return attempt('cpu', 'int8')
+        result=attempt('cpu', 'int8')
+    result.update(vad=vad)
+    result['runtime_receipt'].update(provider='faster_whisper',inference_performed=True,elapsed_seconds=time.monotonic()-started,memory=memory_receipt())
+    return normalize(result,cfg)
 
 
 def transcribe(media_path, cfg):
+    if cfg.asr_provider == 'http':
+        from .speech_m2 import http_asr
+        return http_asr(media_path,cfg)
+    if cfg.asr_provider == 'whisperx':
+        from .speech_m2 import run_isolated
+        return run_isolated('whisperx',media_path,cfg)
     if not cfg.whisper_isolate:
         return _run(media_path, cfg)
     from .runtime.bridge import managed_asr

@@ -10,6 +10,9 @@ def logical_ids(word):
 
 def inspect_caption_plan(plan, cfg, expected_words=None):
     """Check settled positions and line edges against the requested placement."""
+    if plan.get('bilingual'):
+        from .bilingual_m2 import check
+        return check(plan,cfg)
     issues = []
     from .caption_geometry import bounds
     readability = []

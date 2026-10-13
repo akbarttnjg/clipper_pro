@@ -7,6 +7,9 @@ from .dependency_cache import asset_id,content_id
 
 
 def render_words(transcript,document,clip,cfg):
+    translated=transcript.get('m2_translation')
+    if translated and translated['display_mode']=='translation':
+        return [copy.deepcopy(w) for w in translated['words'] if w['end']>clip['start'] and w['start']<clip['end']]
     words=[w for w in transcript['words'] if w['end']>clip['start'] and w['start']<clip['end']]
     def ids(w):return w.get('source_word_ids',[w['word_id']])
     selected={i for w in words for i in ids(w)}
@@ -18,7 +21,7 @@ def render_words(transcript,document,clip,cfg):
     return [{ 'word':t['text'],'start':t['source_start'],'end':t['source_end'],'word_id':t['token_id'],
         'token_id':t['token_id'],'source_word_ids':t['origin_word_ids'],'origin_word_ids':t['origin_word_ids'],
         'manually_edited':t['correction_status']=='manual','timing_status':t.get('timing_status','asr'),
-        'probability':t.get('asr_probability'),
+        'probability':t.get('asr_probability'),'speaker_id':t.get('speaker_id'),'speaker_status':t.get('speaker_status'),'alignment_confidence':t.get('alignment_confidence'),
         'correction':t['correction_status'] if t['correction_status'] not in ('manual','unchanged') else None,
         'alignment_method':t.get('alignment_method')} for t in snapshot['payload']['display_tokens']]
 

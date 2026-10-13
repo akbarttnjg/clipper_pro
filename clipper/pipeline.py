@@ -5,12 +5,12 @@ import time
 from dataclasses import replace
 from pathlib import Path
 from .config import Config
-from . import ffmpeg_util, transcribe, score, story, editorial, editplan, composition, render, captions_pro, qc
+from . import ffmpeg_util, transcribe, score, story, editorial, editplan, render, captions_pro, qc
 from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.11-m0'
+RENDER_VERSION = '4.0.13-m2'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -41,7 +41,7 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
         raise RuntimeError('Tidak ada percakapan yang terdeteksi.')
     asr_seconds = time.monotonic() - asr_started
     evidence_started = time.monotonic()
-    if cfg.source_content_id:
+    if cfg.source_content_id and cfg.source_media_kind != 'audio':
         from . import evidence
         report = evidence.scan(media_path, cfg, transcript['duration'], on_progress, input_fingerprint=key)
         transcript['ocr_suggestions'] = evidence.suggestions(transcript['words'], report)
@@ -85,6 +85,7 @@ def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
     words=intelligence.annotate_words(words,clip,cfg,context_words=context_words)
     preserve=cfg.source_kind in ('board','screen','chart','graphic') and cfg.preserve_material_pauses
     plan=editplan.build(words,clip,replace(cfg,trim_silence=False) if preserve else cfg)
+    from . import composition
     composition.analyze(media_path,plan,cfg,info)
     if cfg.source_kind=='auto' and cfg.trim_silence and cfg.preserve_material_pauses and any(s.get('has_material') for s in plan['shots']):
         plan=editplan.build(words,clip,replace(cfg,trim_silence=False))
@@ -146,6 +147,9 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
 
 
 def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
+    if cfg.source_media_kind == 'audio':
+        from .audio_project import render_clip
+        return render_clip(media_path, words, clip, name, cfg, on_progress)
     started = time.monotonic()
     name = name + f"-r{clip.get('revision', 0)}-v40"
     work = Path(cfg.work_dir) / 'renders' / name
@@ -204,6 +208,11 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
         keywords=clip.get('keywords', []),
         anchors=placement.caption_anchors(plan, cfg))
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
+    if clip.get('_m2_translation'):
+        from . import bilingual_m2
+        translated=bilingual_m2.translation_words(clip['_m2_translation'],plan,clip)
+        plan['captions']=bilingual_m2.make_plan(display,translated,cfg)
+        ass=captions_pro.write_plan(plan['captions'],work/'captions.ass',cfg)
     # SFX cues now follow the final acoustic/semantic caption decisions.
     mix=render.audio_stems(media_path,plan,cfg,work)
     plan['style_report']=readability(plan['captions'],cfg)
@@ -211,7 +220,7 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
     write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
     if plan['style_report']['issue_count']:plan['warnings'].append('Keterbacaan perlu ditinjau; lihat masalah per frasa di panel Gaya Tahap 5.')
     from . import caption_renderer
-    plan['caption_renderer']=caption_renderer.render(plan['captions'],cfg,work,plan['duration'])
+    plan['caption_renderer']=caption_renderer.render(plan['captions'],replace(cfg,caption_renderer='ass') if plan['captions'].get('bilingual') else cfg,work,plan['duration'])
     plan['style_report']['renderer']={k:plan['caption_renderer'].get(k) for k in ('engine','status','reason','generation')}
     plan['style_report']['explanations']=[{'quote':a['origin']['quote'],'renderer':a['renderer'],
         'motion_canvas':a['motion_canvas'],'preview_path':a['path']} for a in plan.get('explanation_assets',[])]

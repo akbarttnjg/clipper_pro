@@ -125,6 +125,9 @@ def test_asr_local_only_and_required_backend_fail_closed(monkeypatch):
             if kwargs['device']=='cuda':raise RuntimeError('CUDA out of memory controlled fixture')
         def transcribe(self,*args,**kwargs):return iter([]),types.SimpleNamespace(duration=1.,language='id')
     monkeypatch.setitem(sys.modules,'faster_whisper',types.SimpleNamespace(WhisperModel=Model))
+    # Explicit VAD double: this test measures fallback ownership, not neural VAD.
+    from clipper import speech_m2
+    monkeypatch.setattr(speech_m2,'vad_input',lambda *args:([0.]*16000,[0.,1.],{'provider':'test_double','gate_count':1}))
     cfg=Config(whisper_model='local-model',whisper_device='cuda',whisper_isolate=False,asr_second_pass=False)
     result=transcribe._run('controlled-audio',cfg)
     assert [c['device'] for c in calls]==['cuda','cpu'] and all(c['local_files_only'] for c in calls)

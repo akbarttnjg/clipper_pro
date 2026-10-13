@@ -71,7 +71,7 @@ def targets(service, doc, cid, vid, op, *, temporal=False):
 
 def check_lock(service, doc, cid, vid, op):
     kind = op.get('op')
-    tracks = {'correct_word': 'captions', 'correct_token': 'captions', 'correct_phrase': 'captions', 'align_words': 'captions',
+    tracks = {'m2_timing':'captions','m2_speaker':'captions','m2_track_display':'captions','correct_word': 'captions', 'correct_token': 'captions', 'correct_phrase': 'captions', 'align_words': 'captions',
         'caption_visibility': 'captions', 'cut_speech': 'video', 'timeline': 'video', 'bounds': 'video',
         'editor_segments': 'video', 'segment_edit': 'video', 'keyframes': 'video', 'visual_controls': 'video',
         'asset_enabled': 'illustration', 'asset_timing': 'illustration', 'asset_replace': 'illustration', 'asset_metadata': 'illustration'}

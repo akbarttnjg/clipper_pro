@@ -104,6 +104,8 @@ def probe_runtime(target, after=False):
             code += 'import clipper.caption_director,clipper.text_area,clipper.segmentation; '
         if (target/'clipper/caption_fit.py').is_file():
             code += 'import clipper.caption_fit,clipper.caption_geometry,clipper.selected_alignment,clipper.semantic_rank; '
+    if after and (target/'clipper/transcript_tracks.py').is_file():
+        code += 'import clipper.transcript_tracks,clipper.transcript_service,clipper.source_imports,clipper.source_assembly,clipper.speech_m2,clipper.translation_m2,clipper.bilingual_m2,clipper.audio_project,clipper.api_ingest; '
     if after and (target/'clipper/artifact_store.py').is_file():
         code += 'import clipper.artifact_store,clipper.caption_readability,clipper.studio_worker; '
     code += "print(json.dumps({'python':sys.version.split()[0],'core_modules':'available','work_dir':str((Path(sys.argv[1])/Config().work_dir).resolve())}))"
@@ -121,24 +123,37 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12'):
+    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
+    managed = set()
     for key in ('files', 'guards'):
         rows = data.get(key)
         if not isinstance(rows, list) or not rows:
             raise ValueError('Daftar ' + key + ' tidak lengkap.')
         seen = set()
         for row in rows:
+            if not isinstance(row, dict) or not isinstance(row.get('path'), str):
+                raise ValueError('Entri ' + key + ' tidak valid.')
             safe_path(package, row['path'])
             name = row['path'].casefold()
-            if name in seen:
+            if name in seen or name in managed:
                 raise ValueError('Path ganda dalam manifest: ' + row['path'])
             seen.add(name)
-            if key == 'files' and not re.fullmatch(r'[0-9a-f]{64}', row.get('sha256', '')):
+            managed.add(name)
+            if key == 'files' and (not isinstance(row.get('sha256'), str) or not re.fullmatch(r'[0-9a-f]{64}', row['sha256'])):
                 raise ValueError('Checksum payload tidak valid.')
             allowed = row.get('allowed_text_sha256', [])
-            if not isinstance(allowed, list) or any(not re.fullmatch(r'[0-9a-f]{64}', h) for h in allowed):
+            if not isinstance(allowed, list) or not allowed or any(not isinstance(h, str) or not re.fullmatch(r'[0-9a-f]{64}', h) for h in allowed):
                 raise ValueError('Checksum dasar tidak valid.')
+            if row.get('baseline_checksum', 'sha256-lf') not in ('sha256-lf', 'sha256'):
+                raise ValueError('Mode checksum dasar tidak valid.')
+    preserved = data.get('preserved_local_files', [])
+    if not isinstance(preserved, list):
+        raise ValueError('Daftar file lokal yang dipertahankan tidak valid.')
+    for name in preserved:
+        safe_path(package, name)
+        if name.casefold() in managed:
+            raise ValueError('File lokal yang dipertahankan tercantum dalam payload/guard: ' + name)
     return data
 
 
@@ -158,11 +173,11 @@ def preflight(target, package, runtime=True, stopped=True):
     conflicts = []
     for row in manifest['guards']:
         dest = safe_path(target, row['path'])
-        if not dest.is_file() or checksum(dest, True) not in row['allowed_text_sha256']:
+        if not dest.is_file() or checksum(dest, row.get('baseline_checksum', 'sha256-lf') == 'sha256-lf') not in row['allowed_text_sha256']:
             conflicts.append(row['path'])
     for row in manifest['files']:
         dest = safe_path(target, row['path'])
-        if dest.exists() and (not dest.is_file() or checksum(dest, True) not in row['allowed_text_sha256']):
+        if dest.exists() and (not dest.is_file() or checksum(dest, row.get('baseline_checksum', 'sha256-lf') == 'sha256-lf') not in row['allowed_text_sha256']):
             conflicts.append(row['path'])
     if conflicts:
         raise ValueError('Kode lokal berbeda atau dasar paket belum lengkap. Tidak ada file ditimpa:\n' +
@@ -193,19 +208,23 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     database=record.get('database_backup') or {}
     current_database=Path(database.get('source',''))
     advanced=[]
-    if record.get('version')=='4.0.12' and record['status']=='installed' and current_database.is_file():
+    if record.get('version') in ('4.0.12','4.0.13') and record['status']=='installed' and current_database.is_file():
         with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
                 for project_id,document in db.execute('SELECT id,document FROM projects'):
                     value=json.loads(document)
+                    if record.get('version')=='4.0.13' and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
+                        advanced.append(project_id)
                     for clip in value.get('clips',{}).values():
                         for variant in clip.get('variants',{}).values():
                             editor=variant.get('editor',{})
                             if editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values()):
                                 advanced.append(project_id)
+            if record.get('version')=='4.0.13' and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
+                if db.execute("SELECT 1 FROM m2_imports WHERE status IN ('queued','running') LIMIT 1").fetchone():advanced.append('antrean-impor-M2')
         if advanced and not restore_project_state:
-            raise ValueError('Proyek memakai timeline/keyframe/track M1 yang tidak dikenali kode lama. Kode dan data belum diubah. '
-                'Jika ingin memulihkan versi lama, gunakan --rollback --restore-project-state. SQLite terbaru akan dicadangkan terpisah sebelum state pra-upgrade dipulihkan. Baca PANDUAN_M1.md.')
+            raise ValueError('Proyek/antrean memakai data upgrade yang tidak dikenali kode lama. Kode dan data belum diubah. '
+                'Jika ingin memulihkan versi lama, gunakan --rollback --restore-project-state. SQLite terbaru akan dicadangkan terpisah sebelum state pra-upgrade dipulihkan. Baca panduan milestone paket yang dipasang.')
     # Validate every original and current file before changing the first one.
     for row in record['files']:
         dest = safe_path(target, row['path'])
@@ -270,6 +289,10 @@ def install(target, package, dry_run=False):
     target, package = target.resolve(), package.resolve()
     manifest, changes, runtime = preflight(target, package)
     print(f"Target: {target}\nVersi paket: {manifest['version']}\nFile yang diperbarui: {len(changes)}")
+    if manifest.get('installer_revision'):
+        print('Revisi installer: ' + str(manifest['installer_revision']))
+    for name in manifest.get('preserved_local_files', []):
+        print('File lokal dipertahankan tanpa dibaca/ditimpa: ' + name)
     print('Pemeriksaan Python: ' + runtime.get('python', ''))
     if dry_run:
         print('Pemeriksaan lulus. Jalankan '+manifest.get('install_command','PASANG_PEMBENAHAN_LENGKAP.cmd')+' untuk memasang.'); return None
