@@ -7,6 +7,8 @@ import pytest
 from clipper.config import Config, validate_overrides
 from clipper import boundaries, story, ffmpeg_util as ff
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
+
 
 def ws(text, step=.4):
     return [{'word': w, 'start': i*step, 'end': i*step+.35} for i,w in enumerate(text.split())]
@@ -130,6 +132,7 @@ def test_manual_regions_are_bounded_and_clearable():
             validate_overrides({'material_rect':value})
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_presentation_detector_finds_board_not_full_white_room():
     import numpy as np
     from clipper.composition import material_panel

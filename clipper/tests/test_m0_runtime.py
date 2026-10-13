@@ -15,7 +15,10 @@ from clipper.runtime import probe,tasks
 from clipper.runtime.state import read,write
 from .test_m0_integration import video,studio,request
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
 
+
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_real_supervised_worker_publishes_and_records_resources(studio):
     svc,doc,cid=studio;job=request(svc,doc['project_id'],cid);svc.queue.autostart=True;svc.queue.start()
     deadline=time.monotonic()+30

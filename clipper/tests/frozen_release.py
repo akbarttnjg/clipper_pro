@@ -5,10 +5,11 @@ from pathlib import Path
 import zipfile
 
 
-def restore(root):
+def restore(root,*,producer=False):
     root=Path(root);root.mkdir(parents=True,exist_ok=True)
-    fixture=Path(__file__).resolve().parents[2]/'docs/releases/m0_fixture.zip'
+    fixture=Path(__file__).resolve().parents[2]/'docs/releases'/('m0_producer_fixture.zip' if producer else 'm0_fixture.zip')
     if not fixture.is_file():
+        if producer:raise ValueError('Frozen M0 producer fixture missing; restore the verified release test fixture before running historical installer checks.')
         from tools.freeze_m0_baseline import export_baseline
         export_baseline(fixture)
     with zipfile.ZipFile(fixture) as z:

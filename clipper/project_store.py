@@ -67,6 +67,13 @@ class ProjectStore:
                 CREATE INDEX IF NOT EXISTS words_identity ON words(take_id,kind,word_id);
                 CREATE TABLE IF NOT EXISTS operations(project_id TEXT,operation_id TEXT,request_hash TEXT,response TEXT,PRIMARY KEY(project_id,operation_id));
                 CREATE TABLE IF NOT EXISTS history(project_id TEXT,revision INTEGER,label TEXT,changes TEXT,created REAL,PRIMARY KEY(project_id,revision));
+                CREATE TABLE IF NOT EXISTS history_actions(project_id TEXT,revision INTEGER,action TEXT,target_revision INTEGER,PRIMARY KEY(project_id,revision));
+                CREATE TABLE IF NOT EXISTS history_metadata(project_id TEXT,revision INTEGER,actor TEXT,operation_id TEXT,command_schema INTEGER,PRIMARY KEY(project_id,revision));
+                CREATE TABLE IF NOT EXISTS editor_drafts(id TEXT PRIMARY KEY,project_id TEXT,base_revision INTEGER,request TEXT,document TEXT,diff TEXT,reviews TEXT,created REAL);
+                CREATE TABLE IF NOT EXISTS editor_sync_evidence(id TEXT PRIMARY KEY,project_id TEXT,data TEXT,created REAL);
+                CREATE TABLE IF NOT EXISTS word_views(view_key TEXT PRIMARY KEY,project_id TEXT,take_id TEXT,scope TEXT,created REAL);
+                CREATE TABLE IF NOT EXISTS word_view_rows(view_key TEXT,ordinal INTEGER,start REAL,end REAL,display_search TEXT,heard_search TEXT,data TEXT,PRIMARY KEY(view_key,ordinal));
+                CREATE INDEX IF NOT EXISTS word_view_time ON word_view_rows(view_key,start,end);
                 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project_id TEXT,kind TEXT,target TEXT,status TEXT,request TEXT,result TEXT,progress INTEGER DEFAULT 0,message TEXT,error TEXT,created REAL,updated REAL,pid INTEGER,owner TEXT);
                 CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(status,created);
                 CREATE TABLE IF NOT EXISTS artifacts(id TEXT PRIMARY KEY,project_id TEXT,clip_id TEXT,variant_id TEXT,kind TEXT,fingerprint TEXT,data TEXT,created REAL);
@@ -97,7 +104,7 @@ class ProjectStore:
         return [{'project_id':r['id'],'revision':r['revision'],'updated':r['updated'],
                  'name':json.loads(r['document']).get('name','Proyek'),'clips':len(json.loads(r['document']).get('clips',{}))} for r in rows]
 
-    def mutate(self,project_id,expected_revision,operation_id,request,change,label='Sunting proyek',*,job_guard=None,job_result=None):
+    def mutate(self,project_id,expected_revision,operation_id,request,change,label='Sunting proyek',*,job_guard=None,job_result=None,history_action=None,preview_only=False):
         if type(expected_revision) is not int or expected_revision<0:raise ValueError('Revisi proyek harus disertakan')
         if not isinstance(operation_id,str) or not 8<=len(operation_id)<=160:raise ValueError('ID operasi diperlukan')
         request_hash=fingerprint(request)
@@ -105,7 +112,7 @@ class ProjectStore:
             db.execute('BEGIN IMMEDIATE')
             try:
                 prior=db.execute('SELECT request_hash,response FROM operations WHERE project_id=? AND operation_id=?',(project_id,operation_id)).fetchone()
-                if prior:
+                if prior and not preview_only:
                     if prior['request_hash']!=request_hash:raise ValueError('ID operasi dipakai untuk perubahan berbeda')
                     db.commit();return json.loads(prior['response'])
                 row=db.execute('SELECT revision,document FROM projects WHERE id=?',(project_id,)).fetchone()
@@ -119,9 +126,18 @@ class ProjectStore:
                         raise JobLeaseLost('Proses dibatalkan atau lease berubah; hasil tidak dipublikasikan.')
                 before=json.loads(row['document']);after=copy.deepcopy(before)
                 extra=change(after) or {};patch=differences(before,after)
+                if preview_only:
+                    db.rollback()
+                    return {**extra,'status':'preview','project_id':project_id,'revision':row['revision'],
+                        'base_revision':row['revision'],'document':{**after,'revision':row['revision']},'changes':patch}
                 revision=row['revision']+1
                 db.execute('UPDATE projects SET revision=?,document=?,updated=? WHERE id=?',(revision,dumps(after),time.time(),project_id))
                 db.execute('INSERT INTO history VALUES(?,?,?,?,?)',(project_id,revision,label,dumps(patch),time.time()))
+                action=history_action or {'action':'job' if job_guard else 'edit'}
+                db.execute('INSERT INTO history_actions VALUES(?,?,?,?)',(project_id,revision,action['action'],action.get('target_revision')))
+                actor=request.get('actor','worker' if job_guard else 'pengguna_lokal') if isinstance(request,dict) else 'pengguna_lokal'
+                if not isinstance(actor,str) or not 1<=len(actor)<=100:raise ValueError('Identitas operator tidak valid')
+                db.execute('INSERT INTO history_metadata VALUES(?,?,?,?,?)',(project_id,revision,actor,operation_id,1))
                 response={**extra,'status':'ready','project_id':project_id,'revision':revision,'operation_id':operation_id}
                 db.execute('INSERT INTO operations VALUES(?,?,?,?)',(project_id,operation_id,request_hash,dumps(response)))
                 if job_guard:
@@ -134,13 +150,88 @@ class ProjectStore:
             except BaseException:db.rollback();raise
 
     def history(self,project_id,limit=50):
-        with self.connect() as db:rows=db.execute('SELECT revision,label,changes,created FROM history WHERE project_id=? ORDER BY revision DESC LIMIT ?',(project_id,min(100,max(1,limit)))).fetchall()
-        return [{**dict(r),'changes':json.loads(r['changes'])} for r in rows]
+        with self.connect() as db:rows=db.execute('SELECT h.revision,h.label,h.changes,h.created,a.action,a.target_revision,m.actor,m.operation_id FROM history h LEFT JOIN history_actions a ON a.project_id=h.project_id AND a.revision=h.revision LEFT JOIN history_metadata m ON m.project_id=h.project_id AND m.revision=h.revision WHERE h.project_id=? ORDER BY h.revision DESC LIMIT ?',(project_id,min(100,max(1,limit)))).fetchall()
+        result=[]
+        for row in rows:
+            value={**dict(row),'changes':json.loads(row['changes'])}
+            value['can_undo']=bool(value['changes']) and value['action'] not in ('job','undo') and not value['label'].startswith('Selesai:')
+            value['can_redo']=bool(value['changes']) and value['action']=='undo'
+            result.append(value)
+        return result
+
+    def revision_document(self,project_id,revision):
+        if type(revision) is not int or revision<0:raise ValueError('Revisi tidak valid')
+        with self.connect() as db:
+            db.execute('BEGIN')
+            row=db.execute('SELECT revision,document FROM projects WHERE id=?',(project_id,)).fetchone()
+            if row is None:raise KeyError('Proyek tidak ditemukan')
+            if revision>row['revision']:raise ValueError('Revisi belum tersedia')
+            doc=json.loads(row['document'])
+            records=db.execute('SELECT revision,changes FROM history WHERE project_id=? AND revision>? ORDER BY revision DESC',(project_id,revision)).fetchall()
+            if len(records)!=row['revision']-revision:raise ValueError('Riwayat tidak lengkap; gunakan backup atau revisi yang tersedia')
+            for record in records:
+                for change in reversed(json.loads(record['changes'])):
+                    put(doc,change['path'],change['before_exists'],change['before'])
+            db.commit()
+        return {**doc,'revision':revision}
+
+    def create_editor_draft(self,project_id,base_revision,request,preview):
+        ident='draft-'+fingerprint([project_id,base_revision,request,preview['document']])[:32]
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT revision FROM projects WHERE id=?',(project_id,)).fetchone()
+            if row is None:raise KeyError('Proyek tidak ditemukan')
+            if row['revision']!=base_revision:raise Conflict(row['revision'])
+            db.execute('INSERT OR IGNORE INTO editor_drafts VALUES(?,?,?,?,?,?,?,?)',(ident,project_id,base_revision,
+                dumps(request),dumps(preview['document']),dumps(preview['changes']),dumps(preview.get('reviews',[])),time.time()))
+            db.commit()
+        return self.editor_draft(project_id,ident)
+
+    def editor_draft(self,project_id,draft_id):
+        with self.connect() as db:row=db.execute('SELECT * FROM editor_drafts WHERE id=? AND project_id=?',(draft_id,project_id)).fetchone()
+        if row is None:raise KeyError('Snapshot draf tidak ditemukan')
+        result=dict(row)
+        for key in ('request','document','diff','reviews'):result[key]=json.loads(result[key])
+        return result
+
+    def editor_drafts(self,project_id,limit=50):
+        with self.connect() as db:
+            rows=db.execute('SELECT id,base_revision,created FROM editor_drafts WHERE project_id=? ORDER BY created DESC LIMIT ?',
+                (project_id,min(100,max(1,limit)))).fetchall()
+        return [dict(row) for row in rows]
+
+    def publish_editor_draft(self,project_id,guard,result):
+        """Publish only a draft artifact and job receipt; never replace active final pointers."""
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                job=db.execute('SELECT status,owner,lease_token,lease_expires FROM jobs WHERE id=?',(guard['id'],)).fetchone()
+                if not job or job['status']!='running' or job['owner']!=guard['owner'] or job['lease_token']!=guard['lease_token'] or not job['lease_expires'] or job['lease_expires']<=time.time():
+                    raise JobLeaseLost('Draf tidak diterbitkan karena pembatalan atau lease berubah')
+                db.execute('INSERT INTO artifacts VALUES(?,?,?,?,?,?,?,?)',('artifact-'+uuid.uuid4().hex,project_id,
+                    guard.get('clip_id'),guard.get('variant_id'),'preview_draft',result['fingerprint'],dumps(result),time.time()))
+                db.execute("UPDATE jobs SET status='completed',progress=100,result=?,message=?,updated=?,lease_expires=NULL WHERE id=?",
+                    (dumps(result),'Preview snapshot draf selesai; final tersimpan tetap tersedia.',time.time(),guard['id']))
+                db.commit()
+            except BaseException:db.rollback();raise
+        return result
 
     def undo(self,project_id,expected_revision,operation_id,revision):
+        return self._reverse(project_id,expected_revision,operation_id,revision,'undo')
+
+    def redo(self,project_id,expected_revision,operation_id,revision):
+        return self._reverse(project_id,expected_revision,operation_id,revision,'redo')
+
+    def _reverse(self,project_id,expected_revision,operation_id,revision,action):
+        if type(revision) is not int or revision<1:raise ValueError('Revisi riwayat tidak valid')
         with self.connect() as db:row=db.execute('SELECT changes,label FROM history WHERE project_id=? AND revision=?',(project_id,revision)).fetchone()
         if not row:raise ValueError('Revisi tidak ditemukan')
+        with self.connect() as db:mark=db.execute('SELECT action FROM history_actions WHERE project_id=? AND revision=?',(project_id,revision)).fetchone()
+        kind=mark['action'] if mark else None
+        if action=='redo' and kind!='undo':raise ValueError('Redo hanya tersedia untuk operasi undo tersimpan')
+        if action=='undo' and (kind in ('job','undo') or row['label'].startswith('Selesai:')):raise ValueError('Pilih perubahan edit; hasil proses tidak di-undo melalui editor')
         patch=json.loads(row['changes'])
+        if not patch:raise ValueError('Revisi ini tidak mempunyai perubahan untuk dipulihkan')
         def change(doc):
             metadata={'timeline_revision','transcript_revision','override_keys'}
             conflicts=[r['path'] for r in patch if r['path'][-1] not in metadata and at(doc,r['path'])!=(r['after_exists'],r['after'])]
@@ -153,7 +244,57 @@ class ProjectStore:
                     existing=set(at(doc,r['path'])[1] or []);before=set(r['before'] or []);after=set(r['after'] or [])
                     put(doc,r['path'],True,sorted((existing-(after-before))|(before-after)))
                 else:put(doc,r['path'],r['before_exists'],r['before'])
-        return self.mutate(project_id,expected_revision,operation_id,{'undo_revision':revision},change,'Undo: '+row['label'])
+        return self.mutate(project_id,expected_revision,operation_id,{action+'_revision':revision},change,
+            ('Undo: ' if action=='undo' else 'Redo: ')+row['label'],history_action={'action':action,'target_revision':revision})
+
+    def effective_words_page(self,project_id,take_id,scope,view_key,factory,*,offset=0,limit=150,start=None,end=None,q='',search_mode='display'):
+        """Search an immutable derived view; source/heard rows are never rewritten.
+
+        Projection creation and pagination share one SQLite transaction. Old
+        views remain usable by concurrent readers and are bounded per scope.
+        """
+        if type(offset) is not int or offset<0 or search_mode not in ('display','heard','both'):raise ValueError('Halaman atau mode pencarian tidak valid')
+        limit=max(1,min(200,int(limit)));query=str(q).strip()[:120].casefold()
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                if not db.execute('SELECT 1 FROM word_views WHERE view_key=?',(view_key,)).fetchone():
+                    records=[]
+                    for ordinal,word in enumerate(factory()):
+                        value={**word,'ordinal':ordinal}
+                        records.append((view_key,ordinal,float(word['start']),float(word['end']),word['word'].casefold(),word.get('heard','').casefold(),dumps(value)))
+                    db.execute('INSERT INTO word_views VALUES(?,?,?,?,?)',(view_key,project_id,take_id,scope,time.time()))
+                    db.executemany('INSERT INTO word_view_rows VALUES(?,?,?,?,?,?,?)',records)
+                    old=db.execute('SELECT view_key FROM word_views WHERE project_id=? AND scope=? ORDER BY created DESC LIMIT -1 OFFSET 4',(project_id,scope)).fetchall()
+                    for item in old:
+                        db.execute('DELETE FROM word_view_rows WHERE view_key=?',(item[0],));db.execute('DELETE FROM word_views WHERE view_key=?',(item[0],))
+                where='view_key=?';args=[view_key]
+                if start is not None:where+=' AND end>?';args.append(float(start))
+                if end is not None:where+=' AND start<?';args.append(float(end))
+                if ' ' in query:
+                    from .editor_search import phrase_groups
+                    rows=[json.loads(row[0]) for row in db.execute('SELECT data FROM word_view_rows WHERE '+where+' ORDER BY ordinal',args)]
+                    matches={}
+                    for field in (('word','heard') if search_mode=='both' else ('heard',) if search_mode=='heard' else ('word',)):
+                        for group in phrase_groups(rows,query,field):
+                            item=rows[group['first']]
+                            matches[(group['first'],group['last'])]={**item,'match_phrase':group['before'],
+                                'match_origin_word_ids':group['origin_word_ids'],'match_start':item['start'],'match_end':rows[group['last']]['end']}
+                    ordered=[matches[key] for key in sorted(matches)];words=ordered[offset:offset+limit];total=len(ordered)
+                    db.commit()
+                    return {'words':words,'total':total,'offset':offset,'next_offset':offset+len(words) if offset+len(words)<total else None,
+                        'view_key':view_key,'search_mode':search_mode}
+                if query:
+                    clauses=[]
+                    for column in (('display_search','heard_search') if search_mode=='both' else ('heard_search',) if search_mode=='heard' else ('display_search',)):
+                        clauses.append('instr('+column+',?)>0');args.append(query)
+                    where+=' AND ('+' OR '.join(clauses)+')'
+                total=db.execute('SELECT count(*) FROM word_view_rows WHERE '+where,args).fetchone()[0]
+                found=db.execute('SELECT data FROM word_view_rows WHERE '+where+' ORDER BY ordinal LIMIT ? OFFSET ?',[*args,limit,offset]).fetchall()
+                db.commit()
+            except BaseException:db.rollback();raise
+        words=[json.loads(row[0]) for row in found]
+        return {'words':words,'total':total,'offset':offset,'next_offset':offset+len(words) if offset+len(words)<total else None,'view_key':view_key,'search_mode':search_mode}
 
     def save_transcript(self,project_id,transcript,take_id=None):
         """Insert once; later word edits live in sparse project corrections."""

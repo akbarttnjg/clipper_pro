@@ -161,6 +161,12 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
     words,plan=source_plan(media_path,words,clip,cfg,info,context_words=context_words)
+    if clip.get('_editor_clock'):
+        plan['editor']={'schema_version':1,'clock':clip['_editor_clock'],'tracks':clip['_editor_tracks'],
+            'original_source':clip['_editor_source'],'original_bounds':clip['_editor_original_bounds'],
+            'proxy_content_id':clip['_editor_proxy_content_id'],'advanced_source_layer':'baked',
+            'hidden_caption_word_ids':clip.get('_editor_hidden_caption_word_ids',[])}
+        plan.setdefault('warnings',[]).append('Edit waktu/keyframe/kamera memakai source layer yang telah dirender. Caption tetap mengikuti jalur ekspor yang dipilih.')
     if not plan['shots']:
         raise ValueError('Tidak ada frame yang dapat dirender. Periksa batas clip.')
     from . import illustrations

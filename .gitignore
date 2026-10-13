@@ -33,3 +33,6 @@ __pycache__/
 *.py[cod]
 .env.pro
 node_modules/
+
+# Isolated test reports
+/m1-test-results/

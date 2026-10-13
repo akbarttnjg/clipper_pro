@@ -28,7 +28,17 @@ except ModuleNotFoundError:
     cv2.__spec__=importlib.util.spec_from_loader('cv2',loader=None)
     cv2.VideoCapture=lambda *_:types.SimpleNamespace(release=lambda:None)
     sys.modules['cv2']=cv2
-from clipper import visual4,placement,composition
+    try:
+        from clipper import visual4,placement,composition
+    finally:
+        sys.modules.pop('cv2',None)
+else:
+    from clipper import visual4,placement,composition
+
+import pytest
+@pytest.fixture(autouse=True)
+def scoped_geometry_placeholder(monkeypatch):
+    if not getattr(cv2,'__file__',None):monkeypatch.setitem(sys.modules,'cv2',cv2)
 
 
 def words(text='Risiko bukan alasan untuk berhenti belajar.',step=.5):

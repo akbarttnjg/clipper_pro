@@ -1,3 +1,5 @@
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.12-m1';
+const localStorage=localDrafts,sessionStorage=sessionDrafts;
 // Source-space visual controls; server revisions protect saved pins from reruns.
 export function normalizedBox(a,b){
  const x=Math.max(0,Math.min(100,Math.min(a.x,b.x))),y=Math.max(0,Math.min(100,Math.min(a.y,b.y)));
@@ -8,6 +10,9 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  const key=`clipper4-visual-draft|${project.project_id}|${clipId}|${variantId}`;
  let controls=structuredClone(variant.visual_controls||{}),draft,box=null,shot=report?.shots?.[0],destroyed=false;
  try{draft=JSON.parse(localStorage.getItem(key)||'null')}catch{}
+ const fieldKey=`clipper4-visual-fields|${project.project_id}|${clipId}|${variantId}`;
+ let fieldDraft=null;try{fieldDraft=JSON.parse(localStorage.getItem(fieldKey)||'null')}catch{}
+ const rememberField=(field,id,original)=>{if(fieldDraft?.values&&id in fieldDraft.values)field.value=fieldDraft.values[id];const save=()=>{const values={...(fieldDraft?.values||{})};if(String(field.value)===String(original))delete values[id];else values[id]=field.value;fieldDraft=Object.keys(values).length?{revision:fieldDraft?.revision??project.revision,values}:null;if(fieldDraft)localStorage.setItem(fieldKey,JSON.stringify(fieldDraft));else localStorage.removeItem(fieldKey)};field.oninput=save;field.onchange=save;return field};
  const e=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n};
  const note=e('p');note.className='help';host.append(note);
  const error=msg=>{note.textContent=msg;note.setAttribute('role','status')};
@@ -15,8 +20,9 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  const field=(parent,label,value,type='text')=>{let l=e('label',label),n=e('input');n.type=type;n.value=value;n.setAttribute('aria-label',label);l.append(n);parent.append(l);return n};
  const select=(parent,label,choices,value)=>{let l=e('label',label),n=e('select');n.setAttribute('aria-label',label);for(const [k,t] of choices){let o=e('option',t);o.value=k;n.append(o)}n.value=value;l.append(n);parent.append(l);return n};
  const time=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
- const changes=async (operations,consumeDraft=false)=>{await api('/changes',{project_id:project.project_id,clip_id:clipId,variant_id:variantId,
-    expected_revision:consumeDraft?(draft?.revision??project.revision):project.revision,operation_id:crypto.randomUUID(),operations});
+ const changes=async (operations,consumeDraft=false,fieldIds=[])=>{await api('/changes',{project_id:project.project_id,clip_id:clipId,variant_id:variantId,
+    expected_revision:consumeDraft?(draft?.revision??project.revision):fieldIds.length?(fieldDraft?.revision??project.revision):project.revision,operation_id:crypto.randomUUID(),operations});
+    if(fieldIds.length&&fieldDraft){for(const id of fieldIds)delete fieldDraft.values[id];if(Object.keys(fieldDraft.values).length)localStorage.setItem(fieldKey,JSON.stringify(fieldDraft));else{fieldDraft=null;localStorage.removeItem(fieldKey)}}
     if(consumeDraft){localStorage.removeItem(key);draft=null}if(!destroyed)await onChange()};
  const head=e('div');head.className='row';host.append(head);
  button(head,'Analisis visual klip',()=>api(`/projects/${project.project_id}/jobs`,{kind:'visual_review',clip_id:clipId,variant_id:variantId,expected_revision:project.revision}).then(onChange));
@@ -28,7 +34,8 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  const policies=e('div');policies.className='fields';host.append(policies);
  const active=select(policies,'Pembicara aktif',[['auto','Otomatis bila TalkNet siap'],['off','Pertahankan semua tamu']],cfg.visual_active_speaker||'auto');
  const vlm=select(policies,'Konfirmasi adegan meragukan',[['off','Geometri saja'],['auto','Model visual lokal yang siap'],['smolvlm','SmolVLM lokal'],['qwen3-vl','Qwen3 VL lokal']],cfg.visual_vlm||'off');
- button(policies,'Simpan analisis visual',()=>changes([{op:'settings',values:{visual_active_speaker:active.value,visual_vlm:vlm.value}}]));
+ rememberField(active,'visual_active_speaker',cfg.visual_active_speaker||'auto');rememberField(vlm,'visual_vlm',cfg.visual_vlm||'off');
+ button(policies,'Simpan analisis visual',()=>{const values=Object.fromEntries(Object.entries({visual_active_speaker:active.value,visual_vlm:vlm.value}).filter(([k,v])=>v!==(cfg[k]|| (k==='visual_vlm'?'off':'auto'))));if(!Object.keys(values).length)return error('Tidak ada pilihan visual yang berubah.');return changes([{op:'settings',values}],false,['visual_active_speaker','visual_vlm'])});
  host.append(e('p','Gambar area pada frame sumber. Koreksi berlaku hanya pada rasio ini; transkrip dan sumber tetap tersedia.'));
  const viewer=e('div');viewer.className='visual4-viewer';host.append(viewer);const canvas=e('canvas');canvas.width=1000;canvas.height=Math.round(1000/(report?.source_size?.[0]/report?.source_size?.[1]||16/9));canvas.setAttribute('aria-label','Frame sumber untuk menandai area');viewer.append(canvas);
  const video=e('video');video.src=project.source.url||'';video.muted=true;video.preload='metadata';video.playsInline=true;video.hidden=true;host.append(video);
@@ -55,7 +62,7 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  const end=field(form,'Area berlaku sampai (detik sumber)',draft?.end??shot?.source_end??clip.end,'number');
  const coords=field(host,'Area x y lebar tinggi dalam persen',draft?.box?.join(', ')||'');
  const remember=()=>{draft={revision:draft?.revision??project.revision,kind:kind.value,start:Number(start.value),end:Number(end.value),box:coords.value.split(',').map(Number)};localStorage.setItem(key,JSON.stringify(draft));box=draft.box;paint()};
- for(const f of [kind,start,end,coords])f.onchange=remember;
+ for(const f of [kind,start,end,coords]){f.oninput=remember;f.onchange=remember;}
  if(draft?.box){box=draft.box;error('Draf area dipulihkan; simpan untuk menerapkannya.');paint()}
  let dragging=null;
  const point=event=>{const r=canvas.getBoundingClientRect();return {x:Math.max(0,Math.min(100,(event.clientX-r.left)/r.width*100)),y:Math.max(0,Math.min(100,(event.clientY-r.top)/r.height*100))}};
@@ -67,16 +74,17 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  button(host,'Muat revisi terbaru untuk draf',async()=>{const latest=await api(`/projects/${project.project_id}`);if(destroyed)return;
   if(!latest.clips?.[clipId]?.variants?.[variantId])throw Error('Klip tidak tersedia pada revisi terbaru');
   project=latest;controls=structuredClone(latest.clips[clipId].variants[variantId].visual_controls||{});
-  if(draft){draft.revision=latest.revision;localStorage.setItem(key,JSON.stringify(draft))}paint();error('Revisi terbaru dimuat. Draf tetap tersedia dan area baru akan ditambahkan ke koreksi terbaru.');});
+  if(draft){draft.revision=latest.revision;localStorage.setItem(key,JSON.stringify(draft))}if(fieldDraft){fieldDraft.revision=latest.revision;localStorage.setItem(fieldKey,JSON.stringify(fieldDraft))}paint();error('Revisi terbaru dimuat. Draf tetap tersedia dan area baru akan ditambahkan ke koreksi terbaru.');});
  button(host,'Buang draf area',()=>{draft=null;box=null;coords.value='';localStorage.removeItem(key);paint();error('Draf area dibuang. Koreksi yang sudah disimpan tetap tersedia.');});
  const tracks=[...new Set((report?.shots||[]).flatMap(s=>(s.visual?.speaker?.tracks||[]).map(t=>t.track_id)))];
  const speaker=select(host,'Pembicara yang dipilih',[['auto','Otomatis / pertahankan bila ragu'],...tracks.map(t=>[t,t])],controls.speaker_track||'auto');
- button(host,'Simpan pilihan pembicara',()=>changes([{op:'visual_controls',values:{speaker_track:speaker.value}}]));
+ rememberField(speaker,'speaker_track',controls.speaker_track||'auto');
+ button(host,'Simpan pilihan pembicara',()=>changes([{op:'visual_controls',values:{speaker_track:speaker.value}}],false,['speaker_track']));
  const list=e('div');list.className='visual4-pins';host.append(list);
  for(const target of ['pins','protected'])for(const area of controls[target]||[]){let row=e('div');row.className='row';row.append(e('span',`${area.kind} · ${time(area.start)}–${time(area.end)} · ${area.box.join(', ')}%`));button(row,'Hapus area',()=>changes([{op:'visual_controls',values:{[target]:controls[target].filter(p=>p.id!==area.id)}}]));list.append(row)}
  const ocr=e('details');ocr.append(e('summary','Tulisan sumber dan koreksi OCR'));host.append(ocr);
  const texts=new Map((report?.shots||[]).flatMap(s=>s.visual?.ocr||[]).map(r=>[r.id,r]));
- for(const row of texts.values()){let value=field(ocr,`${Math.round(row.confidence*100)}% · ${row.confirmed_repeated?'berulang':'satu sampel'}`,controls.ocr_edits?.[row.id]??row.text);button(ocr,'Simpan koreksi tulisan',()=>changes([{op:'visual_controls',values:{ocr_edits:{...(controls.ocr_edits||{}),[row.id]:value.value}}}]))}
+ for(const row of texts.values()){let value=field(ocr,`${Math.round(row.confidence*100)}% · ${row.confirmed_repeated?'berulang':'satu sampel'}`,controls.ocr_edits?.[row.id]??row.text);rememberField(value,'ocr:'+row.id,controls.ocr_edits?.[row.id]??row.text);button(ocr,'Simpan koreksi tulisan',()=>changes([{op:'visual_controls',values:{ocr_edits:{...(controls.ocr_edits||{}),[row.id]:value.value}}}],false,['ocr:'+row.id]))}
  if(!texts.size)ocr.append(e('p','Belum ada OCR berkeyakinan tinggi. Anda bisa menandai area materi secara manual.'));
  const sam=e('details');sam.append(e('summary','Mask SAM opsional'));host.append(sam);sam.append(e('p','Membutuhkan SAM lokal yang lulus uji. Pilih frame acuan atau propagasi maksimal enam detik pada 5 fps. Mask disimpan terpisah, belum dimasukkan ke video atau layer editor. Setelah menyimpan area mask, jalankan Analisis visual klip.'));
  const samMode=select(sam,'Rentang mask SAM',[['frame','Satu frame acuan'],['range','Propagasi rentang area']],controls.sam_span?'range':'frame');
@@ -89,5 +97,5 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
   if(span&&(!(span[1]>span[0])||span[1]-span[0]>6||t<span[0]||t>=span[1]))throw Error('Pilih rentang maksimal enam detik dan frame prompt di dalamnya');
   await changes([{op:'visual_controls',values:{sam_enabled:true,sam_box:box,sam_time:t,sam_span:span}}],true);});
  button(sam,'Matikan mask',()=>changes([{op:'visual_controls',values:{sam_enabled:false}}]));
- return {destroy(){destroyed=true;video.pause();video.removeAttribute('src');video.load?.();host.replaceChildren()}};
+ return {getDrafts(){return {...(draft?{[key]:draft}:{}),...(fieldDraft?{[fieldKey]:fieldDraft}:{})}},destroy(){destroyed=true;video.pause();video.removeAttribute('src');video.load?.();host.replaceChildren()}};
 }

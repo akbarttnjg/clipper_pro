@@ -551,6 +551,11 @@ def _export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
             'DaVinci: Fusion Text+ dengan kurva posisi, ukuran, opacity dan blur; perlu verifikasi tampilan di editor.',
             'CapCut: teks editable dengan gerak posisi/ukuran. Blur dan fade native belum dipetakan; MP4/ASS memuat efek lengkap.',
             'CapCut multi-timeline memakai format draft tidak resmi; perlu uji 9.5. Fallback draft per clip disediakan.']}
+    advanced=[item['plan']['editor'] for item in items if item['plan'].get('editor',{}).get('advanced_source_layer')=='baked']
+    if advanced:
+        manifest['baked_layers']=[*manifest['baked_layers'],'source_time_edits','source_keyframes','camera_switches']
+        manifest['editor_source_mappings']=advanced
+        manifest['limitations'].append('Edit waktu, keyframe dan sudut kamera M1 menyatu dalam source layer. Efek tersebut tidak dapat diubah sebagai kurva native dalam paket ini.')
     manifest['limitations']=EXPORT_MODES[mode]['limitations']+manifest['limitations']
     if mode=='native':
         manifest['limitations']=[v for v in manifest['limitations'] if 'Framing/zoom' not in v]

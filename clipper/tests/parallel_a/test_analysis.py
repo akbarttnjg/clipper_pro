@@ -11,7 +11,9 @@ from clipper import correction_memory, evidence, discovery, story, stock, asset_
 from clipper.storage import read_json, write_json, source_key
 from clipper.typography import make_plan, groups, optical_factor, font, emphasis_indices
 from clipper.caption_checks import inspect_caption_plan
-from clipper.tests.test_upgrade32 import words
+from clipper.tests._media_requirements import words
+
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
 
 
 def test_memory_is_explicit_scoped_disableable_and_protects_values(tmp_path):
@@ -185,6 +187,7 @@ def test_local_query_variants_and_metadata_edit(tmp_path,monkeypatch):
     with pytest.raises(ValueError):stock.save_local_metadata('missing',{})
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_visual_review_sends_actual_frames_and_validates_response(tmp_path,monkeypatch):
     import numpy as np
     p=tmp_path/'asset.mp4';p.write_bytes(b'fixture')

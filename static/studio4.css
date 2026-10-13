@@ -20,3 +20,8 @@
 .visual4-mask { width:100%; max-height:220px; object-fit:contain; }
 
 .workspace6-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}.workspace6-steps section{padding:14px;border:1px solid #d9e4dc;border-radius:12px;background:#f6f9f6}.workspace6-steps .help{font-size:12px}.workspace6-steps button{font-size:12px}@media(max-width:800px){.workspace6-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* M1: panel navigation, persistent process access, and visible draft state. */
+.editor-panel-navigation{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:14px}.editor-panel-navigation button{font-size:11px;padding:7px 9px}.job-dock{position:fixed;right:18px;bottom:18px;width:min(430px,92vw);max-height:210px;overflow:auto;background:#fff;border:1px solid #abc7b6;border-radius:12px;padding:12px 16px;box-shadow:0 5px 20px #0002;z-index:80}.job-dock .row{margin:8px 0;font-size:12px}.job-dock button{font-size:12px;padding:6px 10px}#draft-status.warning{border-left:3px solid #c7852c;background:#fff4df;padding:8px}.canvas-card .jobs{max-height:240px;overflow:auto}body{padding-bottom:110px}
+
+.template video[hidden]{display:none}

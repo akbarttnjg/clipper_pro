@@ -121,7 +121,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11'):
+    if data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     for key in ('files', 'guards'):
         rows = data.get(key)
@@ -175,7 +175,7 @@ def preflight(target, package, runtime=True, stopped=True):
     return manifest, changes, report
 
 
-def rollback(target, backup=None, stopped=True):
+def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     target = target.resolve()
     if stopped:
         require_stopped()
@@ -190,6 +190,22 @@ def rollback(target, backup=None, stopped=True):
     record = json.loads(journal.read_text(encoding='utf-8'))
     if Path(record['target']).resolve() != target or record['status'] not in states:
         raise ValueError('Cadangan tidak sesuai target atau sudah dipulihkan.')
+    database=record.get('database_backup') or {}
+    current_database=Path(database.get('source',''))
+    advanced=[]
+    if record.get('version')=='4.0.12' and record['status']=='installed' and current_database.is_file():
+        with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as db:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
+                for project_id,document in db.execute('SELECT id,document FROM projects'):
+                    value=json.loads(document)
+                    for clip in value.get('clips',{}).values():
+                        for variant in clip.get('variants',{}).values():
+                            editor=variant.get('editor',{})
+                            if editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values()):
+                                advanced.append(project_id)
+        if advanced and not restore_project_state:
+            raise ValueError('Proyek memakai timeline/keyframe/track M1 yang tidak dikenali kode lama. Kode dan data belum diubah. '
+                'Jika ingin memulihkan versi lama, gunakan --rollback --restore-project-state. SQLite terbaru akan dicadangkan terpisah sebelum state pra-upgrade dipulihkan. Baca PANDUAN_M1.md.')
     # Validate every original and current file before changing the first one.
     for row in record['files']:
         dest = safe_path(target, row['path'])
@@ -202,6 +218,24 @@ def rollback(target, backup=None, stopped=True):
         current = checksum(dest) if dest.is_file() else None
         if current not in {row['sha256'], row['original_sha256']}:
             raise ValueError('File berubah setelah upgrade; simpan atau bandingkan dahulu: ' + row['path'])
+    if advanced and restore_project_state:
+        original_database=Path(database['copy'])
+        if not original_database.is_file() or checksum(original_database)!=database['sha256']:
+            raise ValueError('Cadangan SQLite pra-upgrade tidak valid; database terbaru tidak diubah.')
+        checkpoint=journal.parent/'data'/'studio4-latest-before-rollback.sqlite3'
+        if checkpoint.exists():raise ValueError('Checkpoint terbaru sudah ada; periksa cadangan sebelum mengulang pemulihan data.')
+        with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as source:
+            with sqlite3.connect(checkpoint) as destination:
+                source.backup(destination)
+                if destination.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Checkpoint SQLite terbaru belum valid')
+        record['latest_project_checkpoint']={'path':str(checkpoint),'sha256':checksum(checkpoint)}
+        atomic_json(journal,record)
+        with sqlite3.connect(original_database.as_uri()+'?mode=ro',uri=True) as source:
+            with sqlite3.connect(current_database) as destination:
+                source.backup(destination)
+                if destination.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Pemulihan SQLite perlu ditinjau; checkpoint terbaru tersedia: '+str(checkpoint))
+        record['project_state_restored']=True
+        atomic_json(journal,record)
     record['status'] = 'restoring'; atomic_json(journal, record)
     for row in reversed(record['files']):
         dest = safe_path(target, row['path'])
@@ -211,7 +245,9 @@ def rollback(target, backup=None, stopped=True):
         else:
             dest.unlink(missing_ok=True)
     record['status'] = 'restored'; atomic_json(journal, record)
-    print('Kode sebelum Pembenahan Lengkap berhasil dipulihkan. Data proyek tetap tersedia.')
+    if record.get('project_state_restored'):
+        print('Kode dan state pra-upgrade dipulihkan. Pekerjaan terbaru tersedia utuh pada checkpoint: '+record['latest_project_checkpoint']['path'])
+    else:print('Kode sebelum Pembenahan Lengkap berhasil dipulihkan. Data proyek tetap tersedia.')
     return journal.parent
 
 
@@ -236,7 +272,7 @@ def install(target, package, dry_run=False):
     print(f"Target: {target}\nVersi paket: {manifest['version']}\nFile yang diperbarui: {len(changes)}")
     print('Pemeriksaan Python: ' + runtime.get('python', ''))
     if dry_run:
-        print('Pemeriksaan lulus. Jalankan PASANG_PEMBENAHAN_LENGKAP.cmd untuk memasang.'); return None
+        print('Pemeriksaan lulus. Jalankan '+manifest.get('install_command','PASANG_PEMBENAHAN_LENGKAP.cmd')+' untuk memasang.'); return None
     if not changes:
         print('Paket ini sudah terpasang.'); return None
     backup = target / 'steezy_backups' / ('complete-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
@@ -280,6 +316,7 @@ def main():
     parser.add_argument('--target'); parser.add_argument('--package')
     parser.add_argument('--check', action='store_true'); parser.add_argument('--rollback', action='store_true')
     parser.add_argument('--backup', help='Folder cadangan tertentu untuk dipulihkan')
+    parser.add_argument('--restore-project-state',action='store_true',help='Saat rollback, cadangkan SQLite terbaru lalu pulihkan state pra-upgrade jika memakai edit M1 lanjutan')
     args = parser.parse_args()
     if sys.version_info < (3, 10):
         raise ValueError('Gunakan Python 3.10 atau lebih baru.')
@@ -287,7 +324,7 @@ def main():
     raw = args.target or (str(default) if default.is_dir() else input('Folder mesin lama (contoh C:\\AI\\clipper): '))
     target = Path(raw.strip().strip('"')).resolve()
     if args.rollback:
-        rollback(target, args.backup)
+        rollback(target, args.backup,restore_project_state=args.restore_project_state)
     else:
         package = Path(args.package).resolve() if args.package else Path(__file__).resolve().parent
         install(target, package, dry_run=args.check)

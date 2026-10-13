@@ -97,7 +97,10 @@ def _execute(service,job):
         active=service.queue.get(job['id'])
         if active['status'] in ('cancel_requested','canceled') or active['owner']!=job.get('owner') or active.get('lease_token')!=job.get('lease_token'):
             raise StaleJob('Proses sudah dibatalkan atau lease berubah')
-        if dependency!=service.dependency(current,cid,vid,fresh=True,kind=kind):raise StaleJob('Masukan berubah ketika proses berjalan. Hasil lama dipertahankan; jalankan ulang revisi aktif.')
+        validated=doc if job['request'].get('draft_id') else current
+        if dependency!=service.dependency(validated,cid,vid,fresh=True,kind=kind):raise StaleJob('Masukan berubah ketika proses berjalan. Hasil lama dipertahankan; jalankan ulang revisi aktif.')
+        if job['request'].get('draft_id') and current['source']['source_id']!=doc['source']['source_id']:
+            raise StaleJob('Sumber aktif berubah; snapshot draf tidak diterbitkan')
         if kind!='analyze' and current['source'].get('requires_analysis'):raise StaleJob('Sesi lama belum mempunyai identitas sumber yang terverifikasi. Analisis ulang sebelum menerapkan koreksi atau render.')
         if kind!='analyze' and content_id(current['source']['path'],fresh=True)!=current['source']['source_id']:
             raise StaleJob('Isi sumber berubah. Analisis ulang sebelum memakai transkrip atau hasil lama.')
@@ -243,13 +246,23 @@ def _execute(service,job):
                 result=copy.deepcopy(cached);reused=True
             else:
                 name=f'{cid}-{vid}-{key[:12]}'
-                result=pipeline.render_clip(source,words,clip,name,cfg,progress,context_words=transcript['words'])
+                from .editor_media import prepare
+                render_source,render_display,render_clip,render_cfg,edit_receipt=prepare(service,doc,cid,vid,source,words,clip,cfg,progress)
+                result=pipeline.render_clip(render_source,render_display,render_clip,name,render_cfg,progress,
+                    context_words=render_display if edit_receipt else transcript['words'])
+                if edit_receipt:result['editor_receipt']=edit_receipt
                 path=Path(cfg.out_dir)/result['file']
                 result.update(absolute_file=str(path.resolve()),output_content_id=content_id(path,fresh=True),fingerprint=key,dependency=dependency,
                     variant_id=vid,input_revision=doc['revision'],kind=kind,quality=job['request'].get('options',{}).get('quality','draft') if kind=='preview' else 'final')
             plan=read_json(result['plan_path'],{})
+            if result.get('editor_receipt') and plan.get('editor'):
+                result['editor_receipt']['proxy_path']=plan['source']['path']
             result.update(fingerprint=key,dependency=dependency,variant_id=vid,kind=kind,
                           quality=job['request'].get('options',{}).get('quality','draft') if kind=='preview' else 'final')
+            if job['request'].get('render_summary'):
+                result['render_summary']=copy.deepcopy(job['request']['render_summary'])
+            if job['request'].get('draft_id'):
+                result.update(draft_id=job['request']['draft_id'],snapshot_digest=job['request']['snapshot_digest'],is_draft=True)
             result,plan,exchange=studio_set(result,plan,doc,cid,vid,cfg,media,dependency,before_seal=check,reused=reused)
             from urllib.parse import unquote
             for field in ('ass_url','srt_url','credits_url'):
@@ -284,6 +297,10 @@ def _execute(service,job):
             result['package_content_id']=content_id(result['zip'],fresh=True)
             result['reference']={k:final.get(k) for k in ('width','height','length','output_content_id','input_revision')}
     check()
+    if job['request'].get('draft_id'):
+        service.store.publish_editor_draft(pid,{**job,'clip_id':cid,'variant_id':vid},result)
+        editorial.release(cfg)
+        return result
     def publish(current):
         check(current)
         old_take=current.get('transcript_id');old_source=current['source']['source_id']

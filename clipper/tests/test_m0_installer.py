@@ -12,6 +12,8 @@ from .frozen_release import restore
 
 ROOT=Path(__file__).resolve().parents[2]
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
+
 
 def module(name):
     spec=importlib.util.spec_from_file_location(name,ROOT/'tools'/(name+'.py'))
@@ -22,7 +24,8 @@ def module(name):
 def release(tmp_path,monkeypatch):
     target=restore(tmp_path/'machine');package=tmp_path/'upgrade'
     installer=module('complete_installer');builder=module('build_m0_release')
-    with contextlib.redirect_stdout(io.StringIO()):report=builder.build(package,'0'*40)
+    producer=restore(tmp_path/'m0-producer',producer=True)
+    with contextlib.redirect_stdout(io.StringIO()),patch.dict(builder.complete_build.__globals__,{'ROOT':producer}):report=builder.build(package,'0'*40)
     work=target/'work';work.mkdir();database=work/'studio4.sqlite3'
     with sqlite3.connect(database) as db:
         db.execute('CREATE TABLE preserved(note TEXT)');db.execute("INSERT INTO preserved VALUES('before')")
@@ -35,6 +38,7 @@ def release(tmp_path,monkeypatch):
     return installer,target,package,database,report
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_m0_actual_upgrade_imports_backup_idempotence_and_rollback(release):
     installer,target,package,database,report=release
     before=(target/'clipper/project_store.py').read_bytes()
@@ -57,6 +61,7 @@ def test_m0_actual_upgrade_imports_backup_idempotence_and_rollback(release):
     with sqlite3.connect(database) as db:assert db.execute('SELECT count(*) FROM preserved').fetchone()[0]==2
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_m0_disk_failure_mid_copy_rolls_back_every_file(release,monkeypatch):
     installer,target,package,database,_=release
     before={p.relative_to(target):p.read_bytes() for p in target.rglob('*') if p.is_file() and '.venv' not in p.parts}

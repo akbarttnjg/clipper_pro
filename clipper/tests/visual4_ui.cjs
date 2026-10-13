@@ -11,7 +11,10 @@ class Element{
 const document={createElement:t=>new Element(t)},storage=new Map();
 class Image{set src(v){this.url=v;this.onload?.()}}
 const context=vm.createContext({document,Image,console,structuredClone,crypto:require('node:crypto'),localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});
-vm.runInContext(fs.readFileSync(path.join(__dirname,'../../static/features/visual4.js'),'utf8').replace(/export /g,''),context);
+const {loadModule,storageAdapter}=require('./ui_loader.cjs');
+context.localStorage=storageAdapter(context.localStorage||{getItem:()=>null,setItem(){}});context.sessionStorage=storageAdapter(context.sessionStorage||{getItem:()=>null,setItem(){}});
+Object.assign(context,loadModule(path.join(__dirname,'../../static/features/visual4.js'),context));
+const draftStorage=loadModule(path.join(__dirname,'../../static/features/draft_storage.js'),context).localDrafts;const hasDraft=k=>draftStorage.getItem(k)!==null;
 const plain=v=>JSON.parse(JSON.stringify(v)),walk=e=>[e,...e.children.flatMap(walk)],field=(r,t)=>walk(r).find(e=>e.attributes['aria-label']===t),button=(r,t)=>walk(r).find(e=>e.tagName==='button'&&e.textContent===t);
 let project={project_id:'p1',revision:5,source:{url:'/source.mp4'},clips:{c1:{start:10,end:20,variants:{
  portrait:{effective_settings:{},visual_report:{source_size:[640,360],
@@ -39,15 +42,15 @@ const draw=h=>{const c=walk(h).find(n=>n.tagName==='canvas');c.onpointerdown({cl
  assert.deepEqual(plain(context.normalizedBox({x:-10,y:-20},{x:110,y:120})),[0,0,100,100]);
  let {host,panel}=mount();assert.equal(calls.length,0,'opening panel performs no installs or jobs');
  assert(host.textContent.includes('bobot lokal belum siap'),'missing weights never show ready');
- draw(host);let key='clipper4-visual-draft|p1|c1|portrait';assert(storage.has(key));
- conflict=true;await button(host,'Simpan area pada rasio ini').onclick();assert(storage.has(key),'conflict preserves geometry draft');assert(host.textContent.includes('Konflik revisi'));
+ draw(host);let key='clipper4-visual-draft|p1|c1|portrait';assert(hasDraft(key));
+ conflict=true;await button(host,'Simpan area pada rasio ini').onclick();assert(hasDraft(key),'conflict preserves geometry draft');assert(host.textContent.includes('Konflik revisi'));
  project.revision++;project.clips.c1.variants.portrait.visual_controls={pins:[{id:'other-user',start:10,end:20,box:[0,0,30,40],kind:'crop'}]};conflict=false;
  await button(host,'Muat revisi terbaru untuk draf').onclick();await button(host,'Simpan area pada rasio ini').onclick();
  const request=calls.at(-1).data;assert.equal(request.expected_revision,6);assert.equal(request.variant_id,'portrait');assert.equal(request.operations[0].values.pins.length,2,'rebase preserves newest saved pins');
- assert.deepEqual(plain(request.operations[0].values.pins[1].box),[10,20,70,60]);assert(!storage.has(key));assert.equal(project.clips.c1.variants.landscape.visual_controls,undefined);
+ assert.deepEqual(plain(request.operations[0].values.pins[1].box),[10,20,70,60]);assert(!hasDraft(key));assert.equal(project.clips.c1.variants.landscape.visual_controls,undefined);
  panel.destroy();assert.equal(host.children.length,0);
- ({host,panel}=mount());draw(host);await button(host,'Simpan analisis visual').onclick();assert(storage.has(key),'unrelated settings never discard a drawn area');panel.destroy();
- ({host,panel}=mount());assert(host.textContent.includes('Draf area dipulihkan'));await button(host,'Buang draf area').onclick();assert(!storage.has(key));
+ ({host,panel}=mount());draw(host);await button(host,'Simpan analisis visual').onclick();assert(hasDraft(key),'unrelated settings never discard a drawn area');panel.destroy();
+ ({host,panel}=mount());assert(host.textContent.includes('Draf area dipulihkan'));await button(host,'Buang draf area').onclick();assert(!hasDraft(key));
  const canvas=walk(host).find(e=>e.tagName==='canvas');canvas.onpointerdown({clientX:20,clientY:20,pointerId:2});canvas.onpointercancel();canvas.onpointerup({clientX:90,clientY:90,pointerId:2});assert.equal(field(host,'Area x y lebar tinggi dalam persen').value,'');
  draw(host);field(host,'Rentang mask SAM').value='range';field(host,'Area berlaku mulai (detik sumber)').value='10';field(host,'Area berlaku sampai (detik sumber)').value='18';
  const count=calls.length;await button(host,'Simpan area mask').onclick();assert.equal(calls.length,count,'oversized SAM range stops before write');

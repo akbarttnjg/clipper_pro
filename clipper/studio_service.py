@@ -97,6 +97,10 @@ class StudioService:
         values={**asdict(self.base),**doc.get('settings',{})}
         if clip_id:
             variant=self.variant(doc,clip_id,variant_id)
+            for layer in ('profile','brand'):
+                values.update(variant.get('style_layers',{}).get(layer,{}))
+            values.update({k:doc['settings'][k] for k in doc.get('settings_explicit_keys',[]) if k in doc['settings']})
+            values.update(doc['clips'][clip_id].get('settings',{}))
             values.update(variant.get('settings',{}));_,w,h=VARIANTS[variant_id]
             values.update(target_w=w,target_h=h,variant_id=variant_id)
             values['visual_overrides']=variant.get('visual_controls',{})
@@ -209,28 +213,26 @@ class StudioService:
         data['words']=apply_corrections(data['words'],doc,clip_id)
         return data
 
-    def page(self,project_id,clip_id=None,*,offset=0,limit=150,q='',whole=False):
+    def page(self,project_id,clip_id=None,*,offset=0,limit=150,q='',whole=False,search_mode='display'):
         doc=self.store.get(project_id)
         if not doc.get('transcript_id'):return dict(words=[],total=0,next_offset=None,revision=doc['revision'])
+        if clip_id and not whole and clip_id not in doc['clips']:raise KeyError('Klip tidak ditemukan')
         clip=doc['clips'].get(clip_id) if clip_id and not whole else None
-        page=self.store.words_page(doc['transcript_id'],offset=offset,limit=limit,q=q,
-            start=clip['start'] if clip else None,end=clip['end'] if clip else None)
-        heard={dumps(w['word_id']):w['word'] for w in self.store.heard_by_ids(doc['transcript_id'],[i for w in page['words'] for i in origins(w)])}
-        # Pages remain indexed by immutable word IDs; display overlays never alter paging.
-        for row in page['words']:
-            row['heard']=' '.join(heard.get(dumps(i),'') for i in origins(row)).strip() or row['word'];rows=apply_corrections([row],doc,clip_id)
-            row.update(rows[0])
-            for change in list(doc.get('shared_corrections',{}).values())+list(doc.get('clip_corrections',{}).get(clip_id,{}).values()):
-                if change['transcript_id']==doc['transcript_id'] and set(origins(row))&set(change['origin_word_ids']):
-                    row['group_edit']=len(change['origin_word_ids'])>len(origins(row))
-                    row['group_text']=change['after']
-                    row['group_origin_word_ids']=change['origin_word_ids']
-                    if row['group_edit']:
-                        heard_group=self.store.heard_by_ids(doc['transcript_id'],change['origin_word_ids'])
-                        if heard_group:
-                            full={**row,'word':change['after'],'start':min(w['start'] for w in heard_group),'end':max(w['end'] for w in heard_group),'source_word_ids':change['origin_word_ids']}
-                            full=stage3.apply_alignments([full],doc,clip_id)[0]
-                            row['group_start']=full['start'];row['group_end']=full['end'];row['group_aligned_words']=full.get('aligned_words')
+        effective_clip=None if whole else clip_id
+        key=fingerprint({'project':project_id,'take':doc['transcript_id'],'scope':effective_clip,
+            'shared':doc.get('shared_corrections',{}),'clip':doc.get('clip_corrections',{}).get(effective_clip,{}),
+            'alignment':doc.get('alignment_overrides',{}),'projection_version':1})
+        def projection():
+            transcript=self.store.transcript(doc['transcript_id'])
+            heard={dumps(w['word_id']):w['word'] for w in transcript['raw_words']}
+            rows=apply_corrections(transcript['words'],doc,effective_clip)
+            for row in rows:
+                row['heard']=' '.join(heard.get(dumps(i),'') for i in origins(row)).strip() or row.get('raw_word',row['word'])
+                row['group_edit']=False
+                row['group_origin_word_ids']=origins(row)
+            return rows
+        page=self.store.effective_words_page(project_id,doc['transcript_id'],effective_clip or 'source',key,projection,
+            offset=offset,limit=limit,q=q,search_mode=search_mode,start=clip['start'] if clip else None,end=clip['end'] if clip else None)
         return {**page,'revision':doc['revision'],'transcript_id':doc['transcript_id'],'transcript_revision':doc['transcript_revision']}
 
     def dependency(self,doc,clip_id=None,variant_id=None,*,fresh=False,kind='render'):
@@ -244,7 +246,15 @@ class StudioService:
                 clip['_broll_recipe']=variant.get('recipe') or {}
                 if variant.get('timeline'):clip['manual_keep_spans']=variant['timeline']['keep_spans']
                 words=render_words(self.transcript(doc,clip_id),doc,clip,cfg) if doc.get('transcript_id') else []
-                return render_key(doc['source']['path'],words,clip,cfg,fresh=fresh)
+                base_key=render_key(doc['source']['path'],words,clip,cfg,fresh=fresh)
+                from .editor_contract import render_inputs
+                inputs=render_inputs(variant.get('editor',{}))
+                if inputs:
+                    used={r.get('camera_id') for r in inputs.get('segments',[]) if r.get('camera_id')!='primary'}
+                    cameras={key:row for key,row in doc.get('editor_cameras',{}).items() if key in used}
+                    identities={key:asset_id(row['path'],fresh=fresh) for key,row in cameras.items()}
+                    return fingerprint([base_key,inputs,cameras,identities])
+                return base_key
         source=doc['source'];source_hash=asset_id(source['path'],fresh=fresh)
         base=[DEPENDENCY_VERSION,source_hash,source['source_id'],doc.get('transcript_id'),doc.get('transcript_revision'),doc.get('aliases'),doc.get('shared_corrections'),doc.get('alignment_overrides',{}).get('shared')]
         if not clip_id:
@@ -286,7 +296,17 @@ class StudioService:
         if not isinstance(text,str) or not text.strip() or len(text)>120:raise ValueError('Teks koreksi harus 1–120 karakter')
         if op.get('scope','clip') not in ('clip','shared_utterance'):raise ValueError('Cakupan koreksi tidak valid')
         if not clip_id and op.get('scope')!='shared_utterance':raise ValueError('Koreksi sumber penuh memakai cakupan ucapan bersama')
-        if 'word_id' in op:
+        if op.get('op')=='correct_phrase':
+            ids=op.get('origin_word_ids')
+            if not isinstance(ids,list) or not ids or len(set(ids))!=len(ids):raise ValueError('Identitas frasa harus lengkap dan unik')
+            rows=self.transcript(doc,clip_id)['words'];positions=[i for i,w in enumerate(rows) if set(origins(w))&set(ids)]
+            if not positions or positions!=list(range(positions[0],positions[-1]+1)) or set(i for w in rows[positions[0]:positions[-1]+1] for i in origins(w))!=set(ids):
+                raise ValueError('Frasa sudah berubah atau tidak berurutan; tinjau transkrip terbaru')
+            selected=rows[positions[0]:positions[-1]+1];before=' '.join(w['word'] for w in selected)
+            if before!=op.get('before'):raise ValueError('Teks frasa berubah; tinjau pengganti terbaru')
+            if clip_id and any(w['end']<=doc['clips'][clip_id]['start'] or w['start']>=doc['clips'][clip_id]['end'] for w in selected):
+                raise ValueError('Frasa berada di luar klip aktif')
+        elif 'word_id' in op:
             self.store.word(doc['transcript_id'],op['word_id'])
             word=next((w for w in self.transcript(doc,clip_id)['words'] if op['word_id'] in origins(w)),None)
             if word is None:raise ValueError('Kata tidak ditemukan pada transkrip aktif')
@@ -315,16 +335,27 @@ class StudioService:
         if not isinstance(operations,list) or not 1<=len(operations)<=100:raise ValueError('Kirim 1–100 koreksi')
         reviews=[]
         for index,op in enumerate(operations):
-            if op.get('op') not in ('correct_word','correct_token'):continue
-            ids,before,after=self._correction_target(doc,request.get('clip_id'),op)
-            review=stage3.fact_review(before,after)
+            if op.get('op') not in ('correct_word','correct_token','correct_phrase'):continue
+            ids,before,after=self._correction_target(doc,op.get('clip_id',request.get('clip_id')),op)
+            review=self._editor_text_review(doc,before,after,op)
             reviews.append({**review,'operation_index':index,'before':before,'after':after,
                 'confirmation_stamp':stage3.approval_stamp(doc['transcript_id'],doc['transcript_revision'],ids,before,after)})
         return {'revision':doc['revision'],'reviews':reviews}
 
+    def _editor_text_review(self,doc,before,after,op):
+        review=stage3.fact_review(before,after)
+        if op.get('protect_names') and before!=after:
+            import re
+            glossary=str(doc.get('settings',{}).get('glossary','')).casefold()
+            candidate=bool(re.search(r'\b[A-ZÀ-ÖØ-Þ][\w-]+',before)) or bool(before.casefold() in glossary and len(before)>1)
+            if candidate:
+                review={**review,'requires_confirmation':True,'categories':[*review['categories'],'nama_atau_istilah_kritis'],
+                    'message':'Kandidat nama atau istilah penting berubah. Ini pemeriksaan konservatif, bukan pengenalan entitas terukur. Dengarkan sumber dan tinjau penggantinya.'}
+        return review
+
     def _correct(self,doc,clip_id,op):
         ids,before,text=self._correction_target(doc,clip_id,op)
-        review=stage3.fact_review(before,text)
+        review=self._editor_text_review(doc,before,text,op)
         if review['requires_confirmation']:
             stamp=stage3.approval_stamp(doc['transcript_id'],doc['transcript_revision'],ids,before,text)
             if op.get('fact_confirmation')!=stamp:raise ValueError(review['message']+' Buka tinjauan fakta sebelum menyimpan.')
@@ -337,160 +368,212 @@ class StudioService:
             if group[old]['transcript_id']==doc['transcript_id'] and set(group[old]['origin_word_ids'])&set(ids):del group[old]
         group[key]=change
 
-    def changes(self,request):
-        pid=request['project_id'];cid=request.get('clip_id');vid=request.get('variant_id','portrait')
+    def changes(self,request,*,preview_only=False):
         operations=request.get('operations',[])
-        if not isinstance(operations,list) or not 1<=len(operations)<=100:raise ValueError('Kirim 1–100 perubahan kecil')
-        def change(doc):
+        if not isinstance(operations,list) or not 1<=len(operations)<=100 or any(not isinstance(op,dict) for op in operations):
+            raise ValueError('Kirim 1–100 perubahan kecil')
+        return self.store.mutate(request['project_id'],request['expected_revision'],request['operation_id'],request,
+            lambda doc:self._apply_changes(doc,request),' · '.join(dict.fromkeys(op.get('op','Edit') for op in operations)),
+            preview_only=preview_only)
+
+    def _apply_changes(self,doc,request):
+        cid=request.get("clip_id");vid=request.get("variant_id","portrait")
+        operations=request["operations"]
+        if cid:self.variant(doc,cid,vid)
+        touched=set();transcript_changed=False
+        for op in operations:
+            cid=op.get('clip_id',request.get('clip_id'));vid=op.get('variant_id',request.get('variant_id','portrait'))
             if cid:self.variant(doc,cid,vid)
-            touched=set();transcript_changed=False
-            for op in operations:
-                kind=op.get('op')
-                if kind=='include_clip':
-                    selected=op.get('clip_id',cid)
-                    if selected not in doc['clips'] or type(op.get('included')) is not bool:raise ValueError('Pilihan klip tidak valid.')
-                    doc['clips'][selected]['included']=op['included']
-                elif kind in ('correct_word','correct_token'):
-                    self._correct(doc,cid,op);transcript_changed=True
-                elif kind in ('alias_upsert','alias_remove'):
-                    from .correction_memory import propose_change
-                    doc['aliases']=propose_change(doc.get('aliases',[]),op)
-                elif kind in ('settings','analysis_settings'):
-                    values=validate_overrides(op.get('values',{}))
-                    if 'caption_style' in values and 'caption_template_policy' not in op.get('values',{}):values['caption_template_policy']='manual'
-                    if not values:raise ValueError('Tidak ada pengaturan valid')
-                    if op.get('scope')=='project' or kind=='analysis_settings':doc['settings'].update(values)
-                    else:
-                        variant=self.variant(doc,cid,vid);variant['settings'].update(values)
-                        variant['override_keys']=sorted(set(variant.get('override_keys',[]))|set(values));touched.add((cid,vid))
-                elif kind=='preset_batch':
-                    preset=op.get('preset')
-                    if preset not in ('rapi','adaptif','ekspresif'):raise ValueError('Pilih preset Rapi, Adaptif atau Ekspresif.')
-                    from .batch7 import targets
-                    values={'style_preset':preset,'font_main':'dm_sans','font_accent':'dm_serif_italic',
-                            'caption_template_policy':'auto','caption_backdrop':True,'semantic_emphasis':True,
-                            'motion_intensity':'calm' if preset=='rapi' else 'balanced'}
-                    for target in targets(doc):
-                        c,v=target['clip_id'],target['variant_id'];variant=self.variant(doc,c,v)
-                        variant['settings'].update(values)
-                        variant['override_keys']=sorted(set(variant.get('override_keys',[]))|set(values));touched.add((c,v))
-                elif kind=='style':
-                    from .edit_styles import recipe
-                    values=recipe(op['style_id'])
-                    targets=op.get('targets') or [{'clip_id':cid,'variant_id':vid}]
-                    if len(targets)>500:raise ValueError('Maksimal 500 varian per batch')
-                    for target in targets:
-                        c,v=target['clip_id'],target['variant_id'];variant=self.variant(doc,c,v)
-                        keep=set(variant.get('override_keys',[])) if not op.get('replace_manual',False) else set()
-                        variant['settings'].update({k:value for k,value in values.items() if k not in keep});touched.add((c,v))
-                elif kind=='brand_apply':
-                    touched.update(self.workspace.apply_brand(doc,op,cid,vid))
-                elif kind=='design_alternative':
-                    variant=self.variant(doc,cid,vid)
-                    # Regenerate only seeded phrase decisions; retain all other edits.
-                    seed=op.get('seed',self.config(doc,cid,vid).caption_seed+1)
-                    values=validate_overrides({'caption_seed':seed})
-                    if self.config(doc,cid,vid).style_preset=='legacy':
-                        raise ValueError('Pilih preset Rapi, Ekspresif atau Adaptif sebelum membuat alternatif.')
+            from .editor_service import apply_editor_command, check_lock
+            check_lock(self,doc,cid,vid,op)
+            kind=op.get('op')
+            handled=apply_editor_command(self,doc,cid,vid,op,revision=request["expected_revision"])
+            if handled is not None:
+                touched.update(handled.get('touched',[]));transcript_changed|=handled.get('transcript_changed',False)
+                continue
+            if kind=='include_clip':
+                selected=op.get('clip_id',cid)
+                if selected not in doc['clips'] or type(op.get('included')) is not bool:raise ValueError('Pilihan klip tidak valid.')
+                doc['clips'][selected]['included']=op['included']
+            elif kind in ('correct_word','correct_token','correct_phrase'):
+                self._correct(doc,cid,op);transcript_changed=True
+            elif kind in ('alias_upsert','alias_remove'):
+                from .correction_memory import propose_change
+                doc['aliases']=propose_change(doc.get('aliases',[]),op)
+            elif kind in ('settings','analysis_settings'):
+                values=validate_overrides(op.get('values',{}))
+                if 'caption_style' in values and 'caption_template_policy' not in op.get('values',{}):values['caption_template_policy']='manual'
+                if not values:raise ValueError('Tidak ada pengaturan valid')
+                if op.get('scope')=='project' or kind=='analysis_settings':
+                    doc['settings'].update(values)
+                    doc['settings_explicit_keys']=sorted(set(doc.get('settings_explicit_keys',[]))|set(values))
+                else:
+                    variant=self.variant(doc,cid,vid);variant['settings'].update(values)
+                    variant['override_keys']=sorted(set(variant.get('override_keys',[]))|set(values));touched.add((cid,vid))
+            elif kind=='preset_batch':
+                preset=op.get('preset')
+                if preset not in ('rapi','adaptif','ekspresif'):raise ValueError('Pilih preset Rapi, Adaptif atau Ekspresif.')
+                from .batch7 import targets
+                values={'style_preset':preset,'font_main':'dm_sans','font_accent':'dm_serif_italic',
+                        'caption_template_policy':'auto','caption_backdrop':True,'semantic_emphasis':True,
+                        'motion_intensity':'calm' if preset=='rapi' else 'balanced'}
+                for target in targets(doc):
+                    c,v=target['clip_id'],target['variant_id'];variant=self.variant(doc,c,v)
                     variant['settings'].update(values)
-                    variant['override_keys']=sorted(set(variant.get('override_keys',[]))|{'caption_seed'})
-                    touched.add((cid,vid))
-                elif kind=='visual_controls':
-                    from .visual4 import validate_controls
-                    variant=self.variant(doc,cid,vid)
-                    values=copy.deepcopy(op.get('values',{}))
-                    if not isinstance(values,dict):raise ValueError('Koreksi visual harus berupa objek')
-                    if values.get('speaker_track') not in (None,'auto'):
-                        report=variant.get('visual_report',{})
-                        if not report.get('summary',{}).get('key') or variant.get('visual_dependency')!=self.dependency(doc,cid,vid):
-                            raise ValueError('Perbarui analisis visual sebelum memilih lintasan pembicara')
-                        values['speaker_evidence']=report['summary']['key']
-                    elif values.get('speaker_track')=='auto':values['speaker_evidence']=None
-                    merged={**variant.get('visual_controls',{}),**values}
-                    variant['visual_controls']=validate_controls(merged,doc['source']['info']['duration']);touched.add((cid,vid))
-                elif kind in ('bounds','manual_clip'):
-                    a,b=float(op['start']),float(op['end']);duration=doc['source']['info']['duration']
-                    if not all(math.isfinite(n) for n in (a,b)) or not 0<=a<b<=duration+.05:raise ValueError('Rentang klip harus di dalam sumber')
-                    if kind=='manual_clip':self.add_candidates(doc,[{'start':a,'end':b,'title':str(op.get('title','Klip manual'))[:160],'selection_source':'manual','keywords':[],'reason':'Dipilih pengguna','boundary_pin':{'start':a,'end':b,'source':'manual'}}])
-                    else:
-                        for target_vid,variant in doc['clips'][cid]['variants'].items():
-                            spans=variant.get('timeline',{}).get('keep_spans')
-                            if spans:
-                                reconciled=[[max(a,float(x)),min(b,float(y))] for x,y in spans if min(b,float(y))>max(a,float(x))]
-                                if not reconciled:raise ValueError('Batas baru tidak beririsan dengan potongan timeline. Reset potongan atau pilih batas lain.')
-                                variant['timeline']={'keep_spans':reconciled}
-                            touched.add((cid,target_vid))
-                        doc['clips'][cid].update(start=a,end=b,selection_source='reviewed',boundary_pin={'start':a,'end':b,'source':'manual'});doc['clips'][cid]['revision']+=1
-                elif kind=='restore_rejected':
-                    row=next((r for r in stage3.rejection_rows(doc.get('discovery',{})) if r['rejection_id']==op.get('rejection_id')),None)
-                    if not row:raise ValueError('Kandidat ditolak berubah atau tidak tersedia pada laporan aktif')
-                    if doc.get('discovery',{}).get('transcript_id') not in (None,doc.get('transcript_id')):raise ValueError('Laporan memakai transkrip lama; jalankan penjelajahan lagi')
-                    a,b=float(op.get('start',row.get('start',-1))),float(op.get('end',row.get('end',-1)))
-                    duration=doc['source']['info']['duration']
-                    if not all(math.isfinite(x) for x in (a,b)) or not 0<=a<b<=duration+.05:raise ValueError('Tentukan rentang sumber yang valid untuk memulihkan kandidat')
-                    ids=self.add_candidates(doc,[{'title':str(op.get('title',row.get('title','Kandidat dipulihkan')))[:160],
-                        'start':a,'end':b,'keywords':[],'selection_source':'manual','reason':'Dipulihkan pengguna: '+str(row.get('detail',row['code']))[:300],
-                        'restored_rejection_id':row['rejection_id'],'boundary_pin':{'start':a,'end':b,'source':'manual'},
-                        'warnings':['Pemulihan manual; belum dianggap lolos penilaian cerita otomatis.']}])
-                    doc.setdefault('restored_rejections',{})[row['rejection_id']]=ids[0]
-                elif kind=='align_words':
-                    if op.get('transcript_id')!=doc.get('transcript_id') or op.get('transcript_revision')!=doc.get('transcript_revision'):raise ValueError('Timing memakai transkrip lama; muat ulang tanpa membuang draf')
-                    rows=self.transcript(doc,cid)['words'];word=next((w for w in rows if origins(w)==op.get('origin_word_ids')),None)
-                    if not word or word['word']!=op.get('text'):raise ValueError('Frasa telah berubah; timing tidak diterapkan')
-                    if op.get('scope','clip') not in ('clip','shared_utterance') or not cid and op.get('scope')!='shared_utterance':raise ValueError('Cakupan timing tidak valid')
-                    a,b=stage3.alignment_window(word,rows,doc['source']['info']['duration'])
-                    aligned=stage3.validate_alignment(word['word'],op.get('words'),a,b)
-                    patches=doc.setdefault('alignment_overrides',{})
-                    group=patches.setdefault('shared',{}) if op.get('scope')=='shared_utterance' else patches.setdefault('clips',{}).setdefault(cid,{})
-                    stage3.store_alignment(group,{'transcript_id':doc['transcript_id'],'origin_word_ids':origins(word),
-                        'text':word['word'],'words':aligned,'audio_start':a,'audio_end':b,'method':'manual',
-                        'provenance':{'kind':'user_timing','source_id':doc['source']['source_id']}})
-                    transcript_changed=True
-                elif kind in ('asset_enabled','asset_metadata','asset_timing','asset_replace'):
-                    variant=self.variant(doc,cid,vid);scenes=variant.get('recipe',{}).get('scenes',[])
-                    scene=next((s for s in scenes if s['id']==op.get('proposal_id') or
-                        kind=='asset_metadata' and s['asset']['provider']+':'+s['asset']['id']==op.get('asset_id')),None)
-                    if scene is None:raise ValueError('Ilustrasi tidak ditemukan; siapkan ilustrasi dahulu')
-                    if kind=='asset_enabled':
-                        if type(op.get('enabled')) is not bool:raise ValueError('Status ilustrasi harus boolean')
-                        scene['enabled']=op['enabled']
-                    elif kind=='asset_metadata':
-                        for key in ('tags','attribution'):scene['asset'][key]=str(op.get(key,''))[:2000]
-                    elif kind=='asset_timing':
-                        a,b,offset=float(op['start']),float(op['end']),float(op.get('asset_start',0))
-                        if not all(math.isfinite(n) for n in (a,b,offset)) or not doc['clips'][cid]['start']<=a<b<=doc['clips'][cid]['end'] or offset<0:raise ValueError('Waktu ilustrasi tidak valid')
-                        scene.update(source_start=a,source_end=b,asset_start=offset)
-                    else:
-                        from .media_context import inspect
-                        path=Path(op.get('path','')).expanduser().resolve();info=inspect(path)
-                        scene['asset']={'id':content_id(path,fresh=True),'provider':'local','path':str(path),'duration':info['duration'],
-                            'title':path.stem,'attribution':str(op.get('attribution','Aset milik pengguna'))[:2000]}
-                        for proposal in variant.get('asset_proposals',{}).get('payload',{}).get('proposals',[]):
-                            if proposal['proposal_id']==scene['id']:
-                                proposal.update(path=str(path),poster=None,editable_path=None,duration=info['duration'],
-                                    visual_status='unavailable',visual_evidence={},asset_id='local:'+scene['asset']['id'],
-                                    content_fingerprint=scene['asset']['id'],rights={'attribution':scene['asset']['attribution'],'permission_status':'user_supplied'})
-                    touched.add((cid,vid))
-                elif kind=='timeline':
-                    variant=self.variant(doc,cid,vid);intervals=op.get('keep_spans')
-                    if not isinstance(intervals,list) or not 1<=len(intervals)<=200:raise ValueError('Timeline harus mempunyai 1–200 potongan')
-                    previous=doc['clips'][cid]['start']
-                    for pair in intervals:
-                        if not isinstance(pair,list) or len(pair)!=2:raise ValueError('Rentang timeline tidak valid')
-                        a,b=map(float,pair)
-                        if not all(math.isfinite(n) for n in (a,b)) or not previous<=a<b<=doc['clips'][cid]['end']:raise ValueError('Potongan harus berurutan dan berada dalam klip')
-                        previous=b
-                    variant['timeline']={'keep_spans':intervals};touched.add((cid,vid))
-                elif kind=='rename':doc['name']=str(op['name']).strip()[:160] or doc['name']
-                else:raise ValueError('Operasi tidak dikenal: '+str(kind))
-            if transcript_changed:doc['transcript_revision']+=1
-            if any(op.get('op') in ('alias_upsert','alias_remove') or 'glossary' in op.get('values',{}) for op in operations):
-                from .transcript_correction import glossary_entries
-                glossary_entries(self.config(doc))
-            for c,v in touched:doc['clips'][c]['variants'][v]['timeline_revision']+=1
-            return {'impact':list(dict.fromkeys(stage for op in operations for stage in settings_impact(op.get('values',{}))))}
-        return self.store.mutate(pid,request['expected_revision'],request['operation_id'],request,change,
-            ' · '.join(dict.fromkeys(op.get('op','Edit') for op in operations)))
+                    variant['override_keys']=sorted(set(variant.get('override_keys',[]))|set(values));touched.add((c,v))
+            elif kind=='reset_overrides':
+                keys=op.get('keys')
+                if not isinstance(keys,list) or not keys or len(keys)>100 or any(not isinstance(k,str) or k not in CONFIG_FIELDS-PRIVATE for k in keys):raise ValueError('Pilih nama pengaturan yang valid untuk dipulihkan')
+                variant=self.variant(doc,cid,vid)
+                current=asdict(self.config(doc,cid,vid))
+                if set(validate_overrides({k:current[k] for k in keys}))!=set(keys):raise ValueError('Pengaturan ini tidak dapat dipulihkan melalui editor')
+                from .edit_styles import recipe
+                defaults=recipe(current['edit_style'])
+                for key in keys:
+                    if key in defaults:variant['settings'][key]=defaults[key]
+                    else:variant['settings'].pop(key,None)
+                variant['override_keys']=sorted(set(variant.get('override_keys',[]))-set(keys));touched.add((cid,vid))
+            elif kind=='style':
+                from .edit_styles import recipe
+                values=recipe(op['style_id'])
+                targets=op.get('targets') or [{'clip_id':cid,'variant_id':vid}]
+                if len(targets)>500:raise ValueError('Maksimal 500 varian per batch')
+                for target in targets:
+                    c,v=target['clip_id'],target['variant_id'];variant=self.variant(doc,c,v)
+                    keep=set(variant.get('override_keys',[])) if not op.get('replace_manual',False) else set()
+                    variant['settings'].update({k:value for k,value in values.items() if k not in keep});touched.add((c,v))
+            elif kind=='brand_apply':
+                brand_targets=self.workspace.apply_brand(doc,op,cid,vid)
+                for c,v in brand_targets:
+                    branded=self.variant(doc,c,v)
+                    keys=branded.get('brand_kit',{}).get('applied_keys',[])
+                    branded.setdefault('style_layers',{})['brand']={k:branded['settings'][k] for k in keys}
+                    for key in keys:
+                        if key not in branded.get('override_keys',[]):branded['settings'].pop(key,None)
+                touched.update(brand_targets)
+            elif kind=='design_alternative':
+                variant=self.variant(doc,cid,vid)
+                # Regenerate only seeded phrase decisions; retain all other edits.
+                seed=op.get('seed',self.config(doc,cid,vid).caption_seed+1)
+                values=validate_overrides({'caption_seed':seed})
+                if self.config(doc,cid,vid).style_preset=='legacy':
+                    raise ValueError('Pilih preset Rapi, Ekspresif atau Adaptif sebelum membuat alternatif.')
+                variant['settings'].update(values)
+                variant['override_keys']=sorted(set(variant.get('override_keys',[]))|{'caption_seed'})
+                touched.add((cid,vid))
+            elif kind=='visual_controls':
+                from .visual4 import validate_controls
+                variant=self.variant(doc,cid,vid)
+                values=copy.deepcopy(op.get('values',{}))
+                if not isinstance(values,dict):raise ValueError('Koreksi visual harus berupa objek')
+                if values.get('speaker_track') not in (None,'auto'):
+                    report=variant.get('visual_report',{})
+                    if not report.get('summary',{}).get('key') or variant.get('visual_dependency')!=self.dependency(doc,cid,vid):
+                        raise ValueError('Perbarui analisis visual sebelum memilih lintasan pembicara')
+                    values['speaker_evidence']=report['summary']['key']
+                elif values.get('speaker_track')=='auto':values['speaker_evidence']=None
+                merged={**variant.get('visual_controls',{}),**values}
+                variant['visual_controls']=validate_controls(merged,doc['source']['info']['duration']);touched.add((cid,vid))
+            elif kind in ('bounds','manual_clip'):
+                a,b=float(op['start']),float(op['end']);duration=doc['source']['info']['duration']
+                if not all(math.isfinite(n) for n in (a,b)) or not 0<=a<b<=duration+.05:raise ValueError('Rentang klip harus di dalam sumber')
+                if kind=='manual_clip':self.add_candidates(doc,[{'start':a,'end':b,'title':str(op.get('title','Klip manual'))[:160],'selection_source':'manual','keywords':[],'reason':'Dipilih pengguna','boundary_pin':{'start':a,'end':b,'source':'manual'}}])
+                else:
+                    for target_vid,variant in doc['clips'][cid]['variants'].items():
+                        advanced=variant.get('editor',{}).get('segments')
+                        if advanced:
+                            from .editor_contract import tick,validate_segments,build_clock
+                            revised=[]
+                            for segment in advanced:
+                                left=max(tick(a),segment['source_start_tick']);right=min(tick(b),segment['source_end_tick'])
+                                if right<=left:continue
+                                if segment.get('speed_curve') and (left!=segment['source_start_tick'] or right!=segment['source_end_tick']):
+                                    raise ValueError('Batas baru memotong ramp. Ubah ramp/potongan lebih dahulu.')
+                                revised.append({**segment,'source_start_tick':left,'source_end_tick':right})
+                            if not revised:raise ValueError('Batas baru tidak beririsan dengan potongan timeline. Reset potongan atau pilih batas lain.')
+                            revised=validate_segments(revised,{'start':a,'end':b},doc.get('editor_cameras',{}))
+                            clock=build_clock(revised,self.config(doc,cid,target_vid).output_fps)
+                            if any(p['time_tick']>tick(clock['duration']) for points in variant['editor'].get('curves',{}).values() for p in points):
+                                raise ValueError('Batas baru membuat keyframe melewati akhir. Pindahkan/hapus kurva dahulu.')
+                            variant['editor'].update(segments=revised,clock_digest=clock['digest'])
+                        spans=variant.get('timeline',{}).get('keep_spans')
+                        if spans:
+                            reconciled=[[max(a,float(x)),min(b,float(y))] for x,y in spans if min(b,float(y))>max(a,float(x))]
+                            if not reconciled:raise ValueError('Batas baru tidak beririsan dengan potongan timeline. Reset potongan atau pilih batas lain.')
+                            variant['timeline']={'keep_spans':reconciled}
+                        touched.add((cid,target_vid))
+                    doc['clips'][cid].update(start=a,end=b,selection_source='reviewed',boundary_pin={'start':a,'end':b,'source':'manual'});doc['clips'][cid]['revision']+=1
+            elif kind=='restore_rejected':
+                row=next((r for r in stage3.rejection_rows(doc.get('discovery',{})) if r['rejection_id']==op.get('rejection_id')),None)
+                if not row:raise ValueError('Kandidat ditolak berubah atau tidak tersedia pada laporan aktif')
+                if doc.get('discovery',{}).get('transcript_id') not in (None,doc.get('transcript_id')):raise ValueError('Laporan memakai transkrip lama; jalankan penjelajahan lagi')
+                a,b=float(op.get('start',row.get('start',-1))),float(op.get('end',row.get('end',-1)))
+                duration=doc['source']['info']['duration']
+                if not all(math.isfinite(x) for x in (a,b)) or not 0<=a<b<=duration+.05:raise ValueError('Tentukan rentang sumber yang valid untuk memulihkan kandidat')
+                ids=self.add_candidates(doc,[{'title':str(op.get('title',row.get('title','Kandidat dipulihkan')))[:160],
+                    'start':a,'end':b,'keywords':[],'selection_source':'manual','reason':'Dipulihkan pengguna: '+str(row.get('detail',row['code']))[:300],
+                    'restored_rejection_id':row['rejection_id'],'boundary_pin':{'start':a,'end':b,'source':'manual'},
+                    'warnings':['Pemulihan manual; belum dianggap lolos penilaian cerita otomatis.']}])
+                doc.setdefault('restored_rejections',{})[row['rejection_id']]=ids[0]
+            elif kind=='align_words':
+                if op.get('transcript_id')!=doc.get('transcript_id') or op.get('transcript_revision')!=doc.get('transcript_revision'):raise ValueError('Timing memakai transkrip lama; muat ulang tanpa membuang draf')
+                rows=self.transcript(doc,cid)['words'];word=next((w for w in rows if origins(w)==op.get('origin_word_ids')),None)
+                if not word or word['word']!=op.get('text'):raise ValueError('Frasa telah berubah; timing tidak diterapkan')
+                if op.get('scope','clip') not in ('clip','shared_utterance') or not cid and op.get('scope')!='shared_utterance':raise ValueError('Cakupan timing tidak valid')
+                a,b=stage3.alignment_window(word,rows,doc['source']['info']['duration'])
+                aligned=stage3.validate_alignment(word['word'],op.get('words'),a,b)
+                patches=doc.setdefault('alignment_overrides',{})
+                group=patches.setdefault('shared',{}) if op.get('scope')=='shared_utterance' else patches.setdefault('clips',{}).setdefault(cid,{})
+                stage3.store_alignment(group,{'transcript_id':doc['transcript_id'],'origin_word_ids':origins(word),
+                    'text':word['word'],'words':aligned,'audio_start':a,'audio_end':b,'method':'manual',
+                    'provenance':{'kind':'user_timing','source_id':doc['source']['source_id']}})
+                transcript_changed=True
+            elif kind in ('asset_enabled','asset_metadata','asset_timing','asset_replace'):
+                variant=self.variant(doc,cid,vid);scenes=variant.get('recipe',{}).get('scenes',[])
+                scene=next((s for s in scenes if s['id']==op.get('proposal_id') or
+                    kind=='asset_metadata' and s['asset']['provider']+':'+s['asset']['id']==op.get('asset_id')),None)
+                if scene is None:raise ValueError('Ilustrasi tidak ditemukan; siapkan ilustrasi dahulu')
+                if kind=='asset_enabled':
+                    if type(op.get('enabled')) is not bool:raise ValueError('Status ilustrasi harus boolean')
+                    scene['enabled']=op['enabled']
+                elif kind=='asset_metadata':
+                    for key in ('tags','attribution'):scene['asset'][key]=str(op.get(key,''))[:2000]
+                elif kind=='asset_timing':
+                    a,b,offset=float(op['start']),float(op['end']),float(op.get('asset_start',0))
+                    if not all(math.isfinite(n) for n in (a,b,offset)) or not doc['clips'][cid]['start']<=a<b<=doc['clips'][cid]['end'] or offset<0:raise ValueError('Waktu ilustrasi tidak valid')
+                    scene.update(source_start=a,source_end=b,asset_start=offset)
+                else:
+                    from .media_context import inspect
+                    path=Path(op.get('path','')).expanduser().resolve();info=inspect(path)
+                    scene['asset']={'id':content_id(path,fresh=True),'provider':'local','path':str(path),'duration':info['duration'],
+                        'title':path.stem,'attribution':str(op.get('attribution','Aset milik pengguna'))[:2000]}
+                    for proposal in variant.get('asset_proposals',{}).get('payload',{}).get('proposals',[]):
+                        if proposal['proposal_id']==scene['id']:
+                            proposal.update(path=str(path),poster=None,editable_path=None,duration=info['duration'],
+                                visual_status='unavailable',visual_evidence={},asset_id='local:'+scene['asset']['id'],
+                                content_fingerprint=scene['asset']['id'],rights={'attribution':scene['asset']['attribution'],'permission_status':'user_supplied'})
+                touched.add((cid,vid))
+            elif kind=='timeline':
+                variant=self.variant(doc,cid,vid);intervals=op.get('keep_spans')
+                if not isinstance(intervals,list) or not 1<=len(intervals)<=200:raise ValueError('Timeline harus mempunyai 1–200 potongan')
+                previous=doc['clips'][cid]['start']
+                for pair in intervals:
+                    if not isinstance(pair,list) or len(pair)!=2:raise ValueError('Rentang timeline tidak valid')
+                    a,b=map(float,pair)
+                    if not all(math.isfinite(n) for n in (a,b)) or not previous<=a<b<=doc['clips'][cid]['end']:raise ValueError('Potongan harus berurutan dan berada dalam klip')
+                    previous=b
+                from .editor_service import _set_segments,targets as editor_targets
+                rows=[{'id':'legacy-'+fingerprint([index,pair])[:16],'start':pair[0],'end':pair[1]} for index,pair in enumerate(intervals)]
+                for c,v in editor_targets(self,doc,cid,vid,op,temporal=True):
+                    _set_segments(self,doc,c,v,rows);touched.add((c,v))
+            elif kind=='rename':doc['name']=str(op['name']).strip()[:160] or doc['name']
+            else:raise ValueError('Operasi tidak dikenal: '+str(kind))
+        if transcript_changed:doc['transcript_revision']+=1
+        if any(op.get('op') in ('alias_upsert','alias_remove') or 'glossary' in op.get('values',{}) for op in operations):
+            from .transcript_correction import glossary_entries
+            glossary_entries(self.config(doc))
+        for c,v in touched:doc['clips'][c]['variants'][v]['timeline_revision']+=1
+        return {'impact':list(dict.fromkeys(stage for op in operations for stage in settings_impact(op.get('values',{}))))}
 
     def enqueue(self,project_id,kind,clip_id=None,variant_id='portrait',expected_revision=None,options=None):
         doc=self.store.get(project_id)
@@ -519,6 +602,12 @@ class StudioService:
         target={'clip_id':clip_id,'variant_id':variant_id}
         request={'dependency':self.dependency(doc,clip_id,variant_id,fresh=True,kind=kind),'options':options or {},
                  'snapshot':copy.deepcopy(doc),'input_revision':doc['revision']}
+        if kind in ('preview','render'):
+            from .editor_service import render_summary
+            request['render_summary']=render_summary(self,doc,[target])
+            supplied=(options or {}).get('summary_digest')
+            if supplied and supplied!=request['render_summary']['digest']:
+                raise Conflict(doc['revision'],'Ringkasan render berubah; periksa ulang sebelum menjalankan')
         if kind=='export':
             readiness=self.export_readiness(doc,clip_id,variant_id,dependency=request['dependency'],fresh=True)
             if readiness['status']!='ready':raise ValueError(readiness['message'])
@@ -549,7 +638,9 @@ class StudioService:
             cid=t['clip_id'];vid=t['variant_id'];self.variant(doc,cid,vid)
             dep=self.dependency(doc,cid,vid,fresh=True)
             if self.export_readiness(doc,cid,vid,dependency=dep,fresh=True)['status']=='ready':skipped.append(t);continue
-            jobs.append(('render',t,{'dependency':dep,'options':{},'snapshot':copy.deepcopy(doc),'input_revision':doc['revision']}))
+            from .editor_service import render_summary
+            jobs.append(('render',t,{'dependency':dep,'options':{},'snapshot':copy.deepcopy(doc),'input_revision':doc['revision'],
+                'render_summary':render_summary(self,doc,[t])}))
         queued=self.queue.enqueue_many(project_id,jobs,doc['revision'])
         return {'jobs':queued,'skipped':skipped,'timelines':len(rows),'selected_clips':len(rows)//2}
 

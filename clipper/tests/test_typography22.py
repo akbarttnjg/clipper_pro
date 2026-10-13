@@ -9,6 +9,8 @@ from clipper.config import Config
 from clipper.typography import display_units, make_plan, groups
 from clipper.motion import IDS
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
+
 
 def words(text, step=.32):
     return [{'word_id':i, 'word':s, 'start':i*step, 'end':(i+1)*step-.02}
@@ -70,6 +72,7 @@ def test_anchors_choose_containing_shot_and_keep_text_in_band():
         assert 800<w['y']<1140
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_projection_recovers_fragmented_material_without_accepting_white_room():
     from clipper.composition import material_panel
     import cv2

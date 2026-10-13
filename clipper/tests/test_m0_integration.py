@@ -40,6 +40,8 @@ def studio(tmp_path,video):
     yield svc,doc,cid
     svc.queue.close()
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
+
 
 def request(svc,pid,cid,vid='portrait'):
     doc=svc.store.get(pid);return svc.enqueue(pid,'render',cid,vid,doc['revision'])
@@ -49,6 +51,7 @@ def tree_bytes(root):
     return {p.relative_to(root).as_posix():p.read_bytes() for p in Path(root).rglob('*') if p.is_file()}
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_real_two_ratios_cache_publication_and_failed_retry(studio,monkeypatch):
     from clipper import pipeline
     svc,doc,cid=studio;pid=doc['project_id'];outputs=[]

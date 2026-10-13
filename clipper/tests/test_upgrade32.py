@@ -5,7 +5,10 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2=None
 import numpy as np
 import pytest
 
@@ -14,6 +17,8 @@ from clipper import library_paths as paths, placement, story, typography
 from clipper import transcript_correction as correction
 from clipper.storage import read_json
 from clipper.subtitle_edit import clean
+
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
 
 
 def words(text, step=.4):
@@ -210,6 +215,7 @@ def test_adaptive_limit_can_return_more_than_ten_without_filling(tmp_path, monke
 
 
 @pytest.mark.parametrize('dark', [False, True])
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_text_geometry_detects_light_and_dark_boards(dark):
     frame=np.full((360,640,3), 20 if dark else 245, np.uint8)
     color=(245,)*3 if dark else (20,)*3

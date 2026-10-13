@@ -79,6 +79,8 @@ def brand_values(values):
 def native_reasons(plan):
     if not plan or not plan.get('shots'):return ['Render final dahulu untuk memeriksa shot.']
     reasons=[]
+    if plan.get('editor',{}).get('advanced_source_layer')=='baked':
+        reasons.append('Edit waktu/keyframe/kamera M1 menyatu dalam source layer; pilih hibrida.')
     if any(s.get('mode') not in ('fill','fit') for s in plan['shots']):
         reasons.append('Komposisi beberapa area tidak dipetakan ke crop native; gunakan hibrida.')
     if any(s.get('zoom_at') is not None for s in plan['shots']):
@@ -94,8 +96,13 @@ def export_options(variant):
     rows=[]
     for mode,entry in EXPORT_MODES.items():
         reasons=native_reasons(plan) if mode=='native' else []
+        entry=copy.deepcopy(entry)
+        if mode!='preserved' and plan.get('editor',{}).get('advanced_source_layer')=='baked':
+            entry['baked_layers'] += ['source_time_edits','source_keyframes','camera_switches']
+            entry['limitations'] += ['Clock asli dan provenance disimpan; time effects/keyframe/kamera menyatu dalam source layer.']
         rows.append({'id':mode,**copy.deepcopy(entry),'available':not reasons,'reasons':reasons,
-            'native_status':'not_tested','target_versions':{'capcut':'9.5.0','resolve':'21'}})
+            'native_status':'not_tested','target_versions':{'capcut':'9.5.0','resolve':'21'},
+            'architectural_regression_targets':{'capcut':'4.7.0','resolve':'18.6.6'}})
     return rows
 
 
@@ -153,8 +160,10 @@ class Workspace:
         if operation.get('kit_revision')!=kit['revision']:raise ValueError('Brand kit berubah; tinjau nilai terbaru.')
         scope=operation.get('scope','variant')
         if scope not in ('variant','project'):raise ValueError('Cakupan brand kit tidak valid.')
-        targets=[(clip_id,variant_id)] if scope=='variant' else [(c,v) for c,clip in doc['clips'].items() for v in clip['variants']]
-        if scope=='project':doc['settings'].update(kit['settings'])
+        targets=[(clip_id,variant_id)] if scope=='variant' else [(c,v) for c,clip in doc['clips'].items() if clip.get('included',True) or operation.get('include_excluded',False) for v in clip['variants']]
+        if operation.get('targets') is not None:
+            from .editor_service import targets as selected_targets
+            targets=selected_targets(self.service,doc,clip_id,variant_id,operation)
         touched=set();kept={}
         for c,v in targets:
             variant=self.service.variant(doc,c,v);manual=set(variant.get('override_keys',[]))

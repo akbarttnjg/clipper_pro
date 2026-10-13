@@ -1,17 +1,20 @@
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.12-m1';
+const localStorage=localDrafts,sessionStorage=sessionDrafts;
 /* A-owned review component. Host B injects services and owns project revisions. */
 export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen=()=>{},onPreview=null}){
  if(!root||!api?.get_snapshot||!api?.submit_changes||!api?.run_stage)throw Error('Container dan layanan C0 diperlukan');
  let current={...target},expected=revision,snapshot=null,generation=0,destroyed=false;
  const drafts=new Map(),requests=new Map();
  try{for(const [k,v] of JSON.parse(sessionStorage.getItem('clipper-analysis-drafts')||'[]'))drafts.set(k,v)}catch{}
- const persistDrafts=()=>sessionStorage.setItem('clipper-analysis-drafts',JSON.stringify([...drafts]));
+ const persistDrafts=()=>{try{sessionStorage.setItem('clipper-analysis-drafts',JSON.stringify([...drafts]))}catch{notice('Draf masih ada di tab ini. Penyimpanan browser penuh; simpan sebelum menutup tab.')}};
  const key=t=>[t.project_id,t.clip_id,t.variant_id].join('|');
  const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
  const time=n=>Number.isFinite(n)?`${Math.floor(n/60)}:${String(Math.floor(n%60)).padStart(2,'0')}`:'—';
  root.classList.add('analysis-panel');
  const message=node('p','','analysis-message');message.setAttribute('role','status');
- const content=node('div'),reload=node('button','Muat revisi terbaru');reload.type='button';reload.onclick=()=>refresh();root.replaceChildren(message,reload,content);
+ const content=node('div'),reload=node('button','Muat revisi terbaru');reload.type='button';reload.onclick=async()=>{if(await refresh()){drafts.delete(key(current)+'|base');persistDrafts();notice(`Revisi ${expected} · ${current.clip_id} / ${current.variant_id}. Draf dipertahankan; periksa sebelum menyimpan.`)}};root.replaceChildren(message,reload,content);
  function notice(text){if(!destroyed)message.textContent=text}
+ function remember(field,id,original){const draftKey=key(current)+'|'+id;if(drafts.has(draftKey))field.value=drafts.get(draftKey);field.oninput=field.onchange=()=>{if(String(field.value)===String(original))drafts.delete(draftKey);else{if(!drafts.has(key(current)+'|base'))drafts.set(key(current)+'|base',expected);drafts.set(draftKey,field.value)}if(![...drafts.keys()].some(k=>k.startsWith(key(current)+'|')&&!k.endsWith('|base')))drafts.delete(key(current)+'|base');persistDrafts()};return draftKey}
  function button(parent,text,handler,disabled=false){const b=node('button',text);b.type='button';b.disabled=disabled;b.onclick=()=>Promise.resolve(handler()).catch(e=>notice(e.message));parent.append(b);return b}
  function section(title,help){const s=node('section',undefined,'analysis-section');s.append(node('h3',title),node('p',help,'analysis-help'));content.append(s);return s}
  function input(parent,label,value='',type='text'){const l=node('label',label),e=node('input');e.type=type;if(type==='checkbox')e.checked=!!value;else e.value=value;l.append(e);parent.append(l);return e}
@@ -25,17 +28,17 @@ export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen
    if(result.schema_version!==1)throw Error('Snapshot versi ini belum didukung; data asli tidak diubah.');
    if(key(result.target)!==key(t))throw Error('Respons berasal dari target berbeda; panel tidak diperbarui.');
    if(!Number.isInteger(result.revision)||result.revision<minimum)throw Error('Respons lama diabaikan. Muat snapshot terbaru.');
-   snapshot=result;expected=result.revision;render();content.inert=false;notice(`Revisi ${expected} · ${t.clip_id} / ${t.variant_id}`);
+   snapshot=result;expected=result.revision;render();content.inert=false;notice(`Revisi ${expected} · ${t.clip_id} / ${t.variant_id}`);return true;
   }catch(e){if(valid(stamp,t))notice(e.message)}
  }
  async function commit(operations,draftKey){
-  const stamp=generation,t={...current},payloadKey=JSON.stringify([t,expected,operations]);
+  const stamp=generation,t={...current},base=drafts.get(key(current)+'|base')??expected,payloadKey=JSON.stringify([t,base,operations]);
   const operation_id=requests.get(payloadKey)||globalThis.crypto.randomUUID();requests.set(payloadKey,operation_id);
-  const response=await api.submit_changes({...t,expected_revision:expected,operation_id,operations});
+  const response=await api.submit_changes({...t,expected_revision:base,operation_id,operations});
   if(!valid(stamp,t))return;
   if(response.status==='conflict'){notice('Ada perubahan dari tab lain. Draf Anda dipertahankan; muat revisi terbaru sebelum mencoba lagi.');return}
   if(response.status!=='ready'||!Number.isInteger(response.revision))throw Error(response.message||'Perubahan belum tersimpan. Draf Anda tetap tersedia.');
-  if(draftKey){drafts.delete(draftKey);persistDrafts()}requests.delete(payloadKey);expected=response.revision;
+  if(draftKey){for(const id of (Array.isArray(draftKey)?draftKey:[draftKey]))drafts.delete(id);if(![...drafts.keys()].some(k=>k.startsWith(key(current)+'|')&&!k.endsWith('|base')))drafts.delete(key(current)+'|base');persistDrafts()}requests.delete(payloadKey);expected=response.revision;
   onChange({...t,revision:expected,operation_id});await refresh();
  }
  async function stage(stage_id){
@@ -58,7 +61,8 @@ export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen
     button(card,'Dengarkan konteks',()=>onListen({...current,revision:expected,source_start:row.listen_start??Math.max(0,row.start-2),source_end:row.listen_end??row.end+2}));
     if(row.ocr){card.append(node('p',`Slide: “${row.ocr.text}” · keyakinan OCR ${Math.round(row.ocr.confidence*100)}%`));button(card,'Lihat materi',()=>onListen({...current,revision:expected,source_start:row.ocr.time,source_end:row.ocr.time,paused:true}))}
     const draftKey=key(current)+'|'+token.token_id;
-    const text=input(card,'Ejaan yang Anda setujui',drafts.get(draftKey)??row.suggestions?.[0]??token.text);text.maxLength=120;text.oninput=()=>{drafts.set(draftKey,text.value);persistDrafts()};
+    const text=input(card,'Ejaan yang Anda setujui',drafts.get(draftKey)??row.suggestions?.[0]??token.text);text.maxLength=120;remember(text,token.token_id,token.text);
+    card.append(node('small','Saran ejaan diterapkan setelah Anda menyimpannya.'));
     const scope=select(card,'Cakupan',[['clip','Clip ini'],['shared_utterance','Ucapan yang sama pada clip terkait']],'clip');
     if(!caps.shared_utterance){scope.options[1].disabled=true;scope.title='Koreksi lintas klip belum tersedia pada proyek ini'}
     button(card,'Simpan koreksi',()=>commit([{op:'correct_token',scope:scope.value,source_id:transcript.source_id,transcript_id:transcript.transcript_id,
@@ -68,13 +72,14 @@ export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen
    }
   }
   const aliases=section('Memori ejaan proyek','Tambahkan hanya alias yang sudah Anda dengarkan dan setujui. Menonaktifkan memori tidak menghapus koreksi manual.');
-  const form=node('div',undefined,'analysis-card');aliases.append(form);let editId=null;
+  const form=node('div',undefined,'analysis-card');aliases.append(form);const editKey=key(current)+'|alias:id';let editId=drafts.get(editKey)??null;
   const canonical=input(form,'Ejaan benar'),alias=input(form,'Alias salah dengar');
   const topic=select(form,'Topik',[['*','Semua topik proyek'],['finance','Keuangan'],['general','Umum'],['creators','Kreator'],['business','Bisnis'],['students','Pelajar']],'*');
-  button(form,'Simpan alias',()=>commit([{op:'alias_upsert',id:editId,canonical:canonical.value,alias:alias.value,topic:topic.value,enabled:true}]),!caps.aliases);
+  const aliasKeys=[editKey,remember(canonical,'alias:canonical',''),remember(alias,'alias:alias',''),remember(topic,'alias:topic','*')];
+  button(form,'Simpan alias',()=>commit([{op:'alias_upsert',id:editId,canonical:canonical.value,alias:alias.value,topic:topic.value,enabled:true}],aliasKeys),!caps.aliases);
   for(const row of data.aliases||[]){const card=node('div',undefined,'analysis-card');aliases.append(card);card.append(node('strong',`${row.alias} → ${row.canonical} · ${row.topic}`));
    const enabled=input(card,'Aktif',row.enabled,'checkbox');enabled.disabled=!caps.aliases;enabled.onchange=()=>commit([{op:'alias_upsert',...row,enabled:enabled.checked}]).catch(e=>notice(e.message));
-   button(card,'Edit',()=>{editId=row.id;canonical.value=row.canonical;alias.value=row.alias;topic.value=row.topic;canonical.focus()},!caps.aliases);
+   button(card,'Edit',()=>{editId=row.id;drafts.set(editKey,editId);canonical.value=row.canonical;alias.value=row.alias;topic.value=row.topic;canonical.oninput();alias.oninput();topic.onchange();canonical.focus()},!caps.aliases);
    button(card,'Hapus alias',()=>commit([{op:'alias_remove',id:row.id}]),!caps.aliases);
   }
   button(aliases,'Terapkan memori ke analisis',()=>stage('correction'),!caps.correction);
@@ -107,7 +112,8 @@ export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen
    if(proposal.editable_url){const a=node('a','Unduh SVG editable');a.href=proposal.editable_url;a.download='diagram.svg';card.append(a)}
    if(proposal.rights?.permission_status==='user_supplied'){
     const tags=input(card,'Tag lokal (Indonesia / Inggris)',proposal.tags||''),credit=input(card,'Asal / izin / kredit',proposal.rights?.attribution||'');
-    button(card,'Simpan metadata',()=>commit([{op:'asset_metadata',asset_id:proposal.asset_id,tags:tags.value,attribution:credit.value}]),!caps.asset_changes);
+    const metadataKeys=[remember(tags,'asset:'+proposal.asset_id+':tags',proposal.tags||''),remember(credit,'asset:'+proposal.asset_id+':credit',proposal.rights?.attribution||'')];
+    button(card,'Simpan metadata',()=>commit([{op:'asset_metadata',asset_id:proposal.asset_id,tags:tags.value,attribution:credit.value}],metadataKeys),!caps.asset_changes);
    }
   }
   const preview=section('Ukuran ponsel','Periksa pratinjau dari perubahan terbaru. Kata kecil, waktu baca, wajah, dan materi perlu diperiksa pada ukuran ini.');
@@ -118,5 +124,5 @@ export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen
  }
  refresh();
  return {refresh,update(next){generation++;snapshot=null;content.replaceChildren();current={...next.target};expected=next.revision;return refresh()},
-         getDrafts(){return Object.fromEntries(drafts)},destroy(){destroyed=true;generation++;root.replaceChildren();root.classList.remove('analysis-panel')}};
+         getDrafts(){return Object.fromEntries([...drafts].filter(([k])=>k.startsWith(key(current)+'|')&&!k.endsWith('|base')))},destroy(){destroyed=true;generation++;root.replaceChildren();root.classList.remove('analysis-panel')}};
 }

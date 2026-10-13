@@ -3,13 +3,18 @@ import copy
 import json
 from dataclasses import replace
 from pathlib import Path
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2=None
 import numpy as np
 import pytest
 from clipper import story, illustrations, typography, placement, composition, transcript_correction, library_paths
 from clipper.config import Config
 from clipper.tests.test_intelligence31 import example
 from clipper.tests.test_upgrade32 import words, shot, app_fixture
+
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
 
 
 def row(block):
@@ -80,6 +85,7 @@ def test_phrase_not_split_at_two_frame_cut(style):
     assert min(p['end']-p['start'] for p in layout['phrases'])>.2
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_full_white_slide_requires_writing():
     frame=np.full((360,640,3),255,np.uint8)
     assert composition.material_panel(frame) is None

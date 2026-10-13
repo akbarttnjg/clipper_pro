@@ -44,6 +44,10 @@ def capture_plan_files(txn,plan,work):
         elif isinstance(value,list):
             for child in value:visit(child)
     visit(plan)
+    if plan.get('editor',{}).get('advanced_source_layer')=='baked':
+        source=Path(plan.get('source',{}).get('path','')).resolve()
+        if not source.is_file():raise ValueError('Source proxy M1 hilang sebelum pembekuan artifact; final sebelumnya dipertahankan.')
+        paths.add(source)
     for event in plan.get('broll',[]):
         for value in (event.get('path'),event.get('asset',{}).get('path')):
             if value and Path(value).is_file():paths.add(Path(value).resolve())
@@ -146,6 +150,8 @@ def studio_set(result,plan,doc,cid,vid,cfg,media,dependency,*,before_seal=lambda
     txn=ArtifactSet(library_paths.project_root(cfg)/'artifact-sets',
                     {'kind':'studio_render','project_id':doc['project_id'],'clip_id':cid,'variant_id':vid,
                      'requested_revision':doc['revision'],'dependency':dependency,'cache_reused':reused})
+    if result.get('render_summary'):txn.metadata['render_summary']=result['render_summary']
+    if result.get('draft_id'):txn.metadata.update(draft_id=result['draft_id'],snapshot_digest=result['snapshot_digest'],is_draft=True)
     try:
         for name in manifest['members']:
             source=source_root/name;target=txn.staging/name;target.parent.mkdir(parents=True,exist_ok=True)
@@ -167,6 +173,8 @@ def studio_set(result,plan,doc,cid,vid,cfg,media,dependency,*,before_seal=lambda
         value['url']=library_paths.url(value['file'])
         plan['publication']={'requested_revision':doc['revision'],'dependency':dependency,
                              'encode_provenance':value['encode_provenance'],'cache_reused':reused}
+        if value.get('render_summary'):plan['publication']['render_summary']=value['render_summary']
+        if value.get('draft_id'):plan['publication'].update(draft_id=value['draft_id'],is_draft=True,snapshot_digest=value['snapshot_digest'])
         write(txn.staging/'edit-plan.json',plan)
         value['plan_content_id']=content_id(txn.staging/'edit-plan.json',fresh=True)
         exchange=records(plan,value,doc,cid,vid,cfg,media)

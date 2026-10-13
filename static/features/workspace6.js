@@ -1,3 +1,5 @@
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.12-m1';
+const localStorage=localDrafts,sessionStorage=sessionDrafts;
 // Workspace controls use saved revisions. Opening a panel performs read-only calls.
 const LABELS6={talking_head:'Pembicara',chart:'Chart',board:'Papan',multispeaker:'Beberapa pembicara',graphics:'Sumber bergrafis'};
 const STATUS6={not_tested:'Belum diuji',user_reported_passed:'Lolos menurut laporan pengguna',user_reported_issue:'Kendala dilaporkan pengguna',stale:'Bukti memakai berkas lama',evidence_missing:'Berkas bukti tidak tersedia'};
@@ -11,7 +13,7 @@ const mb6=v=>v===null||v===undefined?'belum terukur':(v/1024**2).toFixed(1)+' MB
 
 export function mountSteps6(host,{project,onNavigate}){
  const row=e6('div');row.className='workspace6-steps';host.append(row);
- const stages=[['source','Sumber','Bahasa, track suara, dan kamus menentukan analisis.'],['story','Pilih klip','Dengarkan batas cerita; tinjau kandidat tertolak.'],['edit','Tata gaya','Simpan tiap rasio dan periksa keterbacaan sebelum render.'],['results','Periksa / ekspor','Tinjau final revisi aktif dan layer yang dapat diedit.']];
+ const stages=[['source','Buat','Bahasa, track suara, dan kamus menentukan analisis.'],['story','Pilih','Dengarkan batas cerita; tinjau kandidat tertolak.'],['edit','Edit','Simpan tiap rasio dan periksa keterbacaan sebelum render.'],['results','Ekspor','Tinjau final revisi aktif dan layer yang dapat diedit.']];
  for(const [id,label,help] of stages){const c=e6('section');c.append(e6('strong',label));p6(c,help);const b=e6('button','Buka '+label);b.type='button';b.disabled=!project&&id!=='source';b.onclick=()=>onNavigate(id);c.append(b);row.append(c)}
 }
 
@@ -22,7 +24,7 @@ export async function mountBrand6(host,{project,clipId,variantId,api,onChange,ha
  status.textContent='Kit menyimpan font, warna, intensitas dan aturan layout. Kata, potongan, ilustrasi dan area manual tetap tersimpan.';
  const name=input6(host,'Nama brand kit','Gaya saya'),list=select6(host,'Brand kit tersimpan',data.kits.map(k=>[k.id,k.name+' · v'+k.revision]));
  const scope=select6(host,'Terapkan kit pada',[['variant','Klip dan rasio aktif'],['project','Semua klip dan kedua rasio']],'variant');
- const fields=['style_preset','caption_composition','font_main','font_accent','accent_hex','base_hex','caption_style','caption_position','caption_align','caption_scale','caption_backdrop','motion_intensity','layout','material_share','semantic_emphasis','safe_placement'];
+ const fields=['style_preset','caption_template_policy','caption_composition','font_main','font_accent','accent_hex','base_hex','caption_style','caption_position','caption_align','caption_scale','caption_backdrop','motion_intensity','layout','material_share','semantic_emphasis','safe_placement'];
  p6(host,`Gaya tersimpan: ${cfg.style_preset} · aksen ${cfg.accent_hex} · gerak ${cfg.motion_intensity}. Font ${cfg.font_main} / ${cfg.font_accent}.`);
  p6(host,'Pengaturan yang sudah Anda simpan manual dilindungi saat menerapkan kit. Simpan draf tata gaya sebelum memakai tombol ini.');
  const ready=()=>{if(hasDrafts())throw Error('Simpan atau buang draf aktif dahulu; kit memakai pengaturan yang sudah tersimpan.')};
@@ -47,7 +49,7 @@ export async function mountEvaluation6(host,{project,clipId,variantId,api,onChan
  const baseline=bind(select6(host,'Baseline tersimpan',options,options[1]?.[0]),'baseline'),candidate=bind(select6(host,'Variasi tersimpan',options,options[0]?.[0]),'candidate');
  const category=bind(select6(host,'Jenis sumber evaluasi',Object.entries(LABELS6),'talking_head'),'category');
  const compare=button6(host,'Ukur dua hasil tersimpan',async()=>{await api(`/projects/${pid}/jobs`,{kind:'evaluation',clip_id:clipId,variant_id:variantId,expected_revision:project.revision,options:{baseline_id:baseline.value,candidate_id:candidate.value,category:category.value}});if(alive())await onChange()},status,alive);compare.disabled=eligible.length<2;
- if(eligible.length<2)p6(host,'Buat dua preview atau final pada Tahap 6. Hasil Tahap 5 tetap dapat ditonton, tetapi belum mempunyai identitas pembanding yang lengkap.');
+ if(eligible.length<2)p6(host,'Buat dua preview atau final yang tersimpan. Hasil lama tanpa identitas pembanding lengkap tetap dapat ditonton.');
  const evaluations=ws.evaluations.filter(e=>e.context.variant_id===variantId),pick=bind(select6(host,'Perbandingan untuk dinilai',evaluations.map(e=>[e.id,`${LABELS6[e.category]} · SSIM ${e.ssim.toFixed(4)} · ${e.sampled_seconds}s`])),'evaluation');
  const choice=bind(select6(host,'Hasil peninjauan',[['tie','Setara / belum lebih baik'],['candidate','Variasi lebih baik'],['baseline','Baseline lebih baik']],'tie'),'choice'),note=bind(input6(host,'Alasan: keterbacaan, cerita, efek dan audio','','textarea'),'note');
  const quantities={};for(const [id,label] of [['manual_corrections','Jumlah koreksi manual'],['collisions','Benturan area penting'],['unique_stories','Cerita dengan isi berbeda']])quantities[id]=bind(input6(host,label,'','number'),id);

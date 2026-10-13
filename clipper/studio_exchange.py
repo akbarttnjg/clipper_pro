@@ -30,7 +30,9 @@ def records(plan,result,document,clip_id,variant_id,cfg,media):
         'actual_broll_events':[{**e,'asset_offset':e.get('source_asset_start',e.get('asset_start',0))} for e in plan.get('broll',[])],
         'skipped_intervals':[e for e in plan.get('broll_schedule',[]) if e['status']!='scheduled'],
         'settings_revision':document['clips'][clip_id]['variants'][variant_id]['timeline_revision'],
-        'corrections_revision':document['transcript_revision'],'duration_frames':plan['duration_frames']},key,producer='B-4')
+        'corrections_revision':document['transcript_revision'],'duration_frames':plan['duration_frames'],
+        'editor_source_mapping':plan.get('editor'),'pre_render_summary':result.get('render_summary'),
+        'draft_snapshot':{'id':result.get('draft_id'),'digest':result.get('snapshot_digest'),'is_draft':bool(result.get('is_draft'))}},key,producer='B-4')
     phrases=copy.deepcopy(plan.get('captions',{}).get('phrases',[]))
     for phrase in phrases:
         phrase.update(phrase_id='phrase-'+fingerprint([variant_id,[w['word_id'] for w in phrase['words']]])[:24],

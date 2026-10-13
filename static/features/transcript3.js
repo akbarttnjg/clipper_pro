@@ -1,3 +1,5 @@
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.12-m1';
+const localStorage=localDrafts,sessionStorage=sessionDrafts;
 /* Stage 3 review: bounded pages, original audio, explicit fact approvals. */
 const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};
 const clock=n=>`${Math.floor(n/60)}:${(n%60).toFixed(2).padStart(5,'0')}`;
@@ -5,11 +7,11 @@ const input=(parent,label,value,type='text')=>{const l=node('label',label),e=nod
 const button=(parent,text,fn)=>{const b=node('button',text);b.type='button';b.onclick=async()=>{b.disabled=true;try{await fn()}finally{b.disabled=false}};parent.append(b);return b};
 
 export async function approveFactChanges(api,request){
- if(!request.operations.some(o=>['correct_word','correct_token'].includes(o.op)))return request;
+ if(!request.operations.some(o=>['correct_word','correct_token','correct_phrase'].includes(o.op)))return request;
  const review=await api('/correction-review',request),risks=review.reviews.filter(r=>r.requires_confirmation);
  if(!risks.length)return request;
  const approved=await new Promise(resolve=>{
-  const dialog=node('dialog',undefined,'stage3-facts');dialog.append(node('h2','Periksa perubahan fakta'),node('p','Dengarkan sumber. Centang hanya bila perubahan angka, satuan, negasi atau syarat ini memang disengaja.'));
+  const dialog=node('dialog',undefined,'stage3-facts');dialog.append(node('h2','Periksa perubahan fakta dan istilah'),node('p','Dengarkan sumber. Centang hanya bila perubahan angka, satuan, negasi, syarat, atau kandidat nama ini memang disengaja.'));
   const checks=[];for(const risk of risks){const box=node('section',undefined,'card');box.append(node('p','Sebelum: '+risk.before),node('p','Sesudah: '+risk.after),node('small',risk.categories.join(' · ')));const check=input(box,'Saya menyetujui perubahan fakta ini','','checkbox');checks.push(check);dialog.append(box)}
   let done=false;const finish=value=>{if(done)return;done=true;dialog.close();dialog.remove();resolve(value)};
   const save=button(dialog,'Setujui dan simpan',()=>finish(true));save.disabled=true;checks.forEach(c=>c.onchange=()=>save.disabled=!checks.every(c=>c.checked));
@@ -28,7 +30,7 @@ export function mountTranscript3(root,{api,project,clipId=null,onChange=()=>{},o
  const message=node('p','','help'),content=node('div');root.classList.add('transcript3');root.replaceChildren(message,content);
  const notice=text=>{if(!destroyed){message.textContent=text;onMessage(text)}};
  const action=(parent,text,fn)=>button(parent,text,async()=>{try{await fn()}catch(e){notice(e.message)}});
- function remember(key,e){e.oninput=()=>{if(!drafts.has(prefix+'|base'))drafts.set(prefix+'|base',expected);drafts.set(prefix+'|'+key,e.value);persist()}}
+ function remember(key,e,original=e.value){e.oninput=()=>{if(String(e.value)===String(original)){clear(key);return;}if(!drafts.has(prefix+'|base'))drafts.set(prefix+'|base',expected);drafts.set(prefix+'|'+key,e.value);persist()}}
  function clear(key){drafts.delete(prefix+'|'+key);if(![...drafts.keys()].some(k=>k.startsWith(prefix+'|')&&k!==prefix+'|base'))drafts.delete(prefix+'|base');persist()}
  async function commit(operations,keys=[]){
   const correction=operations.every(o=>['correct_word','correct_token','align_words'].includes(o.op));
@@ -54,13 +56,13 @@ export function mountTranscript3(root,{api,project,clipId=null,onChange=()=>{},o
   let stop=null;player.ontimeupdate=()=>{if(stop!==null&&player.currentTime>=stop){player.pause();stop=null}};
   const listen=(a,b)=>{stop=b;const go=()=>{player.currentTime=a;player.play().catch(()=>{})};if(player.readyState)go();else player.addEventListener('loadedmetadata',go,{once:true})};
   const tools=node('div',undefined,'row');content.append(tools);
-  action(tools,'Muat revisi terbaru',async()=>{drafts.delete(prefix+'|base');persist();await refresh()});
+  action(tools,'Buang draf panel ini',async()=>{for(const key of [...drafts.keys()])if(key.startsWith(prefix+'|'))drafts.delete(key);persist();await refresh()});action(tools,'Muat revisi terbaru',async()=>{drafts.delete(prefix+'|base');persist();await refresh()});
   if(clipId)action(tools,whole?'Tampilkan kata dalam klip':'Buka seluruh transkrip',async()=>{whole=!whole;offset=0;await refresh()});
   const search=input(tools,'Cari dalam transkrip',query);action(tools,'Cari',async()=>{query=search.value;offset=0;await refresh()});
   const speech=node('section',undefined,'card');speech.append(node('h3','Koreksi & timing'),node('p','Uji ulang ASR memeriksa rentang terarah. Koreksi otomatis mempertahankan fakta dan edit manual. Timing manual disimpan terpisah dari teks.','help'));content.append(speech);
   const asr=node('select');asr.setAttribute('aria-label','Model ASR lokal');const defaultModel=node('option','Gunakan model ASR pengaturan proyek');defaultModel.value='';asr.append(defaultModel);for(const m of status.asr_models||[]){const option=node('option',m.model+' · '+m.component+' · lokal');option.value=m.id;asr.append(option)}speech.append(asr);
   action(speech,'Uji ulang kata berkeyakinan rendah',()=>job('asr_recheck',{limit:12,model_ref:asr.value}));action(speech,'Terapkan kamus ke transkrip tersimpan',()=>job('correction'));
-  const modelKey='model_path',model=input(speech,'Folder model alignment lokal (opsional)',drafts.get(prefix+'|'+modelKey)??project.settings.alignment_model_path??'');remember(modelKey,model);
+  const modelKey='model_path',model=input(speech,'Folder model alignment lokal (opsional)',drafts.get(prefix+'|'+modelKey)??project.settings.alignment_model_path??'');remember(modelKey,model,project.settings.alignment_model_path??'');
   speech.append(node('p',status.alignment.message,'help'));action(speech,'Simpan folder model',()=>commit([{op:'analysis_settings',values:{alignment_model_path:model.value}}],[modelKey]));
   action(speech,'Selaraskan frasa yang dikoreksi pada CPU',()=>job('alignment',{limit:12,model_path:model.value}));
   const report=status.speech_reports||{};for(const [name,result] of Object.entries(report)){const detail=node('details');detail.append(node('summary',(name==='alignment'?'Alignment':'Uji ulang ASR')+' terakhir'));if(name==='alignment'){const count=Number(result.aligned)||0,errors=result.errors||[];detail.append(node('p',errors.length?`${count} frasa berhasil; ${errors.length} ditolak. Timing yang ditolak tidak diterapkan.`:count?`${count} frasa berhasil diselaraskan pada ${result.device||'CPU'}.`:'Tidak ada frasa diselaraskan. Hasil ini belum membuktikan model berhasil mengukur timing.','help'))}detail.append(node('pre',JSON.stringify(result,null,2),'history-diff'));speech.append(detail)}
@@ -72,17 +74,17 @@ export function mountTranscript3(root,{api,project,clipId=null,onChange=()=>{},o
    const article=node('article',undefined,'stage3-word');list.append(article);const top=node('div',undefined,'row');article.append(top);
    action(top,`${clock(w.start)}–${clock(w.end)} · Dengar`,()=>listen(Math.max(0,w.start-2),Math.min(project.source.info.duration,w.end+2)));
    article.append(node('small','ASR asli: '+w.heard+' · asal: '+ids.join(', '),'help'));
-   const text=input(article,base.group_edit?'Frasa yang disetujui':'Teks tampilan',drafts.get(prefix+'|'+key)??w.word);text.maxLength=120;remember(key,text);
+   const text=input(article,base.group_edit?'Frasa yang disetujui':'Teks tampilan',drafts.get(prefix+'|'+key)??w.word);text.maxLength=120;remember(key,text,w.word);
    const scope=node('select');scope.setAttribute('aria-label','Cakupan koreksi');for(const [id,label] of (clipId&&!whole?[['clip','Hanya klip ini'],['shared_utterance','Ucapan bersama']]:[['shared_utterance','Ucapan bersama seluruh klip']])){const o=node('option',label);o.value=id;scope.append(o)}article.append(scope);
    action(article,'Simpan teks',()=>commit([{op:'correct_word',word_id:base.word_id,before:w.word,after:text.value,scope:scope.value,transcript_id:page.transcript_id,transcript_revision:page.transcript_revision}],[key]));
    article.append(node('small',w.aligned_words?'Timing kata: '+(w.alignment_method||'manual'):(w.word.split(/\s+/).length>1?'Timing frasa; kata belum diselaraskan':w.correction||w.manually_edited||ids.length>1?'Timing rentang asal; teks koreksi belum diselaraskan':'Timing ASR asli'),'help'));
    const details=node('details');details.append(node('summary','Atur timing kata'));article.append(details);
    details.append(node('p','Simpan teks dahulu. Dengarkan sumber dan isi awal/akhir setiap kata. Rentang frasa tidak dibagi rata secara otomatis.','help'));
-   const times=w.word.trim().split(/\s+/).map((word,index)=>{const r=node('div',undefined,'row');r.append(node('span',word));details.append(r);const existing=w.aligned_words?.[index],aKey=key+':'+index+':start',bKey=key+':'+index+':end';const a=input(r,'Mulai '+word,drafts.get(prefix+'|'+aKey)??existing?.start??'' ,'number'),b=input(r,'Akhir '+word,drafts.get(prefix+'|'+bKey)??existing?.end??'','number');remember(aKey,a);remember(bKey,b);return {word,a,b,aKey,bKey}});
+   const times=w.word.trim().split(/\s+/).map((word,index)=>{const r=node('div',undefined,'row');r.append(node('span',word));details.append(r);const existing=w.aligned_words?.[index],aKey=key+':'+index+':start',bKey=key+':'+index+':end';const a=input(r,'Mulai '+word,drafts.get(prefix+'|'+aKey)??existing?.start??'' ,'number'),b=input(r,'Akhir '+word,drafts.get(prefix+'|'+bKey)??existing?.end??'','number');remember(aKey,a,existing?.start??'');remember(bKey,b,existing?.end??'');return {word,a,b,aKey,bKey}});
    action(details,'Simpan timing manual',async()=>{if(text.value!==w.word)throw Error('Simpan koreksi teks dahulu, lalu beri timing pada frasa terbaru.');if(times.some(t=>!t.a.value||!t.b.value))throw Error('Isi awal dan akhir semua kata.');await commit([{op:'align_words',scope:scope.value,transcript_id:page.transcript_id,transcript_revision:page.transcript_revision,origin_word_ids:ids,text:w.word,words:times.map(t=>({word:t.word,start:Number(t.a.value),end:Number(t.b.value)}))}],times.flatMap(t=>[t.aKey,t.bKey]))});
    action(details,'Dengarkan ulang ASR bagian ini',()=>job('asr_recheck',{limit:1,origin_word_ids:ids,model_ref:asr.value}));
   }
-  const pages=node('div',undefined,'row');content.append(pages);pages.append(node('span',`${page.offset+1}–${Math.min(page.offset+page.words.length,page.total)} / ${page.total}`));
+  const pages=node('div',undefined,'row');content.append(pages);pages.append(node('span',`${page.total?page.offset+1:0}–${Math.min(page.offset+page.words.length,page.total)} / ${page.total}`));
   const previous=action(pages,'← Sebelumnya',async()=>{offset=Math.max(0,offset-60);await refresh()});previous.disabled=offset===0;
   const next=action(pages,'Berikutnya →',async()=>{offset=page.next_offset;await refresh()});next.disabled=page.next_offset===null;
   const coverage=node('section',undefined,'card');coverage.append(node('h3','Cakupan seluruh sumber'));content.append(coverage);
@@ -92,11 +94,11 @@ export function mountTranscript3(root,{api,project,clipId=null,onChange=()=>{},o
   for(const chapter of status.chapters||[]){const detail=node('details');detail.append(node('summary',`${clock(chapter.start)}–${clock(chapter.end)} · ${chapter.label}`),node('p',`${chapter.status} · ${chapter.candidate_count} kandidat · ${chapter.story_kinds.join(', ')||'belum ada jenis cerita'}`));action(detail,'Dengar bab ini',()=>listen(chapter.start,chapter.end));coverage.append(detail)}
   const boundaries=node('section',undefined,'card');boundaries.append(node('h3',clipId?'Batas klip & konteks':'Buat klip dari transkrip'));content.append(boundaries);
   const chosen=clipId?project.clips[clipId]:null,a=input(boundaries,'Mulai sumber',chosen?.start??0,'number'),b=input(boundaries,'Selesai sumber',chosen?.end??Math.min(60,project.source.info.duration),'number'),title=input(boundaries,'Judul',chosen?.title??'Klip pilihan saya');
-  action(boundaries,'Dengar rentang',()=>listen(Number(a.value),Number(b.value)));
-  action(boundaries,clipId?'Simpan batas manual':'Tambah klip manual',()=>commit([{op:clipId?'bounds':'manual_clip',start:Number(a.value),end:Number(b.value),title:title.value}]));
+  const boundaryKeys=['boundary:start','boundary:end','boundary:title'];for(const [index,field] of [a,b,title].entries()){const original=field.value;field.value=drafts.get(prefix+'|'+boundaryKeys[index])??field.value;remember(boundaryKeys[index],field,original)}action(boundaries,'Dengar rentang',()=>listen(Number(a.value),Number(b.value)));
+  action(boundaries,clipId?'Simpan batas manual':'Tambah klip manual',()=>commit([{op:clipId?'bounds':'manual_clip',start:Number(a.value),end:Number(b.value),title:title.value}],boundaryKeys));
   if(status.boundary_pin)boundaries.append(node('p','Batas manual disimpan. Pemeriksaan AI memberi usulan tanpa mengganti batas ini.','help'));
   for(const [name,context] of Object.entries(status.boundary_context||{})){if(!context||typeof context!=='object')continue;boundaries.append(node('p',context.quote));action(boundaries,name==='before'?'Dengar pembuka & konteks':'Dengar penutup & konteks',()=>listen(context.start,context.end))}
-  if(status.boundary_proposal){const p=status.boundary_proposal;boundaries.append(node('p',`Usulan AI: ${clock(p.start)}–${clock(p.end)} · ${p.evidence}`));action(boundaries,'Isi kolom dengan usulan AI',()=>{a.value=p.start;b.value=p.end})}
+  if(status.boundary_proposal){const p=status.boundary_proposal;boundaries.append(node('p',`Usulan AI: ${clock(p.start)}–${clock(p.end)} · ${p.evidence}`));action(boundaries,'Isi kolom dengan usulan AI',()=>{a.value=p.start;b.value=p.end;a.oninput();b.oninput()})}
   if(clipId)action(boundaries,'Periksa konteks dengan AI lokal',()=>job('boundary_review'));
   const rejected=node('section',undefined,'card');rejected.append(node('h3',`Kandidat dilewati (${status.rejection_total})`),node('p','Pemulihan menyimpan klip manual baru. Alasan penolakan tetap tersedia; penilaian otomatis tidak dianggap sudah lolos.','help'));content.append(rejected);
   for(const r of status.rejections){const detail=node('details');detail.append(node('summary',(r.title||r.code)+' · '+r.code),node('p',r.detail||''));rejected.append(detail);
@@ -104,5 +106,5 @@ export function mountTranscript3(root,{api,project,clipId=null,onChange=()=>{},o
   }
   const rejects=node('div',undefined,'row');rejected.append(rejects);const rp=action(rejects,'← Penolakan sebelumnya',async()=>{rejectOffset=Math.max(0,rejectOffset-30);await refresh()});rp.disabled=rejectOffset===0;const rn=action(rejects,'Penolakan berikutnya →',async()=>{rejectOffset=status.next_offset;await refresh()});rn.disabled=status.next_offset===null;
  }
- refresh();return {destroy(){destroyed=true;generation++;root.replaceChildren()},refresh};
+ refresh();return {getDrafts(){return Object.fromEntries([...drafts].filter(([key])=>key.startsWith(prefix+'|')&&!key.endsWith('|base')))},destroy(){destroyed=true;generation++;root.replaceChildren()},refresh};
 }

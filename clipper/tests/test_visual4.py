@@ -16,6 +16,8 @@ from clipper.studio_service import StudioService,identifier
 from clipper.project_store import Conflict
 from clipper.api_studio import create_router
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
+
 
 def samples(two=False, count=12):
     rows=[{'t':i*.5,'faces':[[50+i,40,55,70]]+([[240-i,42,60,75]] if two else []),
@@ -112,6 +114,7 @@ def test_pins_split_layout_at_exact_source_times():
     assert boundaries==[0,1.25,4.5,6]
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_analysis_cache_is_shared_by_output_ratios_and_checks_source_content(tmp_path):
     path=tmp_path/'source';path.write_bytes(b'source1')
     cfg=Config(work_dir=str(tmp_path),ocr_enabled=False);plan={'spans':[{'source_start':0,'source_end':2}]};info={'duration':2,'width':360,'height':240}
@@ -204,6 +207,7 @@ def test_optional_runtime_corrupt_metadata_never_stops_core_layout(tmp_path,monk
         assert visual4.runtime_signature()[0][1]=='invalid_metadata'
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_ocr_corrections_follow_same_source_region_after_pin_splits(tmp_path,monkeypatch):
     source=tmp_path/'source.mp4';source.write_bytes(b'OCR fixture')
     monkeypatch.setattr(visual4,'backend',lambda *args:{'status':'unavailable'})
@@ -240,6 +244,7 @@ def test_sam_prompts_and_budget_are_validated(controls):
     with pytest.raises(ValueError):visual4.validate_controls(controls,20)
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_sam_uses_selected_source_shot_not_always_the_first(tmp_path,monkeypatch):
     calls=[]
     monkeypatch.setattr(visual4,'backend',lambda key,r,*args:calls.append(r) or {'status':'ready'})
@@ -266,6 +271,7 @@ def test_visual_api_checks_revision_and_separates_variants(project):
     assert queued.status_code==200 and service.queue.list(doc['project_id'])[0]['kind']=='visual_review'
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_sam_sequence_maps_source_times_and_saves_masks_without_neural_claim(tmp_path,monkeypatch):
     from clipper.visual_worker import sam_sequence
     from contextlib import nullcontext

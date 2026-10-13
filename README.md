@@ -1,12 +1,10 @@
-# Clipper Studio 4.0.9
+# Clipper Pro 4.0.12 M1
 
-Mesin pemotongan video lokal: transkripsi, pemilihan cerita, koreksi ucapan, framing, subtitle, audio, serta hasil 9:16 dan 16:9. Model ASR dan Ollama memakai instalasi lokal. Jumlah klip mengikuti pembahasan unik yang lolos tinjauan.
+Mesin video clipping lokal dengan editor enam bagian, draft per tab, snapshot preview, diff gaya, timeline bersama dua rasio, pencarian efektif/asli dan undo/redo. Upgrade ini melanjutkan M0 4.0.11 serta M1 awal.
 
-Gunakan paket Upgrade 4.0.9 dan [panduan pemasangan](docs/UPGRADE_4_0_9.md). Paket mencakup pembenahan lengkap sebelumnya dan memeriksa hash dasar 4.0.7/4.0.8 yang telah diaudit. Pemasang mencadangkan kode dan database serta menyediakan rollback.
+Gunakan [panduan M1](docs/UPGRADE_4_0_12_M1.md) dan [register persyaratan](docs/M1_REQUIREMENTS.json). Installer memeriksa dasar, mencadangkan kode/SQLite, dan menyediakan pemulihan. Jalankan JALANKAN_PRO.cmd lalu Ctrl+F5.
 
-Caption director menyediakan editorial bersih, frasa fokus besar dan kutipan tenang. Frasa, ukuran glyph pada layar ponsel, penempatan stabil serta efek diperiksa dengan metrik yang sama pada preview dan final. MediaPipe Selfie Multiclass opsional membantu melindungi wajah/rambut tanpa melarang overlay pada pakaian polos; pemakaian dibatasi delapan frame per klip di CPU.
-
-Jalankan `JALANKAN_PRO.cmd`, lalu buka `http://127.0.0.1:8765` dan tekan Ctrl+F5 setelah pembaruan. Pada **Periksa / ekspor**, pilih klip, terapkan preset Adaptif atau Rapi bila diinginkan, lalu tekan **Render seluruh pilihan · 9:16 + 16:9**. Setelah seluruh final tersedia, satu paket dapat mencakup semua klip terpilih dalam kedua rasio.
+Bukti kode/API/SQLite/FFmpeg dan batas lingkungan disertakan dalam paket. Gate Windows/GPU/video asli/native editor serta usability tetap memerlukan penerimaan target. Resolve teks/font ditunda; efek waktu/keyframe sumber M1 berstatus baked pada ekspor.
 
 ## Perilaku utama
 

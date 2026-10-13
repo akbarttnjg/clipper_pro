@@ -8,7 +8,10 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2=None  # Pure timing/geometry helpers do not require a decoder.
 import numpy as np
 
 from .config import Config
@@ -102,6 +105,7 @@ def _facecam_rect(boxes: list, w: int, h: int, pad: float = 0.5):
 def detect_facecam(clip_path: str, cfg: Config):
     """Sample frames and locate a stationary webcam box (x,y,w,h), or None. Used by the
     'stream' layout to separate facecam from gameplay in a single source."""
+    if cv2 is None:raise RuntimeError('Tahap decoder/reframe memerlukan OpenCV. Periksa komponen inti sebelum render; sumber dan final sebelumnya tetap tersedia.')
     cap = cv2.VideoCapture(clip_path)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -224,6 +228,7 @@ def reframe(clip_path: str, dst: str, cfg: Config, ass_path: str | None = None,
     """
     ow = out_w or cfg.target_w
     oh = out_h or cfg.target_h
+    if cv2 is None:raise RuntimeError('Tahap decoder/reframe memerlukan OpenCV. Periksa komponen inti sebelum render; sumber dan final sebelumnya tetap tersedia.')
     cap = cv2.VideoCapture(clip_path)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -291,6 +296,7 @@ def caption_anchors(path, cfg):
     """Choose empty left/right space on landscape shots; fall back to subtitles below."""
     if cfg.target_w <= cfg.target_h or cfg.caption_position != "auto":
         return []
+    if cv2 is None:raise RuntimeError('Tahap decoder/reframe memerlukan OpenCV. Periksa komponen inti sebelum render; sumber dan final sebelumnya tetap tersedia.')
     cap = cv2.VideoCapture(path)
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps, n = cap.get(cv2.CAP_PROP_FPS) or 30, int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

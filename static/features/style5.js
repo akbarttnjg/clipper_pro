@@ -1,3 +1,5 @@
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.12-m1';
+const localStorage=localDrafts,sessionStorage=sessionDrafts;
 // Variant-scoped typography controls with revision-aware persistent drafts.
 export function mountStyle5(host,{project,clipId,variantId,api,onChange=()=>{},onListen=()=>{}}){
  const variant=project.clips[clipId].variants[variantId],cfg=variant.effective_settings||{};
@@ -7,21 +9,22 @@ export function mountStyle5(host,{project,clipId,variantId,api,onChange=()=>{},o
  const note=e('p');note.className='help';note.setAttribute('role','status');host.append(note);
  const btn=(label,fn)=>{const b=e('button',label);b.type='button';b.onclick=async()=>{b.disabled=true;try{await fn()}catch(err){note.textContent=err.message}finally{b.disabled=false}};host.append(b);return b};
  const fields={};
- const storeDraft=()=>{draft={revision:draft?.revision??project.revision,values:values()};localStorage.setItem(key,JSON.stringify(draft));note.textContent='Draf gaya belum disimpan.'};
- const select=(label,key,options,fallback)=>{const l=e('label',label),s=e('select');s.setAttribute('aria-label',label);for(const [id,name] of options){const o=e('option',name);o.value=id;s.append(o)}s.value=draft?.values?.[key]??cfg[key]??fallback;s.onchange=storeDraft;fields[key]=s;l.append(s);host.append(l);return s};
+ const storeDraft=()=>{const changed=Object.fromEntries(Object.entries(values()).filter(([k,v])=>JSON.stringify(v)!==JSON.stringify(baseline[k])));if(!Object.keys(changed).length){draft=null;localStorage.removeItem(key);note.textContent='Semua pilihan kembali ke nilai tersimpan.';return;}draft={revision:draft?.revision??project.revision,values:changed};localStorage.setItem(key,JSON.stringify(draft));note.textContent='Draf gaya belum disimpan.'};
+ const select=(label,key,options,fallback)=>{const l=e('label',label),s=e('select');s.setAttribute('aria-label',label);s.dataset.settingKey=key;for(const [id,name] of options){const o=e('option',name);o.value=id;s.append(o)}s.value=String(draft?.values?.[key]??cfg[key]??fallback);s.onchange=storeDraft;fields[key]=s;l.append(s);host.append(l);return s};
  select('Preset tipografi','style_preset',[['legacy','Gaya manual sebelumnya'],['rapi','Rapi · tenang dan terukur'],['ekspresif','Ekspresif · hierarki dan variasi'],['adaptif','Adaptif · mengikuti materi']],'legacy');
- select('Pilihan template','caption_template_policy',[['auto','Variasi mengikuti preset'],['manual','Kunci gaya teks yang dipilih']],'auto');
  select('Komposisi frasa','caption_composition',[['auto','Otomatis · editorial, fokus, kutipan'],['editorial','Editorial bersih'],['focus','Frasa fokus besar'],['quote','Kutipan tenang']],'auto');
  select('Pendukung area teks','segmentation_enabled',[['true','MediaPipe bila sudah siap'],['false','Tanpa segmentasi tambahan']],'true');
  select('Selaraskan frasa klip','align_selected_clips',[['true','Otomatis bila model lokal siap'],['false','Gunakan timing tersimpan']],'true');
- const label=e('label','Seed desain'),seed=e('input');seed.type='number';seed.min='0';seed.max='2147483647';seed.value=draft?.values?.caption_seed??cfg.caption_seed??2026;seed.setAttribute('aria-label','Seed desain');fields.caption_seed=seed;seed.oninput=storeDraft;label.append(seed);host.append(label);
+ const label=e('label','Seed desain'),seed=e('input');seed.type='number';seed.min='0';seed.max='2147483647';seed.value=draft?.values?.caption_seed??cfg.caption_seed??2026;seed.setAttribute('aria-label','Seed desain');seed.dataset.settingKey='caption_seed';fields.caption_seed=seed;seed.oninput=storeDraft;label.append(seed);host.append(label);
  select('Renderer subtitle','caption_renderer',[['ass','Subtitle lokal'],['auto','Remotion bila siap'],['remotion','Wajib Remotion lokal']],'ass');
  select('Ilustrasi penjelas','illustration_mode',[['off','Nonaktif'],['labels','Diagram perbandingan atau daftar dari ucapan']],'off');
  select('Peringkat aset visual','broll_ranker',[['off','Metadata dan pemeriksaan visual'],['auto','SigLIP2 bila siap'],['siglip2','Wajib SigLIP2 lokal']],'auto');
  select('Penekanan makna','semantic_emphasis',[['true','Makna, angka utuh, dan negasi'],['false','Tanpa warna penekanan']],'true');
  const values=()=>Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,k==='caption_seed'?Number(v.value):['semantic_emphasis','segmentation_enabled','align_selected_clips'].includes(k)?v.value==='true':v.value]));
- btn('Simpan gaya Tahap 5',async()=>{const selected=values();
-    if(selected.style_preset!=='legacy'&&selected.style_preset!==cfg.style_preset)Object.assign(selected,{font_main:'dm_sans',font_accent:'dm_serif_italic',caption_backdrop:true,motion_intensity:selected.style_preset==='rapi'?'calm':'balanced'});
+ const baseline={...values(),...cfg};for(const [k,field] of Object.entries(fields)){if(draft?.values&&k in draft.values&&cfg[k]===undefined)delete baseline[k]}
+ btn('Simpan template dan animasi',async()=>{const selected=Object.fromEntries(Object.entries(values()).filter(([k,v])=>JSON.stringify(v)!==JSON.stringify(baseline[k])));
+    if(!Object.keys(selected).length){localStorage.removeItem(key);draft=null;note.textContent='Tidak ada pengaturan yang berubah.';return;}
+    if(selected.style_preset&&selected.style_preset!=='legacy'&&selected.style_preset!==cfg.style_preset)Object.assign(selected,{font_main:'dm_sans',font_accent:'dm_serif_italic',caption_backdrop:true,motion_intensity:selected.style_preset==='rapi'?'calm':'balanced'});
     await api('/changes',{project_id:project.project_id,clip_id:clipId,variant_id:variantId,
     expected_revision:draft?.revision??project.revision,operation_id:crypto.randomUUID(),operations:[{op:'settings',values:selected}]});
     localStorage.removeItem(key);draft=null;if(!destroyed)await onChange()});
@@ -30,7 +33,7 @@ export function mountStyle5(host,{project,clipId,variantId,api,onChange=()=>{},o
    draft.revision=latest.revision;localStorage.setItem(key,JSON.stringify(draft));note.textContent='Draf tetap tersedia. Periksa pilihan Anda, lalu Simpan gaya untuk menerapkannya ke revisi terbaru.'});
  btn('Periksa keterbacaan klip',async()=>{if(draft)throw Error('Simpan draf gaya sebelum memeriksa keterbacaan.');await api(`/projects/${project.project_id}/jobs`,
    {kind:'style_review',clip_id:clipId,variant_id:variantId,expected_revision:project.revision});if(!destroyed)await onChange()});
- host.append(e('p','Seed yang sama mempertahankan pilihan susunan saat preview diulang. Tiap rasio mengukur tata letaknya sendiri. Remotion dan SigLIP2 memerlukan komponen lokal yang telah diuji.'));
+ host.append(e('p','Pergantian preset dari gaya sebelumnya juga menerapkan pasangan DM Sans / DM Serif, backdrop dan intensitas gerak bawaan. Perubahan lain hanya menyimpan kolom yang berbeda. Seed yang sama mempertahankan susunan; tiap rasio mengukur layout sendiri.'));
  const report=variant.style_report;
  if(report?.selected_alignment){const a=report.selected_alignment;host.append(e('p','Alignment klip: '+({aligned:'timing terukur diterapkan',unavailable:'model lokal belum siap',no_candidates:'tidak ada frasa yang memerlukan pengukuran',disabled:'nonaktif',failed:'gagal; timing tersimpan digunakan',not_applied:'hasil belum memenuhi pemeriksaan'}[a.status]||a.status)+'. '+(a.reason||'')))}
  if(report?.renderer){const engine=report.renderer.engine==='remotion'?'Remotion':'Subtitle lokal';host.append(e('p','Render terakhir: '+engine+'. '+(report.renderer.reason||'')))}

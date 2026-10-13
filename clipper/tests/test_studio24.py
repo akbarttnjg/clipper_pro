@@ -7,6 +7,8 @@ import pytest
 from clipper import stock, illustrations, editplan, typography, subtitle_edit, boundaries, story
 from clipper.config import Config, validate_overrides
 
+from clipper.tests._media_requirements import OPENCV_AVAILABLE, OPENCV_REASON
+
 
 def words(text):
     return [{'word_id':i,'word':w,'start':i*.5,'end':i*.5+.45,'part':'body'} for i,w in enumerate(text.split())]
@@ -149,6 +151,7 @@ def test_unavailable_illustration_reason_survives_poll_without_poisoning_cache(s
     assert 'Siapkan ilustrasi' in ' '.join(TestClient(app.app).get('/api/illustrations/s/0').json()['notes'])
 
 
+@pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)
 def test_corrupt_stock_does_not_abort_source_render(stock_home,monkeypatch):
     import subprocess
     from clipper import ffmpeg_util

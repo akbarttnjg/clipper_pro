@@ -289,6 +289,7 @@ def test_failed_install_probe_preserves_previous_environment(manager,monkeypatch
 @pytest.mark.skipif(not shutil.which('ffmpeg'),reason='FFmpeg absent')
 @pytest.mark.parametrize('key',['ffmpeg','libass','fonttools','pycapcut'])
 def test_real_available_component_samples(tmp_path,key):
+    if key=='pycapcut':pytest.importorskip('pycapcut',reason='Actual optional pyCapCut package unavailable on this QA host')
     result=probe.infer(dict(component=key,directory=str(tmp_path/key),repo=str(REPO),sample=True,device='cpu'))
     assert result['passed'] and result['level']=='sample'
     for name in result['artifacts']:assert (tmp_path/key/name).is_file()

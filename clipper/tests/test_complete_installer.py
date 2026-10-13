@@ -64,8 +64,12 @@ class CompleteInstaller(unittest.TestCase):
         installer.install(self.target,self.package);self.assertEqual(marker.read_bytes(),b'local model')
     def test_real_release_includes_every_changed_file_and_passes_self_check(self):
         with tempfile.TemporaryDirectory() as tmp:
-            report=builder.build(Path(tmp)/'complete','0'*40)
-            manifest,changes,_=installer.preflight(ROOT,Path(tmp)/'complete',runtime=False,stopped=False)
+            # Historical M0 builder checks must not package future M1 API imports.
+            from .frozen_release import restore
+            producer=restore(Path(tmp)/'m0-producer',producer=True)
+            with patch.dict(builder.complete_build.__globals__,{'ROOT':producer}):
+                report=builder.build(Path(tmp)/'complete','0'*40)
+            manifest,changes,_=installer.preflight(producer,Path(tmp)/'complete',runtime=False,stopped=False)
             self.assertEqual(manifest['version'],'4.0.11');self.assertEqual(changes,[])
             self.assertEqual(report['zip_crc'],'passed')
             names={r['path'] for r in manifest['files']};self.assertIn('clipper/artifact_store.py',names)

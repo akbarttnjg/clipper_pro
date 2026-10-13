@@ -20,7 +20,7 @@ async function main(){
  const box=new Element('section');
  const jobs=[...Array.from({length:8},(_,i)=>({id:'active-'+i,kind:'preview',status:'queued',progress:0})),
   ...Array.from({length:110},(_,i)=>({id:'old-'+i,kind:'alignment',status:'completed',result:{aligned:0,attempted:1,errors:[{}]}}))];
- const context={S:{doc:{jobs}},$:()=>box,el:(tag,text)=>new Element(tag,text),
+ const context={S:{doc:{jobs}},renderJobDock:()=>{},$:()=>box,el:(tag,text)=>new Element(tag,text),
   row:parent=>{const row=new Element('div');parent.append(row);return row},btn:()=>{}};
  vm.runInNewContext(helper+renderer,context);
  const state=result=>context.jobState({kind:'alignment',status:'completed',result});

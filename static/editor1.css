@@ -1,0 +1,24 @@
+:root{--editor-space:1rem;--editor-border:#bdc8bf;--editor-focus:#12492e;--editor-muted:#43524a;--editor-surface:#f7faf7;--editor-warn:#794500}
+.editor-section{border:1px solid var(--editor-border);border-radius:12px;margin:var(--editor-space) 0;padding:0.8rem;background:var(--editor-surface);min-width:0}
+.editor-section>summary{font-size:1.18rem;font-weight:700;cursor:pointer;padding:.3rem;list-style-position:inside}
+.editor-subsection{margin:.8rem 0;padding:.7rem;border-top:1px solid var(--editor-border);min-width:0}
+.editor-subsection>summary{font-weight:600;cursor:pointer;padding:.2rem}
+.editor-toolbar{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;position:sticky;top:0;z-index:3;background:var(--editor-surface);padding:.5rem}
+.editor-panel-navigation{flex-wrap:wrap;display:flex;gap:.35rem}
+[data-mode="simple"] [data-studio-only="true"]{display:none}
+.control-help{display:block;font-size:.82rem;font-weight:400;color:var(--editor-muted);line-height:1.45;padding-top:.3rem}
+.editor-section input,.editor-section textarea,.editor-section select{max-width:100%;box-sizing:border-box}
+.editor-section textarea{font-family:ui-monospace,monospace;min-height:6rem;resize:vertical;width:100%}
+.editor-section .table-wrap,.editor-diff .table-wrap{overflow:auto;max-width:100%}
+.editor-diff td{white-space:pre-wrap;overflow-wrap:anywhere;min-width:8rem;max-width:28rem;vertical-align:top}
+.editor-section td{overflow-wrap:anywhere;vertical-align:top;padding:.5rem}
+.editor-diff,.editor-comparison,.feature-gallery{width:min(90vw,1100px);max-height:85vh;overflow:auto}
+.filmstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem}
+.filmstrip figure{margin:0;min-width:0}.filmstrip img{width:100%;height:auto}.filmstrip figcaption{font-size:.8rem}
+.storyboard{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.6rem}
+.comparison-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.comparison-grid video{max-width:100%;max-height:65vh;background:#000}
+:is(button,input,select,textarea,summary,a):focus-visible{outline:3px solid var(--editor-focus);outline-offset:3px}
+summary{min-height:30px}button{min-height:38px}
+.editor-section .help,.editor-diff p{color:var(--editor-muted)}
+@media(max-width:1100px){.editor-grid{grid-template-columns:1fr}.canvas-card{position:static!important}.editor-toolbar{position:static}.comparison-grid{grid-template-columns:1fr}.storyboard{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}

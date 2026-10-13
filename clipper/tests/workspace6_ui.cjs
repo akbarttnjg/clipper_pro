@@ -1,11 +1,14 @@
 // Real UI handlers under a DOM adapter. This is not a native browser test.
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict');
-class Element{constructor(tag){this.tagName=tag;this.children=[];this.attributes={};this.value='';this.text='';this.checked=false}
+class Element{constructor(tag){this.dataset={};this.tagName=tag;this.children=[];this.attributes={};this.value='';this.text='';this.checked=false}
  set textContent(v){this.text=String(v);this.children=[]}get textContent(){return this.text+this.children.map(c=>c.textContent).join('')}
  append(...items){this.children.push(...items)}replaceChildren(...items){this.children=[];this.append(...items)}setAttribute(k,v){this.attributes[k]=v}}
 const storage=new Map(),context=vm.createContext({document:{createElement:t=>new Element(t)},crypto:require('node:crypto'),
  URLSearchParams,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});
-vm.runInContext(fs.readFileSync(path.join(__dirname,'../../static/features/workspace6.js'),'utf8').replace(/export /g,''),context);
+const {loadModule,storageAdapter}=require('./ui_loader.cjs');
+context.localStorage=storageAdapter(context.localStorage||{getItem:()=>null,setItem(){}});context.sessionStorage=storageAdapter(context.sessionStorage||{getItem:()=>null,setItem(){}});
+Object.assign(context,loadModule(path.join(__dirname,'../../static/features/workspace6.js'),context));
+const draftStorage=loadModule(path.join(__dirname,'../../static/features/draft_storage.js'),context).localDrafts;const hasDraft=k=>draftStorage.getItem(k)!==null;
 const walk=e=>[e,...e.children.flatMap(walk)],field=(h,t)=>walk(h).find(n=>n.attributes['aria-label']===t),button=(h,t)=>walk(h).find(n=>n.tagName==='button'&&n.textContent===t);
 const project={project_id:'p1',revision:4,exports:[],clips:{c1:{variants:{portrait:{effective_settings:{style_preset:'ekspresif',caption_seed:2026,accent_hex:'#FFFFFF',font_main:'dm_sans',font_accent:'dm_serif_italic',motion_intensity:'calm'}}}}}};
 let calls=[],dirty=false,refresh=0,conflict=false;
@@ -24,9 +27,9 @@ const api=async(url,data)=>{calls.push({url,data});if(data){if(conflict)throw Er
  await button(h,'Simpan alternatif seed').onclick();assert.equal(calls.at(-1).data.operations[0].op,'design_alternative');assert.equal(calls.at(-1).data.operations.length,1);panel.destroy();
  calls=[];h=new Element('div');panel=await context.mountEvaluation6(h,{project,clipId:'c1',variantId:'portrait',api,onChange:()=>refresh++});
  assert(calls.every(c=>!c.data),'opening evaluations is read-only');assert(button(h,'Ukur dua hasil tersimpan').disabled);assert(button(h,'Gunakan variasi terpilih untuk proyek baru').disabled);assert(button(h,'Simpan bukti impor').disabled);
- field(h,'Alasan: keterbacaan, cerita, efek dan audio').value='Review draft';field(h,'Alasan: keterbacaan, cerita, efek dan audio').oninput();assert(storage.has('clipper6-evaluation|p1|c1|portrait'));
+ field(h,'Alasan: keterbacaan, cerita, efek dan audio').value='Review draft';field(h,'Alasan: keterbacaan, cerita, efek dan audio').oninput();assert(hasDraft('clipper6-evaluation|p1|c1|portrait'));
  panel.destroy();h=new Element('div');panel=await context.mountEvaluation6(h,{project,clipId:'c1',variantId:'portrait',api,onChange:()=>{}});assert.equal(field(h,'Alasan: keterbacaan, cerita, efek dan audio').value,'Review draft');
- await button(h,'Buang draf evaluasi').onclick();assert.equal(Object.keys(panel.getDrafts()).length,0);assert(!storage.has('clipper6-evaluation|p1|c1|portrait'));panel.destroy();
+ await button(h,'Buang draf evaluasi').onclick();assert.equal(Object.keys(panel.getDrafts()).length,0);assert(!hasDraft('clipper6-evaluation|p1|c1|portrait'));panel.destroy();
  project.exports=[{package_content_id:'pkg-both',variant_id:'both',export_mode:'hybrid',input_revision:4}];
  ws.native_matrix=['c1','c2'].flatMap(clip_id=>['portrait','landscape'].flatMap(variant_id=>['capcut','resolve'].map(editor=>({clip_id,variant_id,editor,title:clip_id,package_content_id:'pkg-both',target_version:editor==='capcut'?'9.5.0':'21',status:'not_tested'}))));
  h=new Element('div');panel=await context.mountEvaluation6(h,{project,clipId:'c1',variantId:'portrait',api,onChange:()=>{}});

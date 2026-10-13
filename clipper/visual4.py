@@ -224,7 +224,6 @@ def analysis_folder(cfg):
 
 
 def collect(media,plan,cfg,info,sampler):
-    import cv2
     folder=analysis_folder(cfg);folder.mkdir(parents=True,exist_ok=True)
     intervals=[[s['source_start'],min(s['source_end'],info['duration'])] for s in plan['spans']]
     source_id=content_id(media)
@@ -257,6 +256,8 @@ def collect(media,plan,cfg,info,sampler):
             if match:item['region_id']=match['id']
     previous=None
     for r in rows:
+        if previous and r['hist'] is not None and previous['hist'] is not None:
+            import cv2
         r['cut']=bool(previous and r['hist'] is not None and previous['hist'] is not None and cv2.compareHist(previous['hist'],r['hist'],cv2.HISTCMP_BHATTACHARYYA)>.53)
         previous=r
     track_faces(rows,gap=step*2.2)
@@ -368,7 +369,6 @@ def describe(media,group,cfg,info,active,allow_vlm=True,source_bounds=None,obser
 
 
 def report(plan,media,cfg):
-    import cv2
     folder=analysis_folder(cfg);folder.mkdir(parents=True,exist_ok=True);shots=[]
     controls=cfg.visual_overrides or {};prompt_time=controls.get('sam_time')
     mask_index=next((i for i,s in enumerate(plan.get('shots',[])) if prompt_time is not None and s['source_start']<=prompt_time<s['source_end']),0 if prompt_time is None else None)
@@ -376,6 +376,7 @@ def report(plan,media,cfg):
         visual=shot.get('visual',{});times=visual.get('frame_times',[]);t=times[len(times)//2] if times else (shot['source_start']+shot['source_end'])/2
         poster=folder/('frame-'+fingerprint([plan.get('visual_summary',{}).get('source_content_id'),t])[:24]+'.jpg')
         if not poster.is_file():
+            import cv2
             cap=cv2.VideoCapture(str(media))
             try:
                 cap.set(cv2.CAP_PROP_POS_MSEC,t*1000);ok,frame=cap.read()

@@ -14,7 +14,7 @@ def guarded(fn):
         try:return fn(*args,**kwargs)
         except Conflict as exc:return JSONResponse({'status':'conflict','revision':exc.revision,'message':str(exc),'paths':exc.paths},status_code=409)
         except KeyError as exc:raise HTTPException(404,str(exc)) from exc
-        except (ValueError,OSError) as exc:raise HTTPException(400,str(exc)) from exc
+        except (ValueError,OSError,TypeError) as exc:raise HTTPException(400,str(exc)) from exc
     return call
 
 
@@ -22,6 +22,8 @@ def create_router(service):
     router=APIRouter(prefix='/api/studio',tags=['studio4'])
     from .api_runtime import router as runtime_router
     router.include_router(runtime_router(service))
+    from .api_editor import router as editor_router
+    router.include_router(editor_router(service,guarded))
     @router.get('/style-presets')
     def style_presets():
         from .style5 import PRESETS,VERSION
@@ -51,7 +53,7 @@ def create_router(service):
 
     @router.get('/projects/{pid}/words')
     @guarded
-    def words(pid:str,clip_id:str|None=None,offset:int=0,limit:int=150,q:str='',whole:bool=False):return service.page(pid,clip_id,offset=offset,limit=limit,q=q,whole=whole)
+    def words(pid:str,clip_id:str|None=None,offset:int=0,limit:int=150,q:str='',whole:bool=False,search_mode:str='display'):return service.page(pid,clip_id,offset=offset,limit=limit,q=q,whole=whole,search_mode=search_mode)
 
     @router.post('/changes')
     @guarded
@@ -72,6 +74,10 @@ def create_router(service):
     @router.post('/projects/{pid}/undo')
     @guarded
     def undo(pid:str,data:dict=Body(...)):return service.store.undo(pid,data['expected_revision'],data['operation_id'],data['revision'])
+
+    @router.post('/projects/{pid}/redo')
+    @guarded
+    def redo(pid:str,data:dict=Body(...)):return service.store.redo(pid,data['expected_revision'],data['operation_id'],data['revision'])
 
     @router.post('/projects/{pid}/jobs')
     @guarded
