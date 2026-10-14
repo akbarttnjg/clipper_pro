@@ -79,3 +79,9 @@ def restore_m1(root):
     fixture=RELEASES/'m2_m1_fixture.zip'
     expected=json.loads(fixture.with_name('m2_fixture_provenance.json').read_text())
     return _restore(root,fixture,expected)
+
+
+def restore_m2(root):
+    fixture=RELEASES/'m3_m2_fixture.zip'
+    expected=json.loads(fixture.with_name('m3_m2_fixture_provenance.json').read_text(encoding='utf-8'))
+    return _restore(root,fixture,expected)

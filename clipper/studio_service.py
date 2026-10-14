@@ -263,6 +263,13 @@ class StudioService:
         return {**page,'revision':doc['revision'],'transcript_id':doc['transcript_id'],'transcript_revision':doc['transcript_revision']}
 
     def dependency(self,doc,clip_id=None,variant_id=None,*,fresh=False,kind='render'):
+        if kind=='selection_m3':
+            from .selection_service import signature
+            cfg=self.config(doc)
+            return fingerprint(['M3-source-selection',asset_id(doc['source']['path'],fresh=fresh),doc['source']['source_id'],
+                signature(self,doc,'display'),signature(self,doc,'raw'),doc.get('m3_markers',[]),
+                cfg.audio_stream_index,cfg.model,cfg.ollama_url,cfg.ollama_num_ctx,cfg.ollama_num_gpu,cfg.ollama_timeout,
+                cfg.visual_runtime_signature])
         if clip_id and kind in ('render','preview','export','evaluation','style_review','visual_review'):
             from .dependency_cache import render_key,fresh_scope
             from .studio_exchange import render_words
@@ -416,6 +423,10 @@ class StudioService:
             from .editor_service import apply_editor_command, check_lock
             check_lock(self,doc,cid,vid,op)
             kind=op.get('op')
+            from .selection_service import apply_command as apply_selection_command
+            selected=apply_selection_command(self,doc,cid,vid,op,request['expected_revision'])
+            if selected is not None:
+                touched.update(selected.get('touched',[]));continue
             from .transcript_service import apply_command
             handled=apply_command(self,doc,cid,vid,op,request['expected_revision'])
             if handled is None:handled=apply_editor_command(self,doc,cid,vid,op,revision=request["expected_revision"])
@@ -425,6 +436,9 @@ class StudioService:
             if kind=='include_clip':
                 selected=op.get('clip_id',cid)
                 if selected not in doc['clips'] or type(op.get('included')) is not bool:raise ValueError('Pilihan klip tidak valid.')
+                if op['included'] and doc['clips'][selected].get('created_from')=='M3':
+                    from .selection_service import renderable
+                    renderable(self,doc,doc['clips'][selected])
                 doc['clips'][selected]['included']=op['included']
             elif kind in ('correct_word','correct_token','correct_phrase'):
                 self._correct(doc,cid,{**op,'variant_id':vid});transcript_changed=True
@@ -599,7 +613,10 @@ class StudioService:
                     _set_segments(self,doc,c,v,rows);touched.add((c,v))
             elif kind=='rename':doc['name']=str(op['name']).strip()[:160] or doc['name']
             else:raise ValueError('Operasi tidak dikenal: '+str(kind))
-        if transcript_changed:doc['transcript_revision']+=1
+        if transcript_changed:
+            doc['transcript_revision']+=1
+            from .selection_service import invalidate
+            invalidate(self,doc)
         if any(op.get('op') in ('alias_upsert','alias_remove') or 'glossary' in op.get('values',{}) for op in operations):
             from .transcript_correction import glossary_entries
             glossary_entries(self.config(doc))
@@ -615,11 +632,17 @@ class StudioService:
             state=snapshot(self,doc,fresh=True,mode=mode,require_ready=True)
             return self.queue.enqueue_many(project_id,[(kind,{'clip_id':None,'variant_id':'both'},
                 {'dependency':state['dependency'],'options':{'mode':mode}})],doc['revision'])[0]
-        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation'):raise ValueError('Tahap tidak dikenal')
-        if kind in ('analyze','source_evidence','correction','discovery','waveform','proxy','diarization','translation'):clip_id=None
+        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation','selection_m3'):raise ValueError('Tahap tidak dikenal')
+        if kind in ('analyze','source_evidence','correction','discovery','waveform','proxy','diarization','translation','selection_m3'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
         if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation') and not clip_id:raise ValueError('Pilih klip dahulu')
-        if kind not in ('analyze','source_evidence','waveform','proxy') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
+        if kind not in ('analyze','source_evidence','waveform','proxy','selection_m3') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
+        if kind=='selection_m3':
+            from .selection_contract import constraints
+            options=constraints(options or {},doc['source']['info']['duration'],self.config(doc));options.pop('duration')
+        if kind in ('render','export') and clip_id:
+            from .selection_service import renderable
+            renderable(self,doc,doc['clips'][clip_id])
         if kind=='translation':
             from .transcript_tracks import language
             options={'provider':'ollama','target_language':language((options or {}).get('target_language','en'))}
@@ -640,6 +663,7 @@ class StudioService:
         target={'clip_id':clip_id,'variant_id':variant_id}
         request={'dependency':self.dependency(doc,clip_id,variant_id,fresh=True,kind=kind),'options':options or {},
                  'snapshot':copy.deepcopy(doc),'input_revision':doc['revision']}
+        if kind=='selection_m3':request['dependency']=fingerprint([request['dependency'],request['options']])
         if kind in ('preview','render'):
             from .editor_service import render_summary
             request['render_summary']=render_summary(self,doc,[target])

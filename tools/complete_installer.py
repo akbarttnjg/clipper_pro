@@ -108,6 +108,8 @@ def probe_runtime(target, after=False):
         code += 'import clipper.transcript_tracks,clipper.transcript_service,clipper.source_imports,clipper.source_assembly,clipper.speech_m2,clipper.translation_m2,clipper.bilingual_m2,clipper.audio_project,clipper.api_ingest; '
     if after and (target/'clipper/artifact_store.py').is_file():
         code += 'import clipper.artifact_store,clipper.caption_readability,clipper.studio_worker; '
+    if after and (target/'clipper/selection_contract.py').is_file():
+        code += 'import clipper.selection_contract,clipper.selection_index,clipper.selection_signals,clipper.selection_engine,clipper.selection_service,clipper.api_selection; '
     code += "print(json.dumps({'python':sys.version.split()[0],'core_modules':'available','work_dir':str((Path(sys.argv[1])/Config().work_dir).resolve())}))"
     process = subprocess.run([str(python), '-I', '-c', code, str(target)], cwd=target,
                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
@@ -123,7 +125,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13'):
+    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     managed = set()
     for key in ('files', 'guards'):
@@ -208,20 +210,24 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     database=record.get('database_backup') or {}
     current_database=Path(database.get('source',''))
     advanced=[]
-    if record.get('version') in ('4.0.12','4.0.13') and record['status']=='installed' and current_database.is_file():
+    if record.get('version') in ('4.0.12','4.0.13','4.0.14') and record['status']=='installed' and current_database.is_file():
         with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
                 for project_id,document in db.execute('SELECT id,document FROM projects'):
                     value=json.loads(document)
-                    if record.get('version')=='4.0.13' and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
+                    if record.get('version') in ('4.0.13','4.0.14') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
+                        advanced.append(project_id)
+                    if record.get('version')=='4.0.14' and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
                         advanced.append(project_id)
                     for clip in value.get('clips',{}).values():
                         for variant in clip.get('variants',{}).values():
                             editor=variant.get('editor',{})
                             if editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values()):
                                 advanced.append(project_id)
-            if record.get('version')=='4.0.13' and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
+            if record.get('version') in ('4.0.13','4.0.14') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
                 if db.execute("SELECT 1 FROM m2_imports WHERE status IN ('queued','running') LIMIT 1").fetchone():advanced.append('antrean-impor-M2')
+            if record.get('version')=='4.0.14' and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
+                if db.execute("SELECT 1 FROM jobs WHERE kind='selection_m3' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-seleksi-M3')
         if advanced and not restore_project_state:
             raise ValueError('Proyek/antrean memakai data upgrade yang tidak dikenali kode lama. Kode dan data belum diubah. '
                 'Jika ingin memulihkan versi lama, gunakan --rollback --restore-project-state. SQLite terbaru akan dicadangkan terpisah sebelum state pra-upgrade dipulihkan. Baca panduan milestone paket yang dipasang.')

@@ -1,8 +1,8 @@
-# Clipper Pro 4.0.12 M1
+# Clipper Pro 4.0.14 M3
 
-Mesin video clipping lokal dengan editor enam bagian, draft per tab, snapshot preview, diff gaya, timeline bersama dua rasio, pencarian efektif/asli dan undo/redo. Upgrade ini melanjutkan M0 4.0.11 serta M1 awal.
+Mesin video clipping lokal dengan seleksi cerita bersumber, query ulang tanpa ASR ulang, review kandidat, dan susunan beberapa segmen untuk dua rasio. M3 melanjutkan editor M1 serta ingest/transkrip M2. Proyek baru dapat mengantrekan M3 setelah transkrip tersimpan; proyek lama mempertahankan alur tersimpan.
 
-Gunakan [panduan M1](docs/UPGRADE_4_0_12_M1.md) dan [register persyaratan](docs/M1_REQUIREMENTS.json). Installer memeriksa dasar, mencadangkan kode/SQLite, dan menyediakan pemulihan. Jalankan JALANKAN_PRO.cmd lalu Ctrl+F5.
+Gunakan [panduan M3](docs/UPGRADE_4_0_14_M3.md), [laporan M3](docs/LAPORAN_M3.md), dan [register CL01–CL19](docs/M3_REQUIREMENTS.json). Installer memeriksa dasar M2, mencadangkan kode/SQLite, dan menyediakan pemulihan. Jalankan JALANKAN_PRO.cmd lalu Ctrl+F5. Kandidat M3 harus diterima setelah diperiksa pada sumber sebelum masuk final; skor model terpisah dari keputusan tersebut. Gate corpus nyata G3 dan model/GPU/native Windows tetap memerlukan penerimaan target.
 
 Bukti kode/API/SQLite/FFmpeg dan batas lingkungan disertakan dalam paket. Gate Windows/GPU/video asli/native editor serta usability tetap memerlukan penerimaan target. Resolve teks/font ditunda; efek waktu/keyframe sumber M1 berstatus baked pada ekspor.
 

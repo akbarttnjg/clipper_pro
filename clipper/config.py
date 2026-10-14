@@ -154,6 +154,7 @@ class Config:
     selection_floor: int = 3
     preview_seconds: float = 0.0
     topic_review: bool = True
+    m3_auto_selection: bool = False  # Existing sessions keep their saved workflow.
     # Optional normalized source regions, editable without cropping the source file.
     material_rect: str = ""
     speaker_rect: str = ""
@@ -220,6 +221,9 @@ LENGTHS: dict[str, tuple[float, float]] = {
 def validate_overrides(form: dict) -> dict:
     """Whitelist + clamp UI form fields into Config overrides. Bad values are dropped."""
     out: dict = {}
+    if 'm3_auto_selection' in form:
+        if type(form['m3_auto_selection']) is not bool:raise ValueError('Seleksi M3 otomatis harus boolean')
+        out['m3_auto_selection']=form['m3_auto_selection']
     for key, choices in {'asr_provider': ('faster_whisper','whisperx','http'), 'vad_policy': ('silero','off')} .items():
         if key in form:
             if form[key] not in choices: raise ValueError(key+' tidak valid')

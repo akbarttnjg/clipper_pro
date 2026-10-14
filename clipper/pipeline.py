@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.13-m2'
+RENDER_VERSION = '4.0.14-m3'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -55,6 +55,10 @@ def analyze(media_path, cfg, on_progress=lambda p, m: None):
         clips = [{'start': 0., 'end': transcript['duration'], 'title': Path(media_path).stem,
                   'reason': 'Video utuh dengan tipografi.', 'keywords': [], 'hook': '',
                   'selection_source': 'full', 'approved': False, 'revision': 0, 'warnings': []}]
+    elif cfg.m3_auto_selection:
+        clips=[]
+        write_json(work/'selection-report.json',{'version':'4.0.14-m3','status':'waiting_for_M3_selection',
+            'note':'ASR dan koreksi tersimpan; proposal M3 berjalan pada antrean berikutnya.'})
     else:
         clips = story.select(transcript, cfg, on_progress)
     for c in clips:
@@ -97,6 +101,8 @@ def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
     """Build a complete immutable core set before returning any new file URLs."""
+    if clip.get('created_from')=='M3' and clip.get('selection_status')!='accepted':
+        raise ValueError('Kandidat M3 belum diterima; final tidak dibuat')
     import uuid
     from .artifact_store import ArtifactSet,rebase,capture_plan_files
     from .runtime.state import write

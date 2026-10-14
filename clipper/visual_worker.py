@@ -32,6 +32,15 @@ def run(request):
         import torch
         from sentence_transformers import SentenceTransformer
         items=request['items']
+        if request.get('operation')=='m3_embeddings':
+            if not 1<=len(items)<=64 or len({i['id'] for i in items})!=len(items):raise ValueError('Anggaran/identitas passage E5 M3 tidak valid')
+            if request.get('prefix') not in ('query','passage') or any(not isinstance(i['text'],str) or not 1<=len(i['text'])<=2000 for i in items):raise ValueError('Prefix/teks embedding M3 tidak valid')
+            torch.set_num_threads(4)
+            model=SentenceTransformer(str(weights),device='cpu',local_files_only=True,trust_remote_code=False)
+            encoded=model.encode([request['prefix']+': '+i['text'] for i in items],batch_size=8,normalize_embeddings=True,convert_to_numpy=True,show_progress_bar=False)
+            if encoded.ndim!=2 or len(encoded)!=len(items) or not np.isfinite(encoded).all():raise ValueError('Embedding E5 M3 tidak valid')
+            return {'status':'ready','vectors':[{'id':item['id'],'values':encoded[i].tolist()} for i,item in enumerate(items)],
+                'device':'cpu','prefix':request['prefix'],'scope':'source_passage_retrieval; no_ASR_or_automatic_story_approval'}
         if not 2<=len(items)<=96 or len({i['id'] for i in items})!=len(items):raise ValueError('Anggaran/identitas kandidat E5 tidak valid.')
         if any(not isinstance(i['text'],str) or not 1<=len(i['text'])<=12000 for i in items):raise ValueError('Kutipan E5 tidak valid.')
         torch.set_num_threads(4)
@@ -143,6 +152,8 @@ def run(request):
         processor=AutoProcessor.from_pretrained(str(weights),local_files_only=True,trust_remote_code=False)
         model=AutoModelForImageTextToText.from_pretrained(str(weights),local_files_only=True,trust_remote_code=False,torch_dtype=torch.float32).eval()
         prompt='Classify this video frame. Return ONLY JSON: {"kind":"speaker|podcast|board|screen|chart|graphic|unknown", "confidence":0.0, "reason":"brief visible evidence"}. Do not infer names or speech. Use unknown if unclear.'
+        if request.get('operation')=='m3_visual_story':
+            prompt+=' Also include objects: [{"label":"visible object", "box":[x,y,width,height]}], at most 8, using normalized 0-1 coordinates. Include only visible evidence. Do not infer game outcomes, emotions, or dialogue.'
         messages=[{'role':'user','content':[{'type':'image','image':image},{'type':'text','text':prompt}]}]
         text=processor.apply_chat_template(messages,add_generation_prompt=True)
         inputs=processor(text=text,images=[image],return_tensors='pt')
@@ -152,6 +163,15 @@ def run(request):
         if a<0 or b<a:raise ValueError('Model visual tidak menghasilkan JSON keputusan')
         decision=json.loads(answer[a:b+1]);confidence=float(decision.get('confidence',0))
         if decision.get('kind') not in ('speaker','podcast','board','screen','chart','graphic','unknown') or not math.isfinite(confidence) or not 0<=confidence<=1:raise ValueError('Keputusan model visual tidak valid')
+        if request.get('operation')=='m3_visual_story':
+            objects=decision.get('objects',[])
+            if not isinstance(objects,list) or len(objects)>8:raise ValueError('Anggaran objek visual M3 tidak valid')
+            for obj in objects:
+                if not isinstance(obj,dict) or not isinstance(obj.get('label'),str) or not 1<=len(obj['label'])<=100:raise ValueError('Label objek M3 tidak valid')
+                box=obj.get('box')
+                if not isinstance(box,list) or len(box)!=4 or any(type(v) not in (int,float) or not math.isfinite(v) for v in box):raise ValueError('Kotak objek M3 tidak valid')
+                x,y,bw,bh=box
+                if not 0<=x<1 or not 0<=y<1 or not 0<bw<=1-x+.001 or not 0<bh<=1-y+.001:raise ValueError('Kotak objek M3 keluar frame')
         return {'status':'ready','decision':{**decision,'confidence':confidence},'source_frame':{'time':request['time'],'width':w,'height':h},'device':'cpu'}
     if key=='talknet':return talknet(request,directory,folder)
     if key=='sam2':

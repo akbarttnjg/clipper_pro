@@ -1,0 +1,504 @@
+{
+  "schema_version": 1,
+  "version": "4.0.14-m3",
+  "architecture": {
+    "filename": "Arsitektur_Clipper_Pro_Terpadu_120_Halaman (2).pdf",
+    "pages": 120,
+    "sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+    "milestone_page": 48,
+    "requirement_pages": [
+      90,
+      91,
+      92
+    ]
+  },
+  "baseline_github_commit": "b8d12eb972b742a75379c39dc8fa7d35752b9e5e",
+  "packages": {
+    "M3.1": [
+      "CL01",
+      "CL02",
+      "CL07"
+    ],
+    "M3.2": [
+      "CL05",
+      "CL06"
+    ],
+    "M3.3": [
+      "CL03",
+      "CL04",
+      "CL12",
+      "CL17"
+    ],
+    "M3.4": [
+      "CL08",
+      "CL09",
+      "CL11"
+    ],
+    "M3.5": [
+      "CL10",
+      "CL13",
+      "CL14",
+      "CL15",
+      "CL16"
+    ],
+    "M3.6": [
+      "CL18",
+      "CL19"
+    ]
+  },
+  "requirements_count": 19,
+  "gate_g3": "blind_real_corpus_acceptance_pending",
+  "requirements": [
+    {
+      "id": "CL01",
+      "title": "Klip otomatis dari video panjang",
+      "phase": "M3",
+      "page": 90,
+      "target": "Temukan kandidat lalu simpan alasan dan waktu sumber.",
+      "acceptance": "Sumber 1-2 jam menghasilkan kandidat yang dapat ditinjau.",
+      "package": "M3.1",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL02",
+      "title": "Durasi, jumlah dan rentang analisis",
+      "phase": "M3",
+      "page": 90,
+      "target": "Pisahkan batas pencarian dari durasi klip dan jumlah final.",
+      "acceptance": "Permintaan 2-10 klip 30-120 detik dihormati atau alasannya terlihat.",
+      "package": "M3.1",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL03",
+      "title": "Prompt dan topik clipping",
+      "phase": "M3",
+      "page": 90,
+      "target": "Cari segmen berdasarkan instruksi bahasa biasa.",
+      "acceptance": "Kandidat cocok topik, bukan hanya mempunyai kata yang mirip.",
+      "package": "M3.3",
+      "implementation_files": [
+        "clipper/selection_index.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "local_runtime_protocol_integrated; actual_model_or_game_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL04",
+      "title": "Query ulang tanpa ASR ulang",
+      "phase": "M3",
+      "page": 90,
+      "target": "Gunakan index transkrip yang masih valid.",
+      "acceptance": "Prompt berubah tanpa membuang hasil ASR valid.",
+      "package": "M3.3",
+      "implementation_files": [
+        "clipper/selection_index.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL05",
+      "title": "Ide lengkap dan caveat",
+      "phase": "M3",
+      "page": 90,
+      "target": "Jaga konteks, syarat, argumen dan kesimpulan.",
+      "acceptance": "Klip dengan negasi/caveat hilang ditolak.",
+      "package": "M3.2",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL06",
+      "title": "Batas kalimat dan padding adaptif",
+      "phase": "M3",
+      "page": 90,
+      "target": "Snap ke ucapan utuh sebelum memberi padding.",
+      "acceptance": "Padding tidak memotong kata atau mengambil konteks keliru.",
+      "package": "M3.2",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL07",
+      "title": "Chunk overlap video panjang",
+      "phase": "M3",
+      "page": 90,
+      "target": "Analisis antar-chunk mempertahankan ide yang melintasi batas.",
+      "acceptance": "Ide lintas chunk tetap dapat ditemukan.",
+      "package": "M3.1",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL08",
+      "title": "Deduplikasi waktu dan makna",
+      "phase": "M3",
+      "page": 90,
+      "target": "Gabungkan kandidat overlap atau menyampaikan fakta yang sama.",
+      "acceptance": "Klip berbeda tidak dihapus hanya karena waktu berdekatan.",
+      "package": "M3.4",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_index.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL09",
+      "title": "Cakupan topik",
+      "phase": "M3",
+      "page": 91,
+      "target": "Pilih himpunan klip yang mewakili topik yang diminta.",
+      "acceptance": "Daftar final mengungkap topik yang tidak terwakili.",
+      "package": "M3.4",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_index.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL10",
+      "title": "Skor daya tarik dengan alasan",
+      "phase": "M3",
+      "page": 91,
+      "target": "Pisahkan sinyal hook, emosi, konflik dan nilai praktis.",
+      "acceptance": "Skor diberi label prediksi internal, bukan jaminan views.",
+      "package": "M3.5",
+      "implementation_files": [
+        "clipper/selection_signals.py",
+        "clipper/selection_engine.py",
+        "clipper/visual_worker.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL11",
+      "title": "Ranking top-N dan alternatif",
+      "phase": "M3",
+      "page": 91,
+      "target": "Render kandidat utama; alternatif tetap bisa dipilih.",
+      "acceptance": "Kandidat belum dirender tidak dihitung sebagai MP4 selesai.",
+      "package": "M3.4",
+      "implementation_files": [
+        "clipper/selection_contract.py",
+        "clipper/selection_index.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL12",
+      "title": "Ringkasan, tag dan chapter",
+      "phase": "M3",
+      "page": 91,
+      "target": "Hasil analisis memberikan topik, ringkasan dan chapter.",
+      "acceptance": "Setiap ringkasan dapat dibuka pada segmen sumber.",
+      "package": "M3.3",
+      "implementation_files": [
+        "clipper/selection_index.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL13",
+      "title": "Sinyal visual dan objek",
+      "phase": "M3",
+      "page": 91,
+      "target": "Gunakan frame terpilih untuk clipping non-dialog.",
+      "acceptance": "Alasan visual menyimpan frame dan model aktual.",
+      "package": "M3.5",
+      "implementation_files": [
+        "clipper/selection_signals.py",
+        "clipper/selection_engine.py",
+        "clipper/visual_worker.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "local_runtime_protocol_integrated; actual_model_or_game_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL14",
+      "title": "Sinyal audio dan emosi",
+      "phase": "M3",
+      "page": 91,
+      "target": "Gunakan event suara sebagai kandidat tambahan.",
+      "acceptance": "Suara ramai tidak otomatis mengalahkan kelengkapan makna.",
+      "package": "M3.5",
+      "implementation_files": [
+        "clipper/selection_signals.py",
+        "clipper/selection_engine.py",
+        "clipper/visual_worker.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "local_runtime_protocol_integrated; actual_model_or_game_corpus_acceptance_pending",
+      "limitation": "Measured audio event implemented; calibrated emotion model not implemented"
+    },
+    {
+      "id": "CL15",
+      "title": "Event gaming",
+      "phase": "M3",
+      "page": 91,
+      "target": "Profil game mendeteksi event/UI yang memang didukung.",
+      "acceptance": "Setiap game/profil mempunyai corpus uji sendiri.",
+      "package": "M3.5",
+      "implementation_files": [
+        "clipper/selection_signals.py",
+        "clipper/selection_engine.py",
+        "clipper/visual_worker.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "local_runtime_protocol_integrated; actual_model_or_game_corpus_acceptance_pending",
+      "limitation": "Custom reviewed HUD profile implemented; no game-specific corpus passed"
+    },
+    {
+      "id": "CL16",
+      "title": "Penanda suara clip-that",
+      "phase": "M3",
+      "page": 91,
+      "target": "Pengguna menandai momen lewat cue suara/hotkey.",
+      "acceptance": "Cue memetakan waktu sumber secara konsisten.",
+      "package": "M3.5",
+      "implementation_files": [
+        "clipper/selection_signals.py",
+        "clipper/selection_engine.py",
+        "clipper/visual_worker.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL17",
+      "title": "Pilih speaker atau keyword",
+      "phase": "M3",
+      "page": 91,
+      "target": "Filter kandidat dari speaker atau istilah tertentu.",
+      "acceptance": "Speaker terpilih cocok dengan diarization yang ditinjau.",
+      "package": "M3.3",
+      "implementation_files": [
+        "clipper/selection_index.py",
+        "clipper/selection_engine.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL18",
+      "title": "Cerita dari banyak segmen",
+      "phase": "M3",
+      "page": 92,
+      "target": "Susun alur dari potongan yang tidak bersebelahan.",
+      "acceptance": "Urutan dan penghubung tidak mengubah klaim sumber.",
+      "package": "M3.6",
+      "implementation_files": [
+        "clipper/selection_service.py",
+        "clipper/api_selection.py",
+        "clipper/editor_media.py",
+        "clipper/studio_worker.py",
+        "clipper/batch7.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py",
+        "clipper/tests/test_m3_media.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    },
+    {
+      "id": "CL19",
+      "title": "Tinjau, terima dan tolak kandidat",
+      "phase": "M3",
+      "page": 92,
+      "target": "Keputusan manusia disimpan terpisah dari skor model.",
+      "acceptance": "Klip ditolak tidak ikut batch final atau publikasi.",
+      "package": "M3.6",
+      "implementation_files": [
+        "clipper/selection_service.py",
+        "clipper/api_selection.py",
+        "clipper/editor_media.py",
+        "clipper/studio_worker.py",
+        "clipper/batch7.py",
+        "static/features/selection3.js"
+      ],
+      "test_files": [
+        "clipper/tests/test_m3_contract.py",
+        "clipper/tests/test_m3_engine.py",
+        "clipper/tests/test_m3_index.py",
+        "clipper/tests/test_m3_service.py",
+        "clipper/tests/test_m3_signals.py"
+      ],
+      "implementation_status": "workflow_implemented",
+      "acceptance_status": "functional_tested; real_corpus_acceptance_pending"
+    }
+  ]
+}

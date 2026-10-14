@@ -8,7 +8,9 @@ from freeze_m0_baseline import export_baseline
 
 
 def build(output,source_commit,verification=None,source_origin='local'):
-    fixture=Path(__file__).resolve().parents[1]/'docs/releases/m0_fixture.zip'
+    # Historical tests select a frozen producer. Do not generate or inspect
+    # an unrelated archive in the currently installed M2 working tree.
+    fixture=Path(complete_build.__globals__['ROOT'])/'docs/releases/m0_fixture.zip'
     if not fixture.is_file():export_baseline(fixture)
     return complete_build(output,source_commit,verification,source_origin,
                           version='4.0.11',base_file='m0_base_hashes.json')

@@ -7,7 +7,7 @@ RATIOS=('portrait','landscape')
 
 def targets(doc):
     rows=[{'clip_id':cid,'variant_id':vid} for cid,c in doc.get('clips',{}).items()
-          if c.get('included',True) for vid in RATIOS]
+          if c.get('included',True) and (c.get('created_from')!='M3' or c.get('selection_status')=='accepted') for vid in RATIOS]
     if not rows:raise ValueError('Pilih setidaknya satu klip untuk kedua rasio.')
     return rows
 
@@ -24,6 +24,8 @@ def _snapshot(service,doc,*,fresh=False,mode=None,require_ready=False):
         if mode not in EXPORT_MODES:raise ValueError('Mode ekspor tidak valid.')
     for target in targets(doc):
         cid=target['clip_id'];vid=target['variant_id'];variant=service.variant(doc,cid,vid)
+        from .selection_service import renderable
+        renderable(service,doc,doc['clips'][cid])
         dependency=service.dependency(doc,cid,vid,fresh=fresh)
         readiness=service.export_readiness(doc,cid,vid,dependency=dependency,fresh=fresh)
         if readiness['status']!='ready':blockers.append({**target,**readiness,'title':doc['clips'][cid]['title']})

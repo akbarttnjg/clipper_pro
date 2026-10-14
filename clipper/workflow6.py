@@ -20,7 +20,7 @@ SOURCE_FIELDS = frozenset({'asr_provider','vad_policy','output_language','diariz
     'processing_mode','source_kind','min_clip_s','max_clip_s','search_depth','num_clips',
     'analysis_window_s','analysis_overlap_s','discovery_extra_windows','selection_floor',
     'adaptive_clips','topic_grace_s','topic_review','ocr_enabled','ocr_max_frames','ocr_interval_s',
-    'visual_cues','vision_model','ollama_url','ollama_timeout'})
+    'visual_cues','vision_model','ollama_url','ollama_timeout','m3_auto_selection'})
 SOURCE_ONLY = {'waveform': frozenset({'audio_stream_index'}),
     'source_evidence': frozenset({'audio_stream_index','ocr_enabled','ocr_max_frames','ocr_interval_s','visual_cues','vision_model'}),
     'correction': frozenset({'audio_stream_index','audience','glossary','transcript_correction','model','ollama_num_ctx','ollama_num_gpu','ollama_url','ollama_timeout'})}

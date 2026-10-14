@@ -83,6 +83,9 @@ def _execute(service,job):
         from .batch7 import export_project
         return export_project(service,job)
     if job['kind']=='evaluation':return evaluation_job(service,job)
+    if job['kind']=='selection_m3':
+        from .selection_service import execute
+        return execute(service,job)
     from . import media_context, evidence, transcript_correction, story, analysis_adapter, editorial
     pid=job['project_id'];target=job['target'];cid=target.get('clip_id');vid=target.get('variant_id','portrait');kind=job['kind']
     doc=copy.deepcopy(job['request'].get('snapshot') or service.store.get(pid));dependency=job['request']['dependency'];cfg=service.config(doc,cid,vid)
@@ -363,6 +366,9 @@ def _execute(service,job):
                 store_alignment(group,patch)
             if alignment_patches:current['transcript_revision']+=1
         if kind=='analyze':current['source']['requires_analysis']=False
+        if kind in ('analyze','correction','asr_recheck','alignment','diarization'):
+            from .selection_service import invalidate
+            invalidate(service,current)
         if cid:
             service.variant(current,cid,vid).update(variant_updates)
             if kind=='boundary_review':
@@ -384,6 +390,11 @@ def _execute(service,job):
             message='Tidak ada koreksi baru yang perlu diselaraskan. Model belum menjalankan pengukuran.'
         else:message=f"Alignment berhasil: {result['aligned']} frasa diselaraskan pada CPU; tersimpan pada revisi {saved['revision']}."
     service.queue.update_owned(job,message=message)
+    if kind=='analyze' and cfg.m3_auto_selection and cfg.processing_mode!='full':
+        profile='finance' if cfg.audience=='finance' else 'education' if cfg.source_kind=='board' else 'screen' if cfg.source_kind in ('screen','chart','graphic') else 'podcast' if cfg.source_kind=='podcast' else 'general'
+        # ASR has already been saved. A concurrent unrelated style edit must
+        # not turn that successful job into a failure while scheduling M3.
+        service.enqueue(pid,'selection_m3',options={'profile':profile})
     return result
 
 

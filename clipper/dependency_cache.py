@@ -126,7 +126,7 @@ def render_key(media,words,clip,cfg,*,fresh=False):
         'whisper_compute','whisper_isolate','ollama_timeout','ollama_num_gpu','ollama_num_ctx','num_clips','search_depth',
         'analysis_window_s','analysis_overlap_s','selection_floor','discovery_extra_windows','asr_recheck_windows',
         'asr_second_pass','auto_export','workflow','audio_cache_dir','visual_cache_dir','cache_limit_gb',
-        'variant_id','visual_runtime_signature','source_content_id','audio_stream_id'}
+        'variant_id','visual_runtime_signature','source_content_id','audio_stream_id','m3_auto_selection'}
     if not cfg.align_selected_clips:irrelevant.add('alignment_model_path')
     if not cfg.use_nvenc:irrelevant.add('allow_backend_fallback')
     for key in irrelevant:settings.pop(key,None)
