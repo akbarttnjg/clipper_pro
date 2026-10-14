@@ -22,9 +22,12 @@ class M3InstallerCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory();cls.package=Path(cls.temp.name)/'M3-test-package'
+        from .frozen_release import restore_m3_producer
+        cls.producer=restore_m3_producer(Path(cls.temp.name)/'frozen-m3-producer')
+        cls.builder_patch=patch.object(build_m3_release,'ROOT',cls.producer);cls.builder_patch.start()
         with contextlib.redirect_stdout(io.StringIO()):cls.report=build_m3_release.build(cls.package,'0'*40)
     @classmethod
-    def tearDownClass(cls):cls.temp.cleanup()
+    def tearDownClass(cls):cls.builder_patch.stop();cls.temp.cleanup()
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.target=restore_m2(Path(self.temp.name)/'machine')
         self.work=self.target/'work';self.work.mkdir();self.db=self.work/'studio4.sqlite3'

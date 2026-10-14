@@ -35,6 +35,8 @@ def _fit(rect, box, cover=False, top=False):
 
 
 def mappings(shot, W, H):
+    if shot.get('m4'):
+        return [(layer['source_crop'],_fit(layer['source_crop'],layer['viewport'])) for layer in shot['m4']['layers']]
     rect = shot['rect']
     if shot['mode'] == 'stream' and shot.get('face_rect'):
         if W > H:
@@ -71,6 +73,7 @@ def project_box(box, region, transform):
 
 
 def protected_boxes(shot, W, H):
+    if shot.get('m4'):return list(shot.get('protected_output',[]))
     output = []
     for item in shot.get('protected_source', []):
         box = item['box']

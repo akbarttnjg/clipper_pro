@@ -1,0 +1,480 @@
+{
+  "schema_version": 1,
+  "version": "4.0.15-m4",
+  "architecture": {
+    "filename": "Arsitektur_Clipper_Pro_Terpadu_120_Halaman (2).pdf",
+    "sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+    "pages": 120,
+    "milestone_page": 49,
+    "requirement_pages": [
+      92,
+      93,
+      94
+    ]
+  },
+  "packages": {
+    "M4.1": [
+      "VF01",
+      "VF02",
+      "VF09",
+      "VF12"
+    ],
+    "M4.2": [
+      "VF03",
+      "VF15"
+    ],
+    "M4.3": [
+      "VF04",
+      "VF05",
+      "VF13"
+    ],
+    "M4.4": [
+      "VF07",
+      "VF08",
+      "VF10",
+      "VF11"
+    ],
+    "M4.5": [
+      "VF06",
+      "VF14",
+      "VF16"
+    ],
+    "M4.6": [
+      "VF17"
+    ]
+  },
+  "requirements_count": 17,
+  "gate_g4": "pending_real_corpus",
+  "requirements": [
+    {
+      "id": "VF01",
+      "title": "Deteksi shot dan perubahan adegan",
+      "phase": "M4",
+      "page": 92,
+      "target": "Pisahkan kamera/adegan sebelum memilih framing.",
+      "acceptance": "Cut kamera tidak disalahartikan sebagai pergerakan wajah.",
+      "package": "M4.1",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF02",
+      "title": "Deteksi dan tracking wajah",
+      "phase": "M4",
+      "page": 92,
+      "target": "Track identitas wajah dengan batas jitter.",
+      "acceptance": "Occlusion tidak membuat crop melompat ke wajah lain.",
+      "package": "M4.1",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ],
+      "native_acceptance": "actual_detector_ASD_tracking_SAM_and_corpus_pending"
+    },
+    {
+      "id": "VF03",
+      "title": "Pembicara aktif",
+      "phase": "M4",
+      "page": 92,
+      "target": "Gabungkan suara dan bukti visual untuk memilih speaker.",
+      "acceptance": "Overlap dan wajah off-screen mempunyai fallback jelas.",
+      "package": "M4.2",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ],
+      "native_acceptance": "actual_detector_ASD_tracking_SAM_and_corpus_pending"
+    },
+    {
+      "id": "VF04",
+      "title": "Crop statis dan mode tanpa pan",
+      "phase": "M4",
+      "page": 92,
+      "target": "Pertahankan framing tetap sesuai profil Anda.",
+      "acceptance": "Tidak ada pan horizontal pada profil edukasi no-pan.",
+      "package": "M4.3",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF05",
+      "title": "Tracking bergerak opt-in",
+      "phase": "M4",
+      "page": 92,
+      "target": "Sediakan deadzone, smoothing dan batas kecepatan.",
+      "acceptance": "Gerak hanya aktif bila profil mengizinkannya.",
+      "package": "M4.3",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF06",
+      "title": "Multi-rasio dan crop per rasio",
+      "phase": "M4",
+      "page": 92,
+      "target": "Layout 16:9, 9:16, 1:1, 4:5 dan rasio khusus.",
+      "acceptance": "Materi utama terlihat pada setiap rasio yang disetujui.",
+      "package": "M4.5",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF07",
+      "title": "Split dua atau lebih pembicara",
+      "phase": "M4",
+      "page": 92,
+      "target": "Susun grid/top-bottom/side-by-side per adegan.",
+      "acceptance": "Speaker overlap dan tiga orang tidak memakai wajah salah.",
+      "package": "M4.4",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF08",
+      "title": "Screencast dan picture-in-picture",
+      "phase": "M4",
+      "page": 93,
+      "target": "Utamakan layar, dengan wajah sebagai inset bila diperlukan.",
+      "acceptance": "Teks layar dan cursor penting tetap terlihat.",
+      "package": "M4.4",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF09",
+      "title": "Papan, grafik dan OCR",
+      "phase": "M4",
+      "page": 93,
+      "target": "Kotak materi membatasi crop dan area caption.",
+      "acceptance": "Daftar, angka dan grafik penting tidak terpotong.",
+      "package": "M4.1",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF10",
+      "title": "Layout gameplay dan facecam",
+      "phase": "M4",
+      "page": 93,
+      "target": "Pisahkan area permainan dan kamera streamer.",
+      "acceptance": "HUD dan facecam tidak saling menutup.",
+      "package": "M4.4",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF11",
+      "title": "Pergantian layout per adegan",
+      "phase": "M4",
+      "page": 93,
+      "target": "Pilih layout berdasarkan shot dan isi.",
+      "acceptance": "Transisi layout tidak menyebabkan frame kosong.",
+      "package": "M4.4",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF12",
+      "title": "Safe area wajah, objek dan platform",
+      "phase": "M4",
+      "page": 93,
+      "target": "Gabungkan kotak larangan materi dengan area aman publikasi.",
+      "acceptance": "Caption tidak menutup kotak penting yang dianotasi.",
+      "package": "M4.1",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF13",
+      "title": "Reframe manual dan keyframe",
+      "phase": "M4",
+      "page": 93,
+      "target": "Edit kotak crop atau keyframe dengan unit yang jelas.",
+      "acceptance": "Perubahan preview dan final mempunyai revisi sama.",
+      "package": "M4.3",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF14",
+      "title": "Blur background dan pillarbox",
+      "phase": "M4",
+      "page": 93,
+      "target": "Isi sisi kosong tanpa merusak sumber utama.",
+      "acceptance": "Blur/pillarbox hanya dipakai oleh kebijakan yang dipilih.",
+      "package": "M4.5",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF15",
+      "title": "No-face dan frozen-frame fallback",
+      "phase": "M4",
+      "page": 93,
+      "target": "Gunakan frame/grid/material ketika bukti speaker lemah.",
+      "acceptance": "Fallback terlihat pada review dan provenance.",
+      "package": "M4.2",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ]
+    },
+    {
+      "id": "VF16",
+      "title": "Object tracking dan planar tracking",
+      "phase": "M4",
+      "page": 93,
+      "target": "Track objek/permukaan untuk menempelkan layer.",
+      "acceptance": "Drift ditandai; layer mengikuti timebase yang benar.",
+      "package": "M4.5",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ],
+      "native_acceptance": "actual_detector_ASD_tracking_SAM_and_corpus_pending"
+    },
+    {
+      "id": "VF17",
+      "title": "Mask kontinu dan cutout",
+      "phase": "M4",
+      "page": 94,
+      "target": "Mask diagnostik menjadi layer render bila modul siap.",
+      "acceptance": "Mask dibuktikan pada rentang final, bukan hanya poster sampel.",
+      "package": "M4.6",
+      "implementation_status": "workflow_and_runtime_adapter_implemented",
+      "acceptance_status": "functional_tested; G4_original_corpus_pending",
+      "files": [
+        "clipper/camera4_contract.py",
+        "clipper/camera4_observe.py",
+        "clipper/camera4_plan.py",
+        "clipper/camera4_render.py",
+        "clipper/camera4_service.py",
+        "static/features/camera4.js"
+      ],
+      "tests": [
+        "clipper/tests/test_m4_contract.py",
+        "clipper/tests/test_m4_service.py",
+        "clipper/tests/test_m4_evidence.py",
+        "clipper/tests/test_m4_media.py"
+      ],
+      "native_acceptance": "actual_detector_ASD_tracking_SAM_and_corpus_pending",
+      "mask_policy": "validated_sampled_neural_timeline -> lossless full-rate carrier; nearest sample hold; no neural_30fps_claim"
+    }
+  ]
+}

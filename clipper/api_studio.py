@@ -29,6 +29,8 @@ def create_router(service):
     router.include_router(ingest_router(service,guarded))
     from .api_selection import router as selection_router
     router.include_router(selection_router(service,guarded))
+    from .api_camera4 import router as camera_router
+    router.include_router(camera_router(service,guarded))
     @router.get('/style-presets')
     def style_presets():
         from .style5 import PRESETS,VERSION

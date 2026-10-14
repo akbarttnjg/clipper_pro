@@ -110,11 +110,22 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'
     if plan.get('source_kind')=='audio':
         from .audio_project import draw
         return draw(source,plan,cfg,ass,target,mix,on_progress)
+    if plan.get('m4') and any(s['m4']['motion']!='static' or s['m4'].get('mask') or s['m4'].get('attachment') for s in plan['shots']):
+        from .camera4_render import bake
+        baked,receipt=bake(source,plan,cfg,Path(cfg.work_dir)/'m4-compositions',on_progress)
+        plan['m4']['composition_receipt']=receipt
+        execution={**plan,'m4':None,'shots':[{'start':0.,'end':plan['duration'],'source_start':0.,'source_end':plan['duration'],
+            'duration_frames':round(plan['duration']*plan['fps']),'rect':[0,0,plan['width'],plan['height']],'mode':'fill','zoom_at':None}]}
+        result=video(baked,execution,cfg,ass,target,mix,on_progress,mode=mode)
+        plan['encoder']=execution['encoder'];plan['warnings']=execution['warnings'];return result
     W, H, fps = plan['width'], plan['height'], plan['fps']
     seek = min(s['source_start'] for s in plan['shots'])
     end = max(s['source_end'] for s in plan['shots'])
-    graph = []
+    graph = [];extra_inputs=[]
     for i, shot in enumerate(plan['shots']):
+        if shot.get('m4'):
+            from .camera4_render import shot_graph
+            graph.extend(shot_graph(shot,i,seek,plan,extra_inputs));continue
         x, y, w, h = shot['rect']
         prefix = (f"[0:v]trim=start={shot['source_start'] - seek:.8f}:end={shot['source_end'] - seek:.8f},"
                   f"setpts=PTS-STARTPTS,fps={fps},crop={w}:{h}:{x}:{y}")
@@ -151,7 +162,7 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'
                 prefix += f",zoompan=z='1+{cfg.zoom_amount}*{envelope}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s={W}x{H}:fps={fps}"
             graph.append(prefix + suffix)
     graph.append(''.join(f'[v{i}]' for i in range(len(plan['shots']))) + f"concat=n={len(plan['shots'])}:v=1:a=0[base]")
-    extra_inputs=[]; previous='base'
+    previous='base'
     for i,event in enumerate(plan.get('broll',[])):
         extra_inputs.extend(['-i',event['path']])
         height = event.get('image_height') if not event.get('framed_plate') else None

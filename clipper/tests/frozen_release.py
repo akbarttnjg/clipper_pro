@@ -85,3 +85,18 @@ def restore_m2(root):
     fixture=RELEASES/'m3_m2_fixture.zip'
     expected=json.loads(fixture.with_name('m3_m2_fixture_provenance.json').read_text(encoding='utf-8'))
     return _restore(root,fixture,expected)
+
+
+def restore_m3_producer(root):
+    fixture=RELEASES/'m4_m3_producer.zip';expected=json.loads(fixture.with_name('m4_m3_producer_provenance.json').read_text())
+    # Historical binary archives are content-addressed, unchanged prerequisites;
+    # avoid recursively duplicating tens of megabytes inside every new fixture.
+    binaries=[]
+    for name,digest in expected['external_files'].items():
+        source=Path(__file__).resolve().parents[2]/name
+        if not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest()!=digest:raise ValueError('Frozen M3 external archive changed: '+name)
+        binaries.append((name,source.read_bytes()))
+    root=_restore(root,fixture,expected)
+    for name,data in binaries:
+        target=_fixture_path(root,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+    return root

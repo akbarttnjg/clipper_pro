@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.14-m3'
+RENDER_VERSION = '4.0.15-m4'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -89,6 +89,11 @@ def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
     words=intelligence.annotate_words(words,clip,cfg,context_words=context_words)
     preserve=cfg.source_kind in ('board','screen','chart','graphic') and cfg.preserve_material_pauses
     plan=editplan.build(words,clip,replace(cfg,trim_silence=False) if preserve else cfg)
+    if clip.get('_m4_camera'):
+        from .camera4_render import apply
+        apply(plan,clip,cfg,info)
+        plan['selected_alignment']=alignment_report
+        return words,plan
     from . import composition
     composition.analyze(media_path,plan,cfg,info)
     if cfg.source_kind=='auto' and cfg.trim_silence and cfg.preserve_material_pauses and any(s.get('has_material') for s in plan['shots']):
@@ -179,6 +184,8 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
         plan.setdefault('warnings',[]).append('Edit waktu/keyframe/kamera memakai source layer yang telah dirender. Caption tetap mengikuti jalur ekspor yang dipilih.')
     if not plan['shots']:
         raise ValueError('Tidak ada frame yang dapat dirender. Periksa batas clip.')
+    if plan.get('m4'):
+        plan.setdefault('warnings',[]).append('Komposisi M4 dan matte/tracking menjadi source layer pada ekspor hibrida; geometri native dasar belum dipetakan.')
     from . import illustrations
     recipe={'scenes':[],'notes':[]}
     if cfg.broll_mode != 'off':

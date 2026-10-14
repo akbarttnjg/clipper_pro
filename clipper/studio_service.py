@@ -115,7 +115,9 @@ class StudioService:
                 values.update(variant.get('style_layers',{}).get(layer,{}))
             values.update({k:doc['settings'][k] for k in doc.get('settings_explicit_keys',[]) if k in doc['settings']})
             values.update(doc['clips'][clip_id].get('settings',{}))
-            values.update(variant.get('settings',{}));_,w,h=VARIANTS[variant_id]
+            values.update(variant.get('settings',{}))
+            if variant_id in VARIANTS:_,w,h=VARIANTS[variant_id]
+            else:w,h=variant['camera4_ratio']
             values.update(target_w=w,target_h=h,variant_id=variant_id)
             values['visual_overrides']=variant.get('visual_controls',{})
         media=doc.get('source',{}).get('media_context',{}).get('payload',{})
@@ -132,7 +134,7 @@ class StudioService:
 
     @staticmethod
     def variant(doc,clip_id,variant_id):
-        if variant_id not in VARIANTS or clip_id not in doc.get('clips',{}):raise KeyError('Klip atau rasio tidak ditemukan')
+        if clip_id not in doc.get('clips',{}) or variant_id not in doc['clips'][clip_id]['variants']:raise KeyError('Klip atau rasio tidak ditemukan')
         return doc['clips'][clip_id]['variants'][variant_id]
 
     def create(self,path,settings=None,name=None):
@@ -263,6 +265,10 @@ class StudioService:
         return {**page,'revision':doc['revision'],'transcript_id':doc['transcript_id'],'transcript_revision':doc['transcript_revision']}
 
     def dependency(self,doc,clip_id=None,variant_id=None,*,fresh=False,kind='render'):
+        if kind=='camera_m4':
+            from .camera4_service import signature
+            return fingerprint(['M4-camera',asset_id(doc['source']['path'],fresh=fresh),signature(self,doc,clip_id,variant_id),
+                self.config(doc,clip_id,variant_id).visual_runtime_signature])
         if kind=='selection_m3':
             from .selection_service import signature
             cfg=self.config(doc)
@@ -281,6 +287,12 @@ class StudioService:
                 if variant.get('timeline'):clip['manual_keep_spans']=variant['timeline']['keep_spans']
                 words=render_words(self.transcript(doc,clip_id,variant_id),doc,clip,cfg) if doc.get('transcript_id') else []
                 base_key=render_key(doc['source']['path'],words,clip,cfg,fresh=fresh)
+                if variant.get('camera4_enabled'):
+                    from .camera4_service import signature
+                    report=variant.get('camera4_report',{})
+                    base_key=fingerprint([base_key,'M4',signature(self,doc,clip_id,variant_id),report,
+                        asset_id(report.get('matte',{}).get('path'),fresh=fresh),
+                        [asset_id(r.get('path'),fresh=fresh) for r in report.get('matte',{}).get('model_samples',[])],variant.get('camera4_ratio')])
                 if variant.get('transcript_display',{}).get('mode')!='source' and variant.get('transcript_display'):
                     base_key=fingerprint([base_key,variant['transcript_display'],doc.get('translation_tracks'),doc['transcript_revision']])
                 from .editor_contract import render_inputs
@@ -423,6 +435,10 @@ class StudioService:
             from .editor_service import apply_editor_command, check_lock
             check_lock(self,doc,cid,vid,op)
             kind=op.get('op')
+            from .camera4_service import apply_command as apply_camera_command
+            camera=apply_camera_command(self,doc,cid,vid,op,request['expected_revision'])
+            if camera is not None:
+                touched.update(camera.get('touched',[]));continue
             from .selection_service import apply_command as apply_selection_command
             selected=apply_selection_command(self,doc,cid,vid,op,request['expected_revision'])
             if selected is not None:
@@ -632,17 +648,20 @@ class StudioService:
             state=snapshot(self,doc,fresh=True,mode=mode,require_ready=True)
             return self.queue.enqueue_many(project_id,[(kind,{'clip_id':None,'variant_id':'both'},
                 {'dependency':state['dependency'],'options':{'mode':mode}})],doc['revision'])[0]
-        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation','selection_m3'):raise ValueError('Tahap tidak dikenal')
+        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation','selection_m3','camera_m4'):raise ValueError('Tahap tidak dikenal')
         if kind in ('analyze','source_evidence','correction','discovery','waveform','proxy','diarization','translation','selection_m3'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
-        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation') and not clip_id:raise ValueError('Pilih klip dahulu')
-        if kind not in ('analyze','source_evidence','waveform','proxy','selection_m3') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
+        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation','camera_m4') and not clip_id:raise ValueError('Pilih klip dahulu')
+        if kind not in ('analyze','source_evidence','waveform','proxy','selection_m3','camera_m4') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
         if kind=='selection_m3':
             from .selection_contract import constraints
             options=constraints(options or {},doc['source']['info']['duration'],self.config(doc));options.pop('duration')
         if kind in ('render','export') and clip_id:
             from .selection_service import renderable
             renderable(self,doc,doc['clips'][clip_id])
+        if kind in ('render','preview','export') and clip_id:
+            from .camera4_service import renderable as camera_renderable
+            camera_renderable(self,doc,clip_id,variant_id)
         if kind=='translation':
             from .transcript_tracks import language
             options={'provider':'ollama','target_language':language((options or {}).get('target_language','en'))}
@@ -671,6 +690,7 @@ class StudioService:
             if supplied and supplied!=request['render_summary']['digest']:
                 raise Conflict(doc['revision'],'Ringkasan render berubah; periksa ulang sebelum menjalankan')
         if kind=='export':
+            if self.variant(doc,clip_id,variant_id).get('camera4_enabled') and (options or {}).get('mode')=='native':raise ValueError('Komposisi M4 memakai source layer. Pilih Hibrida atau Tampilan terjaga untuk menjaga kamera/matte.')
             readiness=self.export_readiness(doc,clip_id,variant_id,dependency=request['dependency'],fresh=True)
             if readiness['status']!='ready':raise ValueError(readiness['message'])
             from .workflow6 import EXPORT_MODES,export_options

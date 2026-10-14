@@ -1,0 +1,9 @@
+{
+  "source_commit": "11d34a18351997d01c99a397ccc2bce41839885a",
+  "sha256": "83d2f052c63aebccf79565aa981b3c535605c9081b76567df9937a819d4fa79d",
+  "files": 49,
+  "external_files": {
+    "docs/releases/m2_m0_fixture.zip": "b2813575bcbaf6ccb795ef50e9f78c1b58c6bde51e0291151671a8a8447a1306",
+    "docs/releases/m3_m2_fixture.zip": "26ab0971606f5bda37cfaa59dd8071736dcb1692516aa5e987a4bf78571b9fbd"
+  }
+}

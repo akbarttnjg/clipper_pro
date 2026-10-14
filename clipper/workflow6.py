@@ -77,6 +77,7 @@ def brand_values(values):
 
 
 def native_reasons(plan):
+    if plan and plan.get('m4'):return ['Komposisi kamera M4 memakai source layer; pilih Hibrida atau Tampilan terjaga.']
     if not plan or not plan.get('shots'):return ['Render final dahulu untuk memeriksa shot.']
     reasons=[]
     if plan.get('editor',{}).get('advanced_source_layer')=='baked':

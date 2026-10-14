@@ -86,7 +86,7 @@ export function mountVisual4(host,{project,clipId,variantId,api,onChange=()=>{},
  const texts=new Map((report?.shots||[]).flatMap(s=>s.visual?.ocr||[]).map(r=>[r.id,r]));
  for(const row of texts.values()){let value=field(ocr,`${Math.round(row.confidence*100)}% · ${row.confirmed_repeated?'berulang':'satu sampel'}`,controls.ocr_edits?.[row.id]??row.text);rememberField(value,'ocr:'+row.id,controls.ocr_edits?.[row.id]??row.text);button(ocr,'Simpan koreksi tulisan',()=>changes([{op:'visual_controls',values:{ocr_edits:{...(controls.ocr_edits||{}),[row.id]:value.value}}}],false,['ocr:'+row.id]))}
  if(!texts.size)ocr.append(e('p','Belum ada OCR berkeyakinan tinggi. Anda bisa menandai area materi secara manual.'));
- const sam=e('details');sam.append(e('summary','Mask SAM opsional'));host.append(sam);sam.append(e('p','Membutuhkan SAM lokal yang lulus uji. Pilih frame acuan atau propagasi maksimal enam detik pada 5 fps. Mask disimpan terpisah, belum dimasukkan ke video atau layer editor. Setelah menyimpan area mask, jalankan Analisis visual klip.'));
+ const sam=e('details');sam.append(e('summary','Mask SAM opsional'));host.append(sam);sam.append(e('p','Membutuhkan SAM lokal yang lulus uji. Pilih frame acuan atau propagasi maksimal enam detik pada 5 fps. Panel ini menyimpan mask diagnostik. Untuk mask yang masuk ke render, gunakan panel M4 · Kamera dan layout per adegan. Setelah menyimpan area mask, jalankan Analisis visual klip.'));
  const samMode=select(sam,'Rentang mask SAM',[['frame','Satu frame acuan'],['range','Propagasi rentang area']],controls.sam_span?'range':'frame');
  const mask=report?.shots?.find(s=>s.mask?.status==='ready')?.mask;
  const maskStatus=report?.shots?.find(s=>!['disabled','ready'].includes(s.mask?.status))?.mask;

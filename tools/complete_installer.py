@@ -110,6 +110,8 @@ def probe_runtime(target, after=False):
         code += 'import clipper.artifact_store,clipper.caption_readability,clipper.studio_worker; '
     if after and (target/'clipper/selection_contract.py').is_file():
         code += 'import clipper.selection_contract,clipper.selection_index,clipper.selection_signals,clipper.selection_engine,clipper.selection_service,clipper.api_selection; '
+    if after and (target/'clipper/camera4_contract.py').is_file():
+        code += 'import clipper.camera4_contract,clipper.camera4_observe,clipper.camera4_plan,clipper.camera4_tracking,clipper.camera4_render,clipper.camera4_service,clipper.api_camera4; '
     code += "print(json.dumps({'python':sys.version.split()[0],'core_modules':'available','work_dir':str((Path(sys.argv[1])/Config().work_dir).resolve())}))"
     process = subprocess.run([str(python), '-I', '-c', code, str(target)], cwd=target,
                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
@@ -125,7 +127,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14'):
+    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14','4.0.15'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     managed = set()
     for key in ('files', 'guards'):
@@ -210,24 +212,27 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     database=record.get('database_backup') or {}
     current_database=Path(database.get('source',''))
     advanced=[]
-    if record.get('version') in ('4.0.12','4.0.13','4.0.14') and record['status']=='installed' and current_database.is_file():
+    supports_m3=record.get('version')=='4.0.15' and str(record.get('baseline_version','')).startswith(('4.0.14','4.0.15'))
+    if record.get('version') in ('4.0.12','4.0.13','4.0.14','4.0.15') and record['status']=='installed' and current_database.is_file():
         with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
                 for project_id,document in db.execute('SELECT id,document FROM projects'):
                     value=json.loads(document)
-                    if record.get('version') in ('4.0.13','4.0.14') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
+                    if not supports_m3 and record.get('version') in ('4.0.13','4.0.14','4.0.15') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
                         advanced.append(project_id)
-                    if record.get('version')=='4.0.14' and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
+                    if not supports_m3 and record.get('version') in ('4.0.14','4.0.15') and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
                         advanced.append(project_id)
                     for clip in value.get('clips',{}).values():
                         for variant in clip.get('variants',{}).values():
                             editor=variant.get('editor',{})
-                            if editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values()):
+                            if record.get('version')=='4.0.15' and any(variant.get(k) for k in ('camera4_report','camera4_controls','camera4_feedback','camera4_enabled','camera4_ratio')):advanced.append(project_id)
+                            if not supports_m3 and (editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values())):
                                 advanced.append(project_id)
-            if record.get('version') in ('4.0.13','4.0.14') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
+            if not supports_m3 and record.get('version') in ('4.0.13','4.0.14','4.0.15') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
                 if db.execute("SELECT 1 FROM m2_imports WHERE status IN ('queued','running') LIMIT 1").fetchone():advanced.append('antrean-impor-M2')
-            if record.get('version')=='4.0.14' and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
-                if db.execute("SELECT 1 FROM jobs WHERE kind='selection_m3' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-seleksi-M3')
+            if record.get('version') in ('4.0.14','4.0.15') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
+                if not supports_m3 and db.execute("SELECT 1 FROM jobs WHERE kind='selection_m3' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-seleksi-M3')
+                if record.get('version')=='4.0.15' and db.execute("SELECT 1 FROM jobs WHERE kind='camera_m4' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-kamera-M4')
         if advanced and not restore_project_state:
             raise ValueError('Proyek/antrean memakai data upgrade yang tidak dikenali kode lama. Kode dan data belum diubah. '
                 'Jika ingin memulihkan versi lama, gunakan --rollback --restore-project-state. SQLite terbaru akan dicadangkan terpisah sebelum state pra-upgrade dipulihkan. Baca panduan milestone paket yang dipasang.')
@@ -312,7 +317,11 @@ def install(target, package, dry_run=False):
         if existed:
             atomic_copy(dest, safe_path(backup / 'original', row['path']))
         records.append({**row, 'existed': existed, 'original_sha256': checksum(dest) if existed else None})
-    record = {'schema_version': 1, 'version': manifest['version'], 'source_commit': manifest['source_commit'],
+    baseline_version=None
+    if manifest['version']=='4.0.15':
+        for node in ast.parse((target/'clipper/pipeline.py').read_text(encoding='utf-8-sig')).body:
+            if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='RENDER_VERSION' for t in node.targets) and isinstance(node.value,ast.Constant):baseline_version=node.value.value
+    record = {'schema_version': 1, 'version': manifest['version'], 'source_commit': manifest['source_commit'],'baseline_version':baseline_version,
               'target': str(target), 'status': 'prepared', 'files': records,
               'database_backup': backup_project_database(target, backup, runtime.get('work_dir'))}
     journal = backup / 'complete-backup.json'; atomic_json(journal, record)

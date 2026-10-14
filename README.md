@@ -1,4 +1,7 @@
-# Clipper Pro 4.0.14 M3
+# Clipper Pro 4.0.15 M4
+
+M4 menambah kamera/layout per shot, no-pan dan tracking opt-in, speaker fallback, grid/layar/PiP/gameplay, rasio tambahan, serta carrier mask kontinu ke compositor. Gunakan [panduan M4](docs/UPGRADE_4_0_15_M4.md), [laporan M4](docs/LAPORAN_M4.md) dan [register VF01–VF17](docs/M4_REQUIREMENTS.json). Komposisi perlu ditinjau sebelum aktif; G4 corpus/model native belum dinyatakan lulus. Paket kumulatif mengenali M3 serta M2 yang telah diverifikasi.
+
 
 Mesin video clipping lokal dengan seleksi cerita bersumber, query ulang tanpa ASR ulang, review kandidat, dan susunan beberapa segmen untuk dua rasio. M3 melanjutkan editor M1 serta ingest/transkrip M2. Proyek baru dapat mengantrekan M3 setelah transkrip tersimpan; proyek lama mempertahankan alur tersimpan.
 

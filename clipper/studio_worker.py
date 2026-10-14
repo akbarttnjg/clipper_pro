@@ -86,6 +86,9 @@ def _execute(service,job):
     if job['kind']=='selection_m3':
         from .selection_service import execute
         return execute(service,job)
+    if job['kind']=='camera_m4':
+        from .camera4_service import execute
+        return execute(service,job)
     from . import media_context, evidence, transcript_correction, story, analysis_adapter, editorial
     pid=job['project_id'];target=job['target'];cid=target.get('clip_id');vid=target.get('variant_id','portrait');kind=job['kind']
     doc=copy.deepcopy(job['request'].get('snapshot') or service.store.get(pid));dependency=job['request']['dependency'];cfg=service.config(doc,cid,vid)
@@ -258,6 +261,9 @@ def _execute(service,job):
                 result=copy.deepcopy(cached);reused=True
             else:
                 name=f'{cid}-{vid}-{key[:12]}'
+                from .camera4_service import renderable as camera_renderable
+                camera=camera_renderable(service,doc,cid,vid)
+                if camera:clip['_m4_camera']=camera
                 from .editor_media import prepare
                 render_source,render_display,render_clip,render_cfg,edit_receipt=prepare(service,doc,cid,vid,source,words,clip,cfg,progress)
                 result=pipeline.render_clip(render_source,render_display,render_clip,name,render_cfg,progress,
