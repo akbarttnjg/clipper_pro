@@ -26,6 +26,9 @@ def write_ass(words, path, cfg, hook="", keywords=(), position="bottom", anchors
 
 def write_plan(plan,path,cfg):
     """Execute the frozen plan used by the preview, final render and exporters."""
+    if plan.get('m5_version'):
+        from .finishing5_render import write_ass
+        return write_ass(plan,path,cfg)
     contrast=bool(plan.get('contrast',cfg.caption_backdrop))
     template=plan.get('template',cfg.caption_style)
     header = f"""[Script Info]

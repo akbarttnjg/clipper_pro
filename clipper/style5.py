@@ -107,6 +107,10 @@ def _overlap(a,b):
 
 def readability(plan,cfg):
     """Per-phrase measured checks. A pass does not certify subjective aesthetics."""
+    if plan.get('m5_version'):
+        from .finishing5_plan import check
+        result=check(plan,cfg)
+        return {**result,'phrases':result['phrase_rows'],'version':plan['m5_version']}
     issues=[];rows=[];W,H=plan['width'],plan['height']
     for index,phrase in enumerate(plan.get('phrases',[])):
         text=' '.join(w['text'] for w in phrase['words']);duration=max(.02,phrase['end']-phrase['start']);cps=len(text)/duration

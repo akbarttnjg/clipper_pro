@@ -235,6 +235,9 @@ def phrase_anchor(phrase, anchors, cfg):
 
 
 def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
+    if cfg.finishing5:
+        from .finishing5_plan import caption_plan
+        return caption_plan(words,cfg,keywords,position,anchors)
     if getattr(cfg,'style_preset','legacy') != 'legacy':
         from .style5 import caption_plan
         return caption_plan(words,cfg,keywords,position,anchors)
@@ -259,7 +262,7 @@ def make_plan(words, cfg, keywords=(), position="bottom", anchors=None):
             if anchor and anchor.get('panel') and cfg.caption_position == 'auto':
                 x, y, width, height = anchor['panel']
                 pos = anchor['position']
-        emph = emphasis_indices(phrase, keywords)
+        emph = emphasis_indices(phrase, keywords) if cfg.semantic_emphasis else set()
         scale = max(.5, min(1.5, cfg.caption_scale))
         base = int(min(cfg.target_w, cfg.target_h) * (.067 if pos in ('left', 'right') else .066) * scale)
         families = [cfg.font_accent if i in emph and cfg.accent_font else cfg.font_main for i in range(len(phrase))]
@@ -375,7 +378,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
             side = pos in ('left', 'right') and W > H
         x,y,width,height = panel_box
         usable_width=width*(.94 if getattr(cfg,'_director',False) else .90)
-        emphasis = set() if getattr(cfg,'_emphasis_disabled',False) else emphasis_indices(phrase, keywords)
+        emphasis = set() if not cfg.semantic_emphasis or getattr(cfg,'_emphasis_disabled',False) else emphasis_indices(phrase, keywords)
         focus = next(iter(emphasis), -1)
         base = getattr(cfg,'_base_font',round(min(W,H)*(.073 if side else .070)*cfg.caption_scale))
         for fs in range(max(18,base), 7, -1):

@@ -42,12 +42,20 @@ def readiness(cfg):
 
 
 def signature(cfg):
+    if cfg.finishing5:return [cfg.caption_renderer,'4.0.16-m5',readiness(cfg) if cfg.caption_renderer in ('auto','remotion') else 'local']
     if cfg.caption_renderer=='ass':return ['ass','4.0.7']
     status=readiness(cfg)
     return [cfg.caption_renderer,'4.0.7',status['status'],status.get('generation'),status.get('browser')]
 
 
 def render(plan,cfg,folder,duration):
+    if plan.get('m5_version'):
+        if cfg.caption_renderer=='raster':
+            from .finishing5_render import raster
+            return raster(plan,cfg,folder,duration)
+        if cfg.caption_renderer=='remotion':raise ValueError('Parity Remotion M5 belum dibuktikan; pilih ASS atau Raster lokal.')
+        return {'engine':'ass','status':'fallback' if cfg.caption_renderer=='auto' else 'ready','plan_version':plan['version'],
+            'reason':'M5 memakai ASS teruji; Remotion belum memiliki bukti parity M5.' if cfg.caption_renderer=='auto' else None}
     if cfg.caption_renderer=='ass':return {'engine':'ass','status':'ready','plan_version':plan['version']}
     state=readiness(cfg)
     if state['status']!='ready':

@@ -279,7 +279,7 @@ def test_real_http_diff_snapshot_and_invalid_revision(studio):
     snap=client.post('/api/studio/editor/drafts',json=req)
     assert snap.status_code==200
     response=client.get('/api/studio/editor/projects/editor-case',params={'clip_id':first(studio)})
-    assert response.status_code==200 and len(response.json()['aliases'])==9
+    assert response.status_code==200 and len(response.json()['aliases'])==10 and response.json()['aliases']['M5 · Caption, brand dan finishing']==['Tampilan','M5 · Caption, brand dan finishing']
     stale=client.post('/api/studio/editor/diff',json={**req,'expected_revision':0})
     assert stale.status_code==409 and document(studio)==before
 

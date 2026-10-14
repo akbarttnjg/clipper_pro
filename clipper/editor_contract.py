@@ -16,6 +16,7 @@ TRACKS = ('video', 'captions', 'illustration', 'voice', 'music', 'sfx')
 CURVE_ATTRIBUTES = {'scale': (1., 4.), 'x': (-1., 1.), 'y': (-1., 1.), 'opacity': (0., 1.)}
 EASINGS = ('linear', 'hold', 'ease_in', 'ease_out', 'ease_in_out')
 PANEL_ALIASES = {
+    'M5 · Caption, brand dan finishing': ('Tampilan', 'M5 · Caption, brand dan finishing'),
     'Kata & ejaan': ('Teks', 'Subtitle dan ucapan'),
     'Potongan & ritme': ('Potongan', 'Batas dan susunan'),
     'Gaya keseluruhan': ('Tampilan', 'Profil'),

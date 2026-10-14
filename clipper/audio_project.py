@@ -15,11 +15,18 @@ def draw(source,plan,cfg,ass,target,mix,on_progress=None):
     w,h,fps=plan['width'],plan['height'],plan['fps'];target=Path(target);target.parent.mkdir(parents=True,exist_ok=True)
     pending=target.with_name(target.stem+'.rendering.mp4');wave_w=round(w*.84)//2*2;wave_h=round(h*.19)//2*2
     graph=f'[1:a]showwaves=s={wave_w}x{wave_h}:mode=line:rate={fps}:colors={cfg.accent_hex.replace("#","0x")}[wave];[0:v][wave]overlay=(W-w)/2:H*0.22:shortest=1[base];[base]'
+    extra=[];previous='base'
+    finishing=plan.get('finishing5',{}).get('overlay')
+    if finishing:
+        extra.extend(['-i',finishing['path']]);graph+='[2:v]overlay=0:0:eof_action=pass:repeatlast=0[finished5];[finished5]';previous='finished5'
+    captions=plan.get('caption_renderer',{})
+    if captions.get('engine')=='raster':
+        idx=2+len(extra)//2;extra.extend(['-i',captions['path']]);graph+=f'[{idx}:v]overlay=0:0:eof_action=pass:repeatlast=0[raster5];[raster5]';ass=None
     graph+=(ffmpeg_util.ass_filter(ass,cfg) if ass else 'null')+'[out]'
     script=target.with_suffix('.filter.txt');script.write_text(graph,encoding='utf-8');codec=cfg.video_codec
     if cfg.use_nvenc and not cfg.allow_backend_fallback and codec!='h264_nvenc':raise ValueError('NVENC diwajibkan tetapi belum tersedia')
     command=['ffmpeg','-v','warning','-y','-f','lavfi','-i',f'color=c=0x11151b:s={w}x{h}:r={fps}:d={plan["duration"]}',
-        '-i',str(mix),'-filter_complex_threads','1',*ffmpeg_util.filter_file_args(script),'-map','[out]','-map','1:a',
+        '-i',str(mix),*extra,'-filter_complex_threads','1',*ffmpeg_util.filter_file_args(script),'-map','[out]','-map','1:a',
         '-t',str(plan['duration']),'-r',str(fps),'-c:v',codec,*ffmpeg_util.encoder_args(codec),'-threads','4','-pix_fmt','yuv420p',
         '-c:a','aac','-b:a','192k','-ar','48000','-movflags','+faststart',str(pending)]
     try:
@@ -41,30 +48,57 @@ def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
     if clip.get('_editor_clock'):plan['editor']={'schema_version':1,'clock':clip['_editor_clock'],'tracks':clip['_editor_tracks'],
         'original_source':clip['_editor_source'],'original_bounds':clip['_editor_original_bounds'],'advanced_source_layer':'baked'}
     locations=library_paths.destinations(cfg,name);video_base,text_base,report_base=locations['video'],locations['text'],locations['report'];work=Path(cfg.work_dir)/'renders'/name;work.mkdir(parents=True,exist_ok=True)
-    ass=captions_pro.write_ass(plan['words'],work/'captions.ass',cfg,keywords=clip.get('keywords',[]));plan['captions']=read_json(Path(ass).with_suffix('.caption-plan.json'))
+    from .finishing5_service import caption_config
+    caption_cfg=caption_config(plan,cfg)
+    ass=captions_pro.write_ass(plan['words'],work/'captions.ass',caption_cfg,keywords=clip.get('keywords',[]));plan['captions']=read_json(Path(ass).with_suffix('.caption-plan.json'))
     if clip.get('_m2_translation'):
         from . import bilingual_m2
-        translated=bilingual_m2.translation_words(clip['_m2_translation'],plan,clip);plan['captions']=bilingual_m2.make_plan(plan['words'],translated,cfg)
+        translated=bilingual_m2.translation_words(clip['_m2_translation'],plan,clip)
+        if cfg.finishing5:
+            from .finishing5_plan import bilingual
+            plan['captions']=bilingual(plan['words'],translated,caption_cfg)
+        else:plan['captions']=bilingual_m2.make_plan(plan['words'],translated,cfg)
         ass=captions_pro.write_plan(plan['captions'],work/'captions.ass',cfg)
     plan['display_words']=plan['words'];plan['subtitle_path']=str(ass);plan['caption_renderer']={'engine':'ass','status':'ready','reason':'audio or bilingual uses measured libass layout'}
     plan['caption_checks']=qc.inspect_caption_plan(plan['captions'],cfg,expected_words=plan['words'])
     if not plan['caption_checks']['passed']:raise ValueError('Subtitle audiogram perlu review: '+'; '.join(plan['caption_checks'].get('issues',[])))
     mix=render.audio_stems(source,plan,cfg,work);on_progress(25,'Merender audiogram dari audio sumber')
+    if cfg.finishing5:
+        from . import caption_renderer
+        from .finishing5_service import map_layers
+        from .finishing5_render import decorations,censor_audio
+        from .finishing5_assets import font_info
+        plan['caption_renderer']=caption_renderer.render(plan['captions'],cfg,work,plan['duration'])
+        map_layers(plan,cfg);decorations(plan,cfg,work);mix=censor_audio(plan,cfg,mix,work)
+        plan['finishing5']['font_assets']=cfg.finishing5.get('font_assets',[])
+        used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']}
+        plan['m5_fonts']=[{**font_info(cfg.fonts_dir,k),'path':str(Path(cfg.fonts_dir)/font_info(cfg.fonts_dir,k)['file'])} for k in used]
     target=draw(source,plan,cfg,ass,work/(name+'.mp4'),mix,lambda p:on_progress(30+round(p*60),'Encoding audiogram'))
     checked=qc.inspect(target,cfg,plan['duration']);plan['status']='done';plan['render_seconds']=time.monotonic()-started
     from .audio_quality import inspect
     plan['audio_quality']=inspect(target,cfg)
     from .style5 import readability
     plan['style_report']=readability(plan['captions'],cfg);plan['render_config']={};plan['style']={'font_main':cfg.font_main,'font_accent':cfg.font_accent}
+    if cfg.finishing5:
+        from .finishing5_render import raster_report
+        plan['raster_qc']=raster_report(target,plan,cfg);plan['style_report']['raster_qc']=plan['raster_qc']
+        plan['caption_checks']['raster_contrast_status']=plan['raster_qc']['status']
     shutil.copy2(ass,text_base.with_suffix('.ass'))
     from .projects import write_srt
     write_srt(plan,text_base.with_suffix('.srt'));report_base.with_suffix('.credits.txt').write_text('Audiogram dari audio sumber milik pengguna.\n',encoding='utf-8')
+    if cfg.finishing5:
+        credits=[]
+        for a in [*[r['asset'] for r in plan['finishing5']['layers'] if r.get('asset')],*cfg.finishing5.get('font_assets',[])]:credits.append({k:a[k] for k in ('id','sha256','origin','license','permission','attribution')})
+        write_json(report_base.with_suffix('.credits.json'),credits)
+        report_base.with_suffix('.credits.txt').write_text('\n'.join(r['attribution']+' · '+r['license'] for r in credits),encoding='utf-8')
+    if plan['captions'].get('bilingual'):
+        for track in ('source','translation'):write_srt({**plan,'captions':plan['captions'][track+'_plan']},text_base.with_suffix('.'+track+'.srt'))
     final=video_base.with_suffix('.mp4');shutil.move(target,final);path=work/'edit-plan.json';write_json(path,plan)
     return {'file':library_paths.relative(cfg,final),'url':library_paths.url(library_paths.relative(cfg,final)),
         'ass_url':library_paths.url(library_paths.relative(cfg,text_base.with_suffix('.ass'))),'srt_url':library_paths.url(library_paths.relative(cfg,text_base.with_suffix('.srt'))),
         'credits_url':library_paths.url(library_paths.relative(cfg,report_base.with_suffix('.credits.txt'))),'title':clip['title'],'reason':clip.get('reason',''),
         'start':clip['start'],'end':clip['end'],'length':checked['duration'],'width':cfg.target_w,'height':cfg.target_h,'fps':cfg.output_fps,
-        'encoder':plan['encoder'],'revision':clip.get('revision',0),'plan_path':str(path),'render_version':'4.0.13-m2','broll_count':0,
+        'encoder':plan['encoder'],'revision':clip.get('revision',0),'plan_path':str(path),'render_version':'4.0.16-m5' if cfg.finishing5 else '4.0.13-m2','broll_count':0,
         'subtitle_flags':0,'render_seconds':plan['render_seconds'],'selection_source':clip.get('selection_source'),'qc':checked,'warnings':plan['warnings']}
 
 

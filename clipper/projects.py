@@ -496,6 +496,10 @@ def _export_bundle(results, cfg, progress=lambda p,m: None, *, mode='hybrid'):
             packed_clean=pack(p['source']['path'],f'{i+1:02}-source{Path(p["source"]["path"]).suffix.lower()}')
         from .illustrations import credits
         credit_rows=credits(p)
+        for layer in p.get('finishing5',{}).get('layers',[]):
+            a=layer.get('asset')
+            if a:credit_rows.append({'provider':'local_m5','id':a['id'],'origin':a['origin'],'license':a['license'],'permission':a['permission'],'sha256':a['sha256'],'credit':a['attribution']})
+        for a in p.get('finishing5',{}).get('font_assets',[]):credit_rows.append({'provider':'font_m5','id':a['id'],'origin':a['origin'],'license':a['license'],'permission':a['permission'],'sha256':a['sha256'],'credit':a['attribution']})
         write_json(root/'Media'/f'{i+1:02}-credits.json',credit_rows)
         (root/'Media'/f'{i+1:02}-credits.txt').write_text('\n'.join(c['credit'] for c in credit_rows),encoding='utf-8')
         for j,event in enumerate(p.get('broll',[])):

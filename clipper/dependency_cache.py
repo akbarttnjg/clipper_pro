@@ -130,7 +130,7 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     if not cfg.align_selected_clips:irrelevant.add('alignment_model_path')
     if not cfg.use_nvenc:irrelevant.add('allow_backend_fallback')
     for key in irrelevant:settings.pop(key,None)
-    fonts=[(p.name,content_id(p,fresh=fresh)) for p in sorted(Path(cfg.fonts_dir).glob('*.ttf'))]
+    fonts=[(p.name,content_id(p,fresh=fresh)) for p in sorted(Path(cfg.fonts_dir).iterdir()) if p.suffix.lower() in ('.ttf','.otf')]
     assets=[asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
     recipe=active_recipe(clip.get('_broll_recipe',{}),cfg)
     for scene in recipe.get('scenes',[]):assets.append(asset_id(scene.get('asset',{}).get('path'),fresh=fresh))
@@ -138,6 +138,11 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     candidate={k:v for k,v in clip.items() if k not in ('result','preview','created','updated','_broll_recipe','included','revision','variants')}
     from .caption_renderer import signature
     parts=[VERSION,content_id(media,fresh=fresh),words,candidate,settings,fonts,assets,recipe,signature(cfg)]
+    if cfg.finishing5 and cfg.broll_ranker!='off' and any(r.get('kind')=='video' for r in cfg.finishing5.get('decorations',[])):
+        from .asset_rank import signature as rank_signature
+        from .runtime.state import runtime_root
+        root=Path(cfg.visual_runtime_root) if cfg.visual_runtime_root else runtime_root()
+        parts.extend([rank_signature(cfg),component_identity(root,('siglip2',),fresh=fresh)])
     parts.append(alignment_identity(cfg,fresh=fresh))
     if cfg.visual_enabled:
         from .runtime.state import signatures,runtime_root

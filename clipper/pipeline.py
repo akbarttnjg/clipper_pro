@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.15-m4'
+RENDER_VERSION = '4.0.16-m5'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -217,23 +217,44 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
     from .style5 import annotate_prosody,readability
     display=annotate_prosody(display,voice)
     plan['display_words']=display
-    ass = captions_pro.write_ass(display, work / 'captions.ass', cfg,
+    from .finishing5_service import caption_config
+    caption_cfg=caption_config(plan,cfg)
+    ass = captions_pro.write_ass(display, work / 'captions.ass', caption_cfg,
         keywords=clip.get('keywords', []),
         anchors=placement.caption_anchors(plan, cfg))
     plan['captions'] = read_json(Path(ass).with_suffix('.caption-plan.json'))
     if clip.get('_m2_translation'):
         from . import bilingual_m2
         translated=bilingual_m2.translation_words(clip['_m2_translation'],plan,clip)
-        plan['captions']=bilingual_m2.make_plan(display,translated,cfg)
+        if cfg.finishing5:
+            from .finishing5_plan import bilingual
+            plan['captions']=bilingual(display,translated,caption_cfg,anchors=placement.caption_anchors(plan,cfg))
+        else:plan['captions']=bilingual_m2.make_plan(display,translated,cfg)
         ass=captions_pro.write_plan(plan['captions'],work/'captions.ass',cfg)
     # SFX cues now follow the final acoustic/semantic caption decisions.
     mix=render.audio_stems(media_path,plan,cfg,work)
+    if cfg.finishing5:
+        from .finishing5_service import map_layers
+        from .finishing5_render import decorations,censor_audio
+        map_layers(plan,cfg);decorations(plan,cfg,work)
+        mix=censor_audio(plan,cfg,mix,work)
+        from .finishing5_assets import font_info
+        used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']}
+        plan['m5_fonts']=[{**font_info(cfg.fonts_dir,key),'path':str(Path(cfg.fonts_dir)/font_info(cfg.fonts_dir,key)['file'])} for key in sorted(used)]
+        plan['finishing5']['font_assets']=cfg.finishing5.get('font_assets',[])
+        credits=illustrations.credits(plan)
+        for layer in plan['finishing5']['layers']:
+            a=layer.get('asset')
+            if a:credits.append({'provider':'local_m5','id':a['id'],'sha256':a['sha256'],'origin':a['origin'],'license':a['license'],'permission':a['permission'],'credit':a['attribution']})
+        for a in cfg.finishing5.get('font_assets',[]):credits.append({'provider':'font_m5','id':a['id'],'sha256':a['sha256'],'origin':a['origin'],'license':a['license'],'permission':a['permission'],'credit':a['attribution']})
+        write_json(report_base.with_suffix('.credits.json'),credits)
+        report_base.with_suffix('.credits.txt').write_text('\n'.join(c['credit'] for c in credits),encoding='utf-8')
     plan['style_report']=readability(plan['captions'],cfg)
     plan['style_report']['selected_alignment']=plan.get('selected_alignment')
     write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
     if plan['style_report']['issue_count']:plan['warnings'].append('Keterbacaan perlu ditinjau; lihat masalah per frasa di panel Gaya Tahap 5.')
     from . import caption_renderer
-    plan['caption_renderer']=caption_renderer.render(plan['captions'],replace(cfg,caption_renderer='ass') if plan['captions'].get('bilingual') else cfg,work,plan['duration'])
+    plan['caption_renderer']=caption_renderer.render(plan['captions'],replace(cfg,caption_renderer='ass') if plan['captions'].get('bilingual') and not cfg.finishing5 else cfg,work,plan['duration'])
     plan['style_report']['renderer']={k:plan['caption_renderer'].get(k) for k in ('engine','status','reason','generation')}
     plan['style_report']['explanations']=[{'quote':a['origin']['quote'],'renderer':a['renderer'],
         'motion_canvas':a['motion_canvas'],'preview_path':a['path']} for a in plan.get('explanation_assets',[])]
@@ -262,6 +283,10 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
     shutil.copy2(ass, text_base.with_suffix('.ass'))
     from .projects import write_srt
     write_srt(plan, text_base.with_suffix('.srt'))
+    if plan['captions'].get('bilingual'):
+        for track in ('source','translation'):
+            target=text_base.with_suffix('.'+track+'.srt')
+            write_srt({**plan,'captions':plan['captions'][track+'_plan']},target)
     on_progress(25, 'Menyiapkan suara dan musik')
     from . import audio_quality
     plan['audio_quality'] = audio_quality.inspect(mix, cfg)
@@ -275,6 +300,12 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
         on_progress(96, 'Memeriksa durasi, gambar, dan suara')
         checked = qc.inspect(rendered, cfg, plan['duration'])
         checked['caption_layout'] = plan['caption_checks']
+        if cfg.finishing5:
+            from .finishing5_render import raster_report
+            raster=raster_report(rendered,plan,cfg);plan['raster_qc']=raster
+            plan['caption_checks']['raster_contrast_status']=raster['status'];plan['style_report']['raster_qc']=raster
+            if raster['status']=='needs_review':plan['warnings'].append('Sebagian sampel kontras raster belum memenuhi pengukuran; tinjau background pada preview.')
+            write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
         plan['audio_quality'] = audio_quality.inspect(rendered, cfg)
         checked['audio_quality'] = plan['audio_quality']
         plan['warnings'].extend(plan['audio_quality'].get('issues', []))

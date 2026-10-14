@@ -21,6 +21,8 @@ def guarded(fn):
 
 def create_router(service):
     router=APIRouter(prefix='/api/studio',tags=['studio4'])
+    from .api_finishing5 import router as finishing_router
+    router.include_router(finishing_router(service,guarded))
     from .api_runtime import router as runtime_router
     router.include_router(runtime_router(service))
     from .api_editor import router as editor_router

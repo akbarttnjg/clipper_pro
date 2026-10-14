@@ -1,0 +1,618 @@
+{
+  "version": "4.0.16-m5",
+  "specification_sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+  "milestone_page": 50,
+  "gate_g5": "pending_real_corpus",
+  "packages": {
+    "M5.1": [
+      "TX03",
+      "TX04",
+      "TX05",
+      "TX06",
+      "TX15"
+    ],
+    "M5.2": [
+      "TX07",
+      "TX13",
+      "TX14"
+    ],
+    "M5.3": [
+      "TX01",
+      "TX08",
+      "TX09",
+      "TX10",
+      "TX11",
+      "TX12",
+      "TX18"
+    ],
+    "M5.4": [
+      "TX02",
+      "TX16",
+      "TX17"
+    ],
+    "M5.5": [
+      "BR01",
+      "BR02",
+      "BR03",
+      "BR04",
+      "BR05",
+      "BR06",
+      "BR07",
+      "BR08",
+      "BR09",
+      "BR10"
+    ],
+    "M5.6": [
+      "FX03",
+      "FX06",
+      "FX07",
+      "FX08",
+      "FX17"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "TX03",
+      "title": "Font utama, aksen dan fallback",
+      "phase": "M5",
+      "page": 96,
+      "target": "Simpan family, weight, glyph fallback dan sumber font.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.1",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX04",
+      "title": "Import font kustom",
+      "phase": "M5",
+      "page": 96,
+      "target": "Font lokal terdaftar dengan metadata dan izin aset.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.1",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX05",
+      "title": "Warna, stroke, shadow dan glow",
+      "phase": "M5",
+      "page": 96,
+      "target": "Satu schema nilai efektif untuk seluruh renderer.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.1",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX06",
+      "title": "Posisi, anchor dan perataan",
+      "phase": "M5",
+      "page": 96,
+      "target": "Kiri/kanan/atas/bawah memakai safe area yang sama.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.1",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX15",
+      "title": "Diff preset dan reset per field",
+      "phase": "M5",
+      "page": 97,
+      "target": "Tampilkan perubahan sebelum menerapkan preset.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.1",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX07",
+      "title": "Auto-fit dan pemecahan frasa",
+      "phase": "M5",
+      "page": 96,
+      "target": "Pecah sesuai makna, durasi tampil dan ukuran layar.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.2",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX13",
+      "title": "Keterbacaan pada layar kecil",
+      "phase": "M5",
+      "page": 97,
+      "target": "Ukur glyph final setelah skala/animasi.",
+      "acceptance": "automated evidence plus real user corpus pending",
+      "m5_package": "M5.2",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX14",
+      "title": "QC frame sepanjang animasi",
+      "phase": "M5",
+      "page": 97,
+      "target": "Periksa envelope blur/shadow/scale dan kontras.",
+      "acceptance": "automated evidence plus real user corpus pending",
+      "m5_package": "M5.2",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX01",
+      "title": "Caption kata, frasa dan karaoke",
+      "phase": "M5",
+      "page": 95,
+      "target": "Pilih granularitas caption dan penekanan per kata.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX08",
+      "title": "Penekanan semantik",
+      "phase": "M5",
+      "page": 96,
+      "target": "Tekankan frasa bermakna bersama angka/negasi/unit.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX09",
+      "title": "Emoji dan keyword opsional",
+      "phase": "M5",
+      "page": 96,
+      "target": "Tambahkan ikon/emoji hanya sesuai profil.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX10",
+      "title": "Warna caption per speaker",
+      "phase": "M5",
+      "page": 96,
+      "target": "Gunakan identitas speaker yang disetujui.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX11",
+      "title": "Sensor kata tertentu",
+      "phase": "M5",
+      "page": 97,
+      "target": "Bleep/mask tampilan dengan kamus dan lingkup jelas.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX12",
+      "title": "Deteksi caption bakar sumber",
+      "phase": "M5",
+      "page": 97,
+      "target": "Tandai dan pilih hindari, tutup atau rekonstruksi.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX18",
+      "title": "Caption bilingual dan aksesibilitas",
+      "phase": "M5",
+      "page": 97,
+      "target": "Dua bahasa, speaker label dan output subtitle terpisah.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.3",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX02",
+      "title": "Galeri template dengan preview nyata",
+      "phase": "M5",
+      "page": 96,
+      "target": "Pilih template pada potongan video pengguna.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.4",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX16",
+      "title": "Template builder dan reusable style",
+      "phase": "M5",
+      "page": 97,
+      "target": "Pengguna membuat template memakai schema terbatas.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.4",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "TX17",
+      "title": "Parity ASS dan renderer alternatif",
+      "phase": "M5",
+      "page": 97,
+      "target": "Sediakan kontrak visual serta label batas renderer.",
+      "acceptance": "automated evidence plus real user corpus pending",
+      "m5_package": "M5.4",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR01",
+      "title": "Brand kit berversi",
+      "phase": "M5",
+      "page": 97,
+      "target": "Font, warna, motion, template policy dan aset disimpan utuh.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR02",
+      "title": "Banyak brand dan sub-brand",
+      "phase": "M5",
+      "page": 98,
+      "target": "Pilih kit per proyek/klip tanpa state bercampur.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR03",
+      "title": "Logo dan watermark kustom",
+      "phase": "M5",
+      "page": 98,
+      "target": "Teks/gambar memakai anchor, padding, opacity dan skala.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR04",
+      "title": "Intro, outro dan title card",
+      "phase": "M5",
+      "page": 98,
+      "target": "Kartu opsional menjadi layer terpisah.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR05",
+      "title": "Lower-third dan speaker card",
+      "phase": "M5",
+      "page": 98,
+      "target": "Identitas pembicara dapat diisi dan dijadwalkan.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR06",
+      "title": "Kamus brand dan istilah",
+      "phase": "M5",
+      "page": 98,
+      "target": "Aturan ejaan dan istilah dibagikan ke ASR/editor.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR07",
+      "title": "Library media lokal dan stok",
+      "phase": "M5",
+      "page": 98,
+      "target": "Index musik, gambar, video dan sumber berlisensi.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR08",
+      "title": "Cover dan thumbnail editor",
+      "phase": "M5",
+      "page": 98,
+      "target": "Frame pilihan dan desain dapat diedit.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR09",
+      "title": "Collections dan pencarian aset",
+      "phase": "M5",
+      "page": 98,
+      "target": "Cari menurut objek, teks, speaker dan metadata.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "BR10",
+      "title": "Import-export kit dan template",
+      "phase": "M5",
+      "page": 98,
+      "target": "Paket portable menyertakan versi, font dan aset.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.5",
+      "scope": "M5",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "FX03",
+      "title": "Transisi cut, fade, blur dan glitch",
+      "phase": "M9",
+      "page": 99,
+      "target": "Transisi mempunyai durasi, alasan dan intensitas.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.6",
+      "scope": "core subset; M9 extensions remain separate",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "FX06",
+      "title": "Kinetic typography",
+      "phase": "M9",
+      "page": 99,
+      "target": "Animasi kata memakai ukuran, easing dan budget gerak.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.6",
+      "scope": "core subset; M9 extensions remain separate",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "FX07",
+      "title": "Animated charts dan diagram",
+      "phase": "M9",
+      "page": 99,
+      "target": "Tabel/grafik/daftar dirender dari data dan sumber ucapan.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.6",
+      "scope": "core subset; M9 extensions remain separate",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "FX08",
+      "title": "B-roll, split dan crossfade",
+      "phase": "M9",
+      "page": 99,
+      "target": "Aset relevan dapat mengganti atau mendampingi sumber.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.6",
+      "scope": "core subset; M9 extensions remain separate",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    },
+    {
+      "id": "FX17",
+      "title": "Photo, overlay, sticker dan compositing",
+      "phase": "M9",
+      "page": 100,
+      "target": "Canvas multi-layer untuk aset dan elemen visual.",
+      "acceptance": "automated functional/contract evidence; original-media acceptance separate",
+      "m5_package": "M5.6",
+      "scope": "core subset; M9 extensions remain separate",
+      "implementation": "implemented",
+      "evidence": [
+        "test_m5_contract.py",
+        "test_m5_service.py",
+        "test_m5_media.py",
+        "m5_ui.cjs"
+      ]
+    }
+  ],
+  "prior_gates": "G3/G4 real corpus remain pending; proceeding follows user authorization",
+  "renderer_scope": "ASS and actual local Pillow Raster; Remotion M5 fails explicitly when required"
+}

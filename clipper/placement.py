@@ -172,6 +172,10 @@ def reserve_band(shot, cfg, phrases=()):
 
 
 def place_shot(shot, cfg, phrases=()):
+    if cfg.finishing5:
+        shot['protected_output']=protected_boxes(shot,cfg.target_w,cfg.target_h)
+        shot['placement']={'mode':'m5_final_ink','geometry_source':'M4' if shot.get('m4') else 'source_evidence'}
+        return
     W, H = cfg.target_w, cfg.target_h
     shot['caption_profile']='editorial9' if cfg.style_preset!='legacy' else 'legacy'
     if cfg.caption_position!='auto' or not cfg.safe_placement:
@@ -253,6 +257,9 @@ def protect_broll(plan, cfg):
 
 
 def caption_anchors(plan, cfg=None):
+    if cfg and cfg.finishing5:
+        return [{'time':(s['start']+s['end'])/2,'start':s['start'],'end':s['end'],'position':s.get('position','bottom'),
+            'panel':s.get('caption_panel'),'protected':protected_boxes(s,cfg.target_w,cfg.target_h),'has_material':s.get('has_material',False)} for s in plan['shots']]
     if cfg and cfg.style_preset!='legacy' and cfg.caption_position=='auto' and cfg.safe_placement:
         return phrase_anchors(plan,cfg)
     if cfg and cfg.caption_position=='auto' and cfg.safe_placement:

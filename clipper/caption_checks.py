@@ -10,6 +10,12 @@ def logical_ids(word):
 
 def inspect_caption_plan(plan, cfg, expected_words=None):
     """Check settled positions and line edges against the requested placement."""
+    if plan.get('m5_version'):
+        from .finishing5_plan import check
+        if plan.get('bilingual'):
+            source=check(plan['source_plan'],cfg,plan['source_words']);translation=check(plan['translation_plan'],cfg,plan['translation_words'])
+            return {**source,'translation':translation,'bilingual':True}
+        return check(plan,cfg,expected_words)
     if plan.get('bilingual'):
         from .bilingual_m2 import check
         return check(plan,cfg)

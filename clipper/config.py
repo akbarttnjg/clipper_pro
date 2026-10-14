@@ -82,6 +82,7 @@ class Config:
     font_name: str = os.environ.get("FONT_NAME", "Arial")
     font_size: int = _env_int("FONT_SIZE", 120)
     caption_style: str = os.environ.get("CAPTION_STYLE", "narrative")
+    finishing5: dict | None = None  # Opt-in M5; old projects keep their renderer.
     # Existing projects retain their manually selected typography.
     style_preset: str = 'legacy'
     caption_template_policy: str = 'auto'

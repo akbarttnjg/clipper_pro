@@ -77,6 +77,7 @@ def brand_values(values):
 
 
 def native_reasons(plan):
+    if plan and plan.get('finishing5'):return ['Finishing M5 memiliki paint/layer yang belum dipetakan identik ke editor native; pilih Tampilan terjaga.']
     if plan and plan.get('m4'):return ['Komposisi kamera M4 memakai source layer; pilih Hibrida atau Tampilan terjaga.']
     if not plan or not plan.get('shots'):return ['Render final dahulu untuk memeriksa shot.']
     reasons=[]
@@ -97,6 +98,10 @@ def export_options(variant):
     rows=[]
     for mode,entry in EXPORT_MODES.items():
         reasons=native_reasons(plan) if mode=='native' else []
+        if mode=='hybrid' and plan.get('captions',{}).get('censor_intervals'):reasons.append('Bleep M5 memakai mix final; pilih Tampilan terjaga agar sensor tetap terdengar.')
+        style=plan.get('finishing5',{}).get('style',{})
+        if mode=='hybrid' and style.get('source_caption_mode') in ('cover','reconstruct') and style.get('source_captions'):
+            reasons.append('Penutup subtitle bakar M5 belum dipetakan ke layer editor; pilih Tampilan terjaga agar teks sumber tetap tertutup.')
         entry=copy.deepcopy(entry)
         if mode!='preserved' and plan.get('editor',{}).get('advanced_source_layer')=='baked':
             entry['baked_layers'] += ['source_time_edits','source_keyframes','camera_switches']

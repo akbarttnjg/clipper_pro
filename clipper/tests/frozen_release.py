@@ -100,3 +100,16 @@ def restore_m3_producer(root):
     for name,data in binaries:
         target=_fixture_path(root,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
     return root
+
+
+def restore_m4_producer(root):
+    fixture=RELEASES/"m5_m4_producer.zip";expected=json.loads(fixture.with_name("m5_m4_producer_provenance.json").read_text())
+    binary=[]
+    for name,digest in expected["external_files"].items():
+        source=Path(__file__).resolve().parents[2]/name
+        if not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest()!=digest:raise ValueError("Frozen M4 external archive changed: "+name)
+        binary.append((name,source.read_bytes()))
+    root=_restore(root,fixture,expected)
+    for name,data in binary:
+        target=_fixture_path(root,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+    return root

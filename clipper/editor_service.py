@@ -76,7 +76,9 @@ def check_lock(service, doc, cid, vid, op):
         'editor_segments': 'video', 'segment_edit': 'video', 'keyframes': 'video', 'visual_controls': 'video',
         'asset_enabled': 'illustration', 'asset_timing': 'illustration', 'asset_replace': 'illustration', 'asset_metadata': 'illustration'}
     track = tracks.get(kind)
-    if kind in ('settings', 'style', 'profile', 'preset_batch', 'brand_apply', 'paste_attributes', 'reset_overrides'):
+    if kind.startswith('m5_'):
+        track='illustration' if kind=='m5_layers' else 'captions'
+    elif kind in ('settings', 'style', 'profile', 'preset_batch', 'brand_apply', 'paste_attributes', 'reset_overrides'):
         keys = set(op.get('values', {})) | set(op.get('keys', []))
         track = 'music' if keys and keys <= set(ATTRIBUTE_GROUPS['audio']) else 'captions'
     if not track or not cid:
@@ -449,6 +451,11 @@ def render_summary(service, doc, requested):
         fonts={}
         for role in ('font_main','font_accent'):
             name=getattr(cfg,role)
+            if cfg.finishing5:
+                from .finishing5_assets import font_info
+                spec=font_info(cfg.fonts_dir,name)
+                fonts[role]={'selected':name,'installed':True,'family':spec['family'],'weight':spec['weight'],'files':[{'name':spec['file'],'digest':'sha256:'+spec['sha256']}]}
+                continue
             spec=FONTS.get(name,{})
             fonts[role]={'selected':name,'installed':False,'files':[]}
             for path in Path(cfg.fonts_dir).glob('*'):
@@ -460,7 +467,8 @@ def render_summary(service, doc, requested):
             'revision':doc['revision'],'width':cfg.target_w,'height':cfg.target_h,'fps':cfg.output_fps,'duration':clock['duration'],
             'clock_digest':clock['digest'],'style_preset':cfg.style_preset,'profile':variant.get('footage_profile'),
             'duration_basis':'shared_editor_clock' if variant.get('editor',{}).get('segments') else 'source_bounds_before_optional_pause_or_hook_planning',
-            'template':cfg.caption_style,'template_policy':cfg.caption_template_policy,'seed':cfg.caption_seed,'fonts':fonts,
+            'template':cfg.finishing5['style']['template_id'] if cfg.finishing5 else cfg.caption_style,'template_policy':cfg.caption_template_policy,'seed':cfg.caption_seed,'fonts':fonts,
+            'finishing5':cfg.finishing5['style'] if cfg.finishing5 else None,
             'audio_normalize':cfg.audio_normalize,'audio_target_lufs':cfg.audio_target_lufs,'audio_peak_db':cfg.audio_peak_db,
             'caption_renderer_requested':cfg.caption_renderer,'encoder_requested':'h264_nvenc' if cfg.use_nvenc else 'libx264',
             'required_capabilities':['ffmpeg','libass']+(['remotion'] if cfg.caption_renderer=='remotion' else []),

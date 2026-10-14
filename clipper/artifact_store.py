@@ -51,6 +51,11 @@ def capture_plan_files(txn,plan,work):
     for event in plan.get('broll',[]):
         for value in (event.get('path'),event.get('asset',{}).get('path')):
             if value and Path(value).is_file():paths.add(Path(value).resolve())
+    for row in plan.get('m5_fonts',[]):
+        if row.get('path') and Path(row['path']).is_file():paths.add(Path(row['path']).resolve())
+    for row in plan.get('finishing5',{}).get('layers',[]):
+        value=row.get('asset',{}).get('path')
+        if value and Path(value).is_file():paths.add(Path(value).resolve())
     for i,source in enumerate(sorted(paths)):
         relative=Path('prepared-assets')/(str(i).zfill(4)+'-'+source.name)
         target=txn.staging/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)

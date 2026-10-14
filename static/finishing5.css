@@ -1,0 +1,9 @@
+.m5-panel details {border:1px solid #374456;border-radius:10px;padding:10px;margin:10px 0}
+.m5-panel summary {cursor:pointer;font-weight:650;line-height:1.5}
+.m5-panel label {display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin:12px 0}
+.m5-panel input,.m5-panel select,.m5-panel textarea {max-width:100%;box-sizing:border-box}
+.m5-panel textarea {width:100%;min-height:90px;resize:vertical;font:13px/1.5 ui-monospace,monospace}
+.m5-panel small {opacity:.75}
+.m5-panel p,.m5-panel pre {overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.55}
+.m5-panel video,.m5-panel img {display:block;max-width:100%;max-height:430px;object-fit:contain;border-radius:8px}
+.m5-panel button {max-width:100%;white-space:normal;margin:4px 4px 4px 0}

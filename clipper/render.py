@@ -171,10 +171,14 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'
         graph.append(f"[{i+2}:v]trim=start={event.get('asset_start',0):.8f}:duration={event['duration']:.8f},setpts=PTS-STARTPTS+{event['start']:.8f}/TB,fps={fps},{layout},setsar=1[br{i}]")
         graph.append(f"[{previous}][br{i}]overlay=0:0:eof_action=pass:repeatlast=0:enable='gte(t,{event['start']:.8f})*lt(t,{event['end']:.8f})'[layer{i}]")
         previous=f'layer{i}'
+    finishing=plan.get('finishing5',{}).get('overlay')
+    if finishing:
+        idx=2+sum(extra_inputs[i]=='-i' for i in range(len(extra_inputs)))
+        extra_inputs.extend(['-i',finishing['path']]);graph.append(f'[{previous}][{idx}:v]overlay=0:0:eof_action=pass:repeatlast=0[finished5]');previous='finished5'
     captions=plan.get('caption_renderer',{})
-    if captions.get('engine')=='remotion' and captions.get('path'):
-        idx=2+len(plan.get('broll',[]))
-        extra_inputs.extend(['-c:v','libvpx-vp9','-i',captions['path']])
+    if captions.get('engine') in ('remotion','raster') and captions.get('path'):
+        idx=2+sum(extra_inputs[i]=='-i' for i in range(len(extra_inputs)))
+        extra_inputs.extend((['-c:v','libvpx-vp9'] if captions.get('engine')=='remotion' else [])+['-i',captions['path']])
         graph.append(f'[{previous}][{idx}:v]overlay=0:0:eof_action=pass:repeatlast=0[captioned]')
         previous='captioned';ass=None
     graph.append(f'[{previous}]'+(ass_filter(ass,cfg) if ass else 'null')+'[out]')

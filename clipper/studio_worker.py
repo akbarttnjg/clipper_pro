@@ -79,6 +79,9 @@ def execute(service,job):
 
 
 def _execute(service,job):
+    if job['kind'] in ('gallery_m5','cover_m5'):
+        from .finishing5_jobs import execute
+        return execute(service,job)
     if job['kind']=='export_project':
         from .batch7 import export_project
         return export_project(service,job)
@@ -212,7 +215,8 @@ def _execute(service,job):
                 voice=render.voice_stem(source,plan,cfg,work/'style-review-audio')
                 cleaned=annotate_prosody(cleaned,voice)
                 plan['display_words']=cleaned
-                captions=make_plan(cleaned,cfg,clip.get('keywords',[]),anchors=caption_anchors(plan,cfg))
+                from .finishing5_service import caption_config
+                captions=make_plan(cleaned,caption_config(plan,cfg),clip.get('keywords',[]),anchors=caption_anchors(plan,cfg))
                 result=readability(captions,cfg)
                 result['selected_alignment']=plan.get('selected_alignment')
                 for phrase in result['phrases']:
@@ -289,7 +293,11 @@ def _execute(service,job):
             from .runtime.state import write
             write(Path(cfg.work_dir)/'render-cache'/f'{key}.json',result)
             from . import visual4
-            visual_report=visual4.report(plan,source,cfg)
+            if plan.get('m4'):
+                visual_report={'summary':{**plan.get('visual_summary',{}),'key':plan['m4']['analysis_id'],'scope':'M4 approved composition; no duplicate legacy inference'},'shots':[],'m4':plan['m4']}
+            elif not cfg.visual_enabled:
+                visual_report={'summary':{'status':'disabled','scope':'legacy visual report disabled by configuration'},'shots':[]}
+            else:visual_report=visual4.report(plan,source,cfg)
             variant_updates.update({('preview' if kind=='preview' else 'result'):result,'schedule':plan.get('broll_schedule',[]),'schedule_dependency':dependency,
                 'timeline_summary':{k:plan.get(k) for k in ('spans','duration','fps','width','height','warnings','audio_quality')},
                 'shot_summary':[{k:s.get(k) for k in ('start','end','source_start','source_end','mode','has_material','composition_reason')} for s in plan.get('shots',[])],
