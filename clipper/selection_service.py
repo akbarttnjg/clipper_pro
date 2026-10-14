@@ -25,7 +25,7 @@ def signature(service,doc,scope='display'):
     data=transcript(service,doc,scope)
     rows,words=sc.sentences(data['words'],data['duration'])
     return fingerprint([sc.VERSION,doc['source']['source_id'],doc.get('transcript_id'),scope,
-        [[w['word_id'],w['word'],w['start'],w['end'],w.get('speaker_id'),w.get('speaker_provenance'),w.get('probability')] for w in words]])
+        [[w['word_id'],w['word'],w['start'],w['end'],w.get('speaker_id'),w.get('speaker_provenance'),w.get('probability'),w.get('aligned_words'),w.get('alignment_method')] for w in words]])
 
 
 def required_review(candidate):

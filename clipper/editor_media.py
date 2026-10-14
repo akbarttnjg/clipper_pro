@@ -225,7 +225,7 @@ def prepare(service,doc,cid,vid,source,words,clip,cfg,progress=lambda *_:None):
     cfg=replace(cfg,**values)
     info=ffmpeg_util.probe(source)
     width,height=info['width']//2*2,info['height']//2*2
-    identities={k:r['content_id'] for k,r in cameras.items() if any(s['camera_id']==k for s in clock['slices'])}
+    identities={k:{'content_id':r['content_id'],'offset_seconds':r['offset_seconds']} for k,r in cameras.items() if any(s['camera_id']==k for s in clock['slices'])}
     key=fingerprint([ec.VERSION,content_id(source),clock['digest'],identities,editor.get('curves'),
         {k:v['enabled'] for k,v in tracks.items()},width,height])
     folder=service.work/doc['project_id']/'editor-proxies'/key[:32]

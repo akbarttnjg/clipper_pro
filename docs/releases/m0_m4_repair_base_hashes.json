@@ -1,0 +1,1213 @@
+{
+  "base_commit": "e6ed7006a67cf323b63eb943f3ff4924843e6e78",
+  "base_tree": "842951a1ce9b18b50d3d306bab7db6dc16addeeb",
+  "repair_baseline_commit": "e6ed7006a67cf323b63eb943f3ff4924843e6e78",
+  "additional_base_commits": [
+    "11d34a18351997d01c99a397ccc2bce41839885a",
+    "2df0ce596229c60434e4ffae7d078aaf5ea7a317",
+    "3f6a8a1c89036c733222d56842da51c1e1cba5e2",
+    "4529c82f964c83f1031823b937f784c50e8858eb",
+    "71a145c9839e235bfadc81ca9ee633ecf4bd6efe",
+    "aff985482eb5d0568ccf74670dc6dfe31fe3137d",
+    "b8c4ce275021a7b09db2710939a4c063b754f35b",
+    "b8d12eb972b742a75379c39dc8fa7d35752b9e5e"
+  ],
+  "payload_paths": [
+    ".gitignore",
+    "README.md",
+    "clipper/analysis_adapter.py",
+    "clipper/api_camera4.py",
+    "clipper/api_editor.py",
+    "clipper/api_ingest.py",
+    "clipper/api_selection.py",
+    "clipper/api_studio.py",
+    "clipper/artifact_store.py",
+    "clipper/audio_project.py",
+    "clipper/batch7.py",
+    "clipper/bilingual_m2.py",
+    "clipper/camera4_contract.py",
+    "clipper/camera4_observe.py",
+    "clipper/camera4_plan.py",
+    "clipper/camera4_render.py",
+    "clipper/camera4_service.py",
+    "clipper/camera4_tracking.py",
+    "clipper/caption_checks.py",
+    "clipper/caption_director.py",
+    "clipper/config.py",
+    "clipper/crop.py",
+    "clipper/dependency_cache.py",
+    "clipper/editor_contract.py",
+    "clipper/editor_drafts.py",
+    "clipper/editor_media.py",
+    "clipper/editor_search.py",
+    "clipper/editor_service.py",
+    "clipper/editplan.py",
+    "clipper/ffmpeg_util.py",
+    "clipper/media_context.py",
+    "clipper/pipeline.py",
+    "clipper/placement.py",
+    "clipper/project_store.py",
+    "clipper/projects.py",
+    "clipper/render.py",
+    "clipper/selected_alignment.py",
+    "clipper/selection_contract.py",
+    "clipper/selection_engine.py",
+    "clipper/selection_index.py",
+    "clipper/selection_service.py",
+    "clipper/selection_signals.py",
+    "clipper/source_assembly.py",
+    "clipper/source_imports.py",
+    "clipper/speech_m2.py",
+    "clipper/stage3.py",
+    "clipper/studio_exchange.py",
+    "clipper/studio_service.py",
+    "clipper/studio_worker.py",
+    "clipper/tests/_m3_fixture.py",
+    "clipper/tests/_m4_fixture.py",
+    "clipper/tests/_media_requirements.py",
+    "clipper/tests/editor_complete_ui.cjs",
+    "clipper/tests/frozen_release.py",
+    "clipper/tests/m1_analysis_ui.cjs",
+    "clipper/tests/m1_ui.cjs",
+    "clipper/tests/m2_ui.cjs",
+    "clipper/tests/m3_ui.cjs",
+    "clipper/tests/m4_ui.cjs",
+    "clipper/tests/parallel_a/test_analysis.py",
+    "clipper/tests/repair1_ui.cjs",
+    "clipper/tests/stage3_ui.cjs",
+    "clipper/tests/style5_ui.cjs",
+    "clipper/tests/test_complete_installer.py",
+    "clipper/tests/test_complete_repairs.py",
+    "clipper/tests/test_editor_m1.py",
+    "clipper/tests/test_m0_installer.py",
+    "clipper/tests/test_m0_integration.py",
+    "clipper/tests/test_m0_m2_repairs.py",
+    "clipper/tests/test_m0_m4_repair_installer.py",
+    "clipper/tests/test_m0_runtime.py",
+    "clipper/tests/test_m1.py",
+    "clipper/tests/test_m1_installer.py",
+    "clipper/tests/test_m2_fixture_integrity.py",
+    "clipper/tests/test_m2_installer.py",
+    "clipper/tests/test_m2_installer_contract.py",
+    "clipper/tests/test_m2_sources.py",
+    "clipper/tests/test_m2_speech.py",
+    "clipper/tests/test_m2_transcripts.py",
+    "clipper/tests/test_m3_contract.py",
+    "clipper/tests/test_m3_engine.py",
+    "clipper/tests/test_m3_index.py",
+    "clipper/tests/test_m3_installer.py",
+    "clipper/tests/test_m3_m4_repairs.py",
+    "clipper/tests/test_m3_media.py",
+    "clipper/tests/test_m3_service.py",
+    "clipper/tests/test_m3_signals.py",
+    "clipper/tests/test_m3_worker.py",
+    "clipper/tests/test_m4_contract.py",
+    "clipper/tests/test_m4_evidence.py",
+    "clipper/tests/test_m4_installer.py",
+    "clipper/tests/test_m4_media.py",
+    "clipper/tests/test_m4_service.py",
+    "clipper/tests/test_recovery.py",
+    "clipper/tests/test_runtime_stage2.py",
+    "clipper/tests/test_studio24.py",
+    "clipper/tests/test_typography22.py",
+    "clipper/tests/test_upgrade32.py",
+    "clipper/tests/test_upgrade33.py",
+    "clipper/tests/test_visual4.py",
+    "clipper/tests/ui_loader.cjs",
+    "clipper/tests/visual4_ui.cjs",
+    "clipper/tests/workspace6_ui.cjs",
+    "clipper/transcribe.py",
+    "clipper/transcript_service.py",
+    "clipper/transcript_tracks.py",
+    "clipper/translation_m2.py",
+    "clipper/typography.py",
+    "clipper/visual4.py",
+    "clipper/visual_worker.py",
+    "clipper/workflow6.py",
+    "docs/AUDIT_INSTALLER_M2_FIX1.md",
+    "docs/LAPORAN_M3.md",
+    "docs/LAPORAN_M4.md",
+    "docs/M0_M4_REPAIRS_4_0_15_1.json",
+    "docs/M1_REQUIREMENTS.json",
+    "docs/M2_REQUIREMENTS.json",
+    "docs/M3_REQUIREMENTS.json",
+    "docs/M4_REQUIREMENTS.json",
+    "docs/UPGRADE_4_0_11_M1.md",
+    "docs/UPGRADE_4_0_12_M1.md",
+    "docs/UPGRADE_4_0_13_M2.md",
+    "docs/UPGRADE_4_0_14_M3.md",
+    "docs/UPGRADE_4_0_15_1_M0_M4.md",
+    "docs/UPGRADE_4_0_15_M4.md",
+    "docs/releases/m0_m2_aud06_fixture.zip",
+    "docs/releases/m0_m2_aud06_provenance.json",
+    "docs/releases/m0_m2_repair_fixture_provenance.json",
+    "docs/releases/m0_m2_repair_m2_fixture.zip",
+    "docs/releases/m0_m4_repair_base_hashes.json",
+    "docs/releases/m0_m4_repair_m4_fixture.zip",
+    "docs/releases/m0_m4_repair_m4_provenance.json",
+    "docs/releases/m0_producer_fixture.zip",
+    "docs/releases/m1_base_hashes.json",
+    "docs/releases/m1_fixture.zip",
+    "docs/releases/m1_initial_fixture.zip",
+    "docs/releases/m2_base_hashes.json",
+    "docs/releases/m2_fixture_provenance.json",
+    "docs/releases/m2_m0_fixture.zip",
+    "docs/releases/m2_m0_fixture_provenance.json",
+    "docs/releases/m2_m1_fixture.zip",
+    "docs/releases/m3_base_hashes.json",
+    "docs/releases/m3_m2_fixture.zip",
+    "docs/releases/m3_m2_fixture_provenance.json",
+    "docs/releases/m4_base_hashes.json",
+    "docs/releases/m4_m3_producer.zip",
+    "docs/releases/m4_m3_producer_provenance.json",
+    "static/camera4.css",
+    "static/editor1.css",
+    "static/features/analysis.js",
+    "static/features/camera4.js",
+    "static/features/draft_storage.js",
+    "static/features/editor1.js",
+    "static/features/editor_clock.js",
+    "static/features/editor_state.js",
+    "static/features/ingest2.js",
+    "static/features/selection3.js",
+    "static/features/style5.js",
+    "static/features/transcript3.js",
+    "static/features/visual4.js",
+    "static/features/workspace6.js",
+    "static/index.html",
+    "static/ingest2.css",
+    "static/selection3.css",
+    "static/studio4.css",
+    "static/studio4.js",
+    "tools/build_m0_m4_repair_release.py",
+    "tools/build_m0_release.py",
+    "tools/build_m1_release.py",
+    "tools/build_m2_release.py",
+    "tools/build_m3_release.py",
+    "tools/build_m4_release.py",
+    "tools/complete_installer.py"
+  ],
+  "guard_paths": [
+    "JALANKAN_PRO.cmd",
+    "app.py",
+    "clipper/__init__.py",
+    "clipper/analysis_options.py",
+    "clipper/api_analysis.py",
+    "clipper/api_runtime.py",
+    "clipper/asset_rank.py",
+    "clipper/asset_review.py",
+    "clipper/audio_quality.py",
+    "clipper/benchmark.py",
+    "clipper/boundaries.py",
+    "clipper/broll.py",
+    "clipper/capcut_worker7.py",
+    "clipper/caption_fit.py",
+    "clipper/caption_geometry.py",
+    "clipper/caption_readability.py",
+    "clipper/caption_renderer.py",
+    "clipper/captions.py",
+    "clipper/captions_pro.py",
+    "clipper/composition.py",
+    "clipper/contracts/__init__.py",
+    "clipper/correction_memory.py",
+    "clipper/discovery.py",
+    "clipper/edit_styles.py",
+    "clipper/editorial.py",
+    "clipper/evaluation6.py",
+    "clipper/evidence.py",
+    "clipper/explanation5.py",
+    "clipper/export6.py",
+    "clipper/export_verify.py",
+    "clipper/font_catalog.py",
+    "clipper/framing.py",
+    "clipper/illustration_catalog.py",
+    "clipper/illustration_schedule.py",
+    "clipper/illustrations.py",
+    "clipper/intelligence/__init__.py",
+    "clipper/intelligence/core.py",
+    "clipper/job_queue.py",
+    "clipper/layout.py",
+    "clipper/library_paths.py",
+    "clipper/looks.py",
+    "clipper/metrics6.py",
+    "clipper/motion.py",
+    "clipper/project_install.py",
+    "clipper/qc.py",
+    "clipper/runtime/__init__.py",
+    "clipper/runtime/bridge.py",
+    "clipper/runtime/catalog.py",
+    "clipper/runtime/cli.py",
+    "clipper/runtime/download.py",
+    "clipper/runtime/gpu.py",
+    "clipper/runtime/install.py",
+    "clipper/runtime/manager.py",
+    "clipper/runtime/probe.py",
+    "clipper/runtime/samples/motion-canvas/vite.config.mjs",
+    "clipper/runtime/state.py",
+    "clipper/runtime/tasks.py",
+    "clipper/runtime/templates/motion5/vite.config.mjs",
+    "clipper/runtime/templates/remotion5/caption_math.mjs",
+    "clipper/runtime/templates/remotion5/index.jsx",
+    "clipper/score.py",
+    "clipper/segmentation.py",
+    "clipper/semantic_rank.py",
+    "clipper/source_assets.py",
+    "clipper/speech_jobs.py",
+    "clipper/stock.py",
+    "clipper/storage.py",
+    "clipper/story.py",
+    "clipper/studio_storage.py",
+    "clipper/style5.py",
+    "clipper/subtitle_edit.py",
+    "clipper/text_area.py",
+    "clipper/timebase.py",
+    "clipper/transcript_correction.py",
+    "clipper/trim.py",
+    "doctor_pro.py",
+    "requirements-pro.txt",
+    "requirements.txt",
+    "static/features/analysis.css",
+    "static/features/batch7.js",
+    "static/features/runtime.js",
+    "static/runtime.css",
+    "static/studio.css",
+    "static/studio.js"
+  ],
+  "allowed_hashes": {
+    ".gitignore": [
+      "534034f016fd498b05d4dde7aab2dda245b2a31a553fde489a4ab07ca3e391ad",
+      "5c96a50697ba052261f419eec7614e5e0ac7a180ed97721ff416992f76a6d3b5"
+    ],
+    "README.md": [
+      "1d0da02fd27082bc594b6d196f556a3275787d3a69e1908f4558787394b16272",
+      "1dbdc5b121da5169cdc82093648bf090120d4d3ddb69be89cbd8d02a135df21e",
+      "3a68b33d07f97c7448e3e6f82e509caba10044718c1277509f36015449ed02a7",
+      "a89ebdeea84af0b9ab0ae58764e5a8834731762d4dc1bb4a5f96d23337cbc5ff",
+      "d9536763920ae4a1532c5b15849404529b73e9d0b3dcbffda67b0f462b55d5a0"
+    ],
+    "clipper/analysis_adapter.py": [
+      "17a15d3cf6dc038ee1249a1c061e9dd8d53f2f987325830ca9b64b59f696257e",
+      "d07e46bea2f0f9d8eccfeb9359bda33a8d8211d6f546a4351710c1922df63f87"
+    ],
+    "clipper/api_editor.py": [
+      "27b178bdc1c19ad145a51cb18227eb9a425243aed18ba1ca90148119f3777fbe"
+    ],
+    "clipper/api_ingest.py": [
+      "b360ed9e3543cda84e8dd8af2007dcc6e25ce61bb85f729454f7b6edd0558074"
+    ],
+    "clipper/api_studio.py": [
+      "1c41979d770ea6247b0a8d187fea5d8c1fd0e1ca9c3726358a9e3cf179077a8e",
+      "1e034cc3d3d572181922530203b0e1f3306539710d583f7d668d29786c37f8c5",
+      "475f130140fc16a68cb943ce99c9effe4e8d833fb6f972efbe5948d301b469b8",
+      "7a776f3320bcbfb3b251e540b70b575fb19291db6a6776fc8178c9ac7d3959ee",
+      "c48de9ddd68385b1ed38c80258cc7d3be0d31807a59230a9d96b9d4efceb9589",
+      "daa2d399b71eae148522f3d0278aec64fcd5c1972d21ec50d9b348abc317a35b"
+    ],
+    "clipper/artifact_store.py": [
+      "0c6aad57cfebedcf891a3dd05bb827b35c1f882faee661b24510129a6f9fb45e",
+      "26f842c9fc42724c3feb92c92fec53fa93e8a74875d073e18a3ab399f125111b"
+    ],
+    "clipper/audio_project.py": [
+      "7ac6795a9188cc42846db7263dea13156094702eda3e2fbd502be170f799daeb",
+      "e24b3918dedf5217e58fe5bdb08491c9769c1844f0f219bb20b457dba7cca0db"
+    ],
+    "clipper/bilingual_m2.py": [
+      "ccc6f6eea968544e5e61fad59244aa63dc5982e43dfeed35587e8b23dd0c6239"
+    ],
+    "clipper/caption_checks.py": [
+      "76dce3168af78fb71dc85659961c13da1b5577301cc6e79fc269556939c1f8a5",
+      "c37a78a36b1358c9a7264f91bb1ce8c3178392080cccb828a6dd8c0874e85310",
+      "d98e72e13e5fda5ffaa7cca18e160d766e511cae20005d74e5cf9bbef5660709"
+    ],
+    "clipper/config.py": [
+      "1cfc074a5e780bd03e1df076c51afe351bdab818176f23ef417651a08aafbbc6",
+      "c1f00411541309f1ebb5ad0bafcc73be9b996c27bc8fcdc68bf75e314c863f26",
+      "c44b897ac045c466c0945d489eeba49b0ea049a8a9486cce28de2d7e86827463"
+    ],
+    "clipper/crop.py": [
+      "59871e7464d03516de7ef96fff28f4b265a5017736e978dd64c864cde5b5dfde",
+      "aed0377907132cef4750d3367f740f1e8db55b8394b3458fe3e05c1e5aa6ec14"
+    ],
+    "clipper/dependency_cache.py": [
+      "1acf403e65d29120e78eddbc4526c3e25a5a47ce8d8eee6afb3fffb58b3998dc",
+      "22ab656dc1c8e1bb3e548cd44adc8085d085303e35810260e24e40ddf4fb62b0",
+      "277ed7ed1f8ce8591c04648eaf47a0143186a1cecd55e4a799d189a11c2ff8d5",
+      "8c493d47a8d804c936f86694b7660b3bc32a0e40a3e3b287cc385250df97c749"
+    ],
+    "clipper/editor_contract.py": [
+      "09b176be7ec919292af0b77724d8946cc172e1b5ca5f821f8022b10dbca5b9ef",
+      "dee60f0cca2f1055e9067a8e59a29b28691452686130fc5c740193a991ea9a33"
+    ],
+    "clipper/editor_drafts.py": [
+      "8563ccb4e4793958244368877bd1f53aea7b7173f7edc9c370a467f4332ada61"
+    ],
+    "clipper/editor_media.py": [
+      "128e9dac8d5cd7d217bc8c8ede4daeba9f611178248a35ea1309cd064cf00580",
+      "3a42154905ccb6e64f08269e16fb74323877be9d9fa5d39fcc97dd037bd22dd1",
+      "a445456f7c470f20f2de0baa701f00270715ebdea6539c63bdc2c42b4f058d1d"
+    ],
+    "clipper/editor_search.py": [
+      "93b9440049dc725ab8dc0e45d0fd4bf50d0ab88dd639fb10cebc95f6c1c1519c"
+    ],
+    "clipper/editor_service.py": [
+      "0e9f9977bc0b3a65ddd80365ca5d5595f60e9be32ef1e85673e8f0de2ccd360e",
+      "226ee76f5d94d115e92335660ae935995bc4704891b98933612281a93fb40995",
+      "ba3fecccaac53e28fc74dbbf097d2d75147738e866513852dc72960352a03319"
+    ],
+    "clipper/ffmpeg_util.py": [
+      "c696ee1d031cd6688d1d58ed178f2032f105542eaebcb54aeeaf5c48f885435b",
+      "e441f00d2397a9c3d6e9d737b3168b6ea187d593bad223365d68b57a799fde30"
+    ],
+    "clipper/media_context.py": [
+      "44c1b9d0b9d587299728cea928e4a8baf2092f2a2cc47d59f0f6ffe7d7df7b36",
+      "5e43f94ec3f5e93af12d4b33e5fda127fd684a54019bdea1b09e82193e0d5736",
+      "f617c609665a90e5afb15932d6599936c38b680135e77792035b262d60e98796"
+    ],
+    "clipper/pipeline.py": [
+      "0bcd386f489ebdc6c02ecff443461630c283f9da7c43cd9959010263d6d541bd",
+      "420641ce0134adef72c25bb35a5e2a907eb427db024588c49c1c40164dd91e3e",
+      "87231000ca6216f01aebab1c2c1c0d8963db3c51de4ecac937eb3bd99cfdffce",
+      "a5067ffc8dee7c8e32f274bce9a08e3c6c0fc8487c9990a4a46643dd44f9ba80",
+      "be65b1a188d921d49c6f271ec8b85708bd584f0c7e4b90d1d6c7a5c233b657dd",
+      "d39785b5cf384d1dfff2563cd2b1129db9b606bdd81857ffe88422434c9a9401"
+    ],
+    "clipper/project_store.py": [
+      "a116c0cb0178c1fb2c98ec3e23981f7cd1d6a87932d37d2564c8e442bdc644c3",
+      "ae618f1be84d6f67ed908eeae4dd1af416935161020f39f2f16ba86ab74161da",
+      "d9a8eaeaf8dbfaa0af93a15409578587f811133504bbe71e6e61bb562512ab16",
+      "eea00b9a5431c92e06533aa1d9418374f01ccfd6dec079e7e353c1b8b6f23506"
+    ],
+    "clipper/projects.py": [
+      "2153ac0159c29c774f245d038767264c1eb6b4f93171a55da7c8800a198336c2",
+      "de60a0d2bf68a593b8d74f9c3c7b83ecf95fc40c04457616aabf1b23f549dcd2"
+    ],
+    "clipper/render.py": [
+      "5ac5f56007e556b3aba9f1409e0001f3f242c0403963b3878e447872a438b376",
+      "ed6f0cfd8003974970ec07593aff239bc542817bced0ed26d7d161cbe2c90b25",
+      "f1b0d258928f84fb10670c86ef7a5a253e62aaa2885d64d0cb55763fedba84ff"
+    ],
+    "clipper/selected_alignment.py": [
+      "6fc93d6e47ac8cad88a1be0a187f3cb66519a08e797ea2f5cb5671e38fcc3967",
+      "db0b9d4871776e3a9f8bee71ecbb6f90861ebae6c32580dcea0d39d61a281257"
+    ],
+    "clipper/source_assembly.py": [
+      "0dd506b589d02e11955489690c7119074a87dfbbcecf3b0ba98b7492b9cbc51d",
+      "62e69ec2bcda14e47423aaa134abf28c16e20e8716dbdca3b31291e282b2f488"
+    ],
+    "clipper/source_imports.py": [
+      "775c362c2ed80219425bf56639e8cb2606c6f58c826cabdd4cbd529ec01fca44",
+      "f2bcb61875410f21109bbc616730b319041dd23b8e595e55bf78845ce7661293"
+    ],
+    "clipper/speech_m2.py": [
+      "a75ddf9d6ed5baa8517c633e179707da1599a85eb9ff39fd5ceb1926012a849f"
+    ],
+    "clipper/stage3.py": [
+      "4913ae77ca83a8c24a5014c96b9c8eef8ac7f36002ea6d5edee25e27161ffe46",
+      "7dd00c3d5bd7b73b7cda1ac2b3b6fc2e5fe90d9370c0b1b2e0b3c9b8a8db981a"
+    ],
+    "clipper/studio_exchange.py": [
+      "2fd800f8385ec6d98411b501c8a99b81c4502ef9f9dba807da5e092542bc90ab",
+      "384ce104474f9b21cd0e307115eaa42f2c23703e19fbfd47d82577f36f1a1c6b",
+      "50f69688c875055add673b6e9bc48f0a82b55276b392a1d17176242fbc5f2147",
+      "d9c544411ee67a41783aea72949e1fe0ba5f19ead9f5d261055090210a48f146"
+    ],
+    "clipper/studio_service.py": [
+      "3e73f23742a4533355ea66d4c309ed42fb97d219e6236d69c646e67c6662db8f",
+      "57b4e165dc483689f977aa74b446aa7ff65d136ddfce89aeb24e0e400e6930a3",
+      "5c807a7220a81f9dfb21dcbab07c2867ef911110d75920f86f7afa2d435990f1",
+      "64e8fd416d342e4100839c1769688fb236e09407fa08e3716d3f1dcdaa8b2a91",
+      "7c142db47128e44028e81753b0f3956c1fc37c47468b27055c89d133e01b8858",
+      "86c87263864f53053fdfe93e55cdf9cebd8ffcd5391ce1434743d198e2cd3852",
+      "9fa21425e4f42d0a971a48a756b8e56383ee6d2dc893122949babb74586231a2"
+    ],
+    "clipper/studio_worker.py": [
+      "6697b9917cb0c7e94189c7c1841abb52b031dfb4773ed274b28875ff88bd78f8",
+      "d83c4f1cd22880dd13468b41ceb92f70356668876bdab633cf2816ba7f6b6179",
+      "e7a35671256569dff97f37244188a27462e44900ca429353bb9852901b64f0ef",
+      "f7a3ed7018d229fe1b037e4b6c7d30713a4790085d04ccdbfa03241e29e1127d",
+      "fb43970076b3662822a7a115b6f577862f0302b6886682ca9af8c0829b6cbb38"
+    ],
+    "clipper/tests/_media_requirements.py": [
+      "5a9d05d5395e8d220f0ec74a51076e3efca137597952cbfad861ed493b3f47d1"
+    ],
+    "clipper/tests/editor_complete_ui.cjs": [
+      "028ac1106b0ef306636d5c0b710da985f6364e45e1908d8bf0cfc99564591a62",
+      "cb0ebc4d0367b286b5aa74c0331498ca39e1cb890188bbf84e90c2f3ab41fae6"
+    ],
+    "clipper/tests/frozen_release.py": [
+      "09b1c545107de25bc9e62ad442f747ea1fe42d34c066d24cf78333109e4cd4b8",
+      "0b0301167f0f61da37731ba45b1291da5874425c518fb76ff948a138898a772c",
+      "3e0023cd4cdfaeef0c9ef1b97df4c03edf32558a974b23d123d83592cf871949",
+      "5e56c906bae087ac84d4a225be95b16c385e3d875ec499a3bf7a5233cca68f1f",
+      "daf17f591ab8abd5a45ff1bfc2bca32af212c6eca21d53ea548dff88d9ee3f95",
+      "e17b46fe9782713fa3c107d26da91994a7a19a37438f2a3ebe2db42eae053e5b"
+    ],
+    "clipper/tests/m1_analysis_ui.cjs": [
+      "68e76292e8fec1164b05d3f336d167cecf56655e4ea796f1c740628e02c09823",
+      "e99cd4071519f943d015a67200ec3c78d2a2ccfcc3bcc0126919ae5d56aed09c"
+    ],
+    "clipper/tests/m1_ui.cjs": [
+      "672939a92722af8d462cfc37eb853442b1619d7be87061e2a14a237c5d9512c4",
+      "7c2775d0056ed5d9ed72d85e08590c71d75bcd00964d03dbee05c015e949f270"
+    ],
+    "clipper/tests/m2_ui.cjs": [
+      "497605ed58469af6a679a7a7b896067530b5ea661442568eabfca25751e9d6bf",
+      "99931ca92c233ac3a23a91bcc6cda682b5c92d15a5938f9174beafedd8761eba"
+    ],
+    "clipper/tests/parallel_a/test_analysis.py": [
+      "462d65c98e60fd14b3926e37360d1bb805599ae557365b3c775e542cda708d0f",
+      "4e2655957935b0f98e4faebdb66bc74bf354c5b47f45f8bff50e4f2d8aa72535"
+    ],
+    "clipper/tests/repair1_ui.cjs": [
+      "59a6221f82c8d57c4a5d29210225c9dac433587876a4ca9a2b31680dcf093e6d",
+      "d383969fa54d4d3deb0d647e8d32fc9a217d3b9a37ba12a0d68580e62d02d420"
+    ],
+    "clipper/tests/stage3_ui.cjs": [
+      "2d03db6b29465c5507a83cd371e74e08d8267ccd9c0e6e1e40c2bf246446407d",
+      "41274365c4bf5720d94b876167631517694cd1ad618e973e9b9ae8da6e50d4e2"
+    ],
+    "clipper/tests/style5_ui.cjs": [
+      "32bf5e03d679fc62ddc058c90c22422305bf6a036646d8f5ee9f49a72f81b682",
+      "586888685c504f2a39239fd9e4c32ada083692f317d087365c52552791676e0c"
+    ],
+    "clipper/tests/test_complete_installer.py": [
+      "1fd19a4ca1b981ad03ad9fb7b9e03519dbfbb19ca33e0b0068a243aeebf98e98",
+      "60b4e08f26ceb1367eb62570994a683c8efe7afa56e5d5822f07a4be2cff1992"
+    ],
+    "clipper/tests/test_complete_repairs.py": [
+      "f2f345357beed2e330f2a7eda1ca6879005771278789d6827a64c8ebf7e1f8ff",
+      "fad2c75deb9761f8619dc88290de665ebdc8e9cc72db2aa8a0b87e7bea490ef1"
+    ],
+    "clipper/tests/test_editor_m1.py": [
+      "301e077cc55305cdb70e52abdb57157020699e528425970c84e27110dff9d08d"
+    ],
+    "clipper/tests/test_m0_installer.py": [
+      "6511582843953f0765baee8a112f8a1a41d78f80b65347c24e5db75e482e6787",
+      "e9f3b48aa51e3864332fd3197e4d24b0371281cd9824792f3dda348cea49ad48"
+    ],
+    "clipper/tests/test_m0_integration.py": [
+      "35a2832e8199cf24a4650a35a64a5b12f98997df04085254efabdb0034c1a357",
+      "b2bf45480ee518d35056beb632e09d0ec06b7d4269750e9c36b1b135b49fa85f",
+      "fe1e24738018f94fc9d79179967a7fe97235a5eeea0f9a7942c68fb9690be011"
+    ],
+    "clipper/tests/test_m0_runtime.py": [
+      "66cd4549c50372a62dceee07f7259171b0b73d5d26336bda9453a66ae8a15361",
+      "cd9acd8c129ff3a5c8caa41fd307492c2abf96066db88d695b5734d8fdc055ff"
+    ],
+    "clipper/tests/test_m1.py": [
+      "cb65e60734bf9e7e894e950fcd722601a69bca9a2198dec382d24511b88898a2"
+    ],
+    "clipper/tests/test_m1_installer.py": [
+      "156f8c4c382d7c0fa760d910807d5a5c4fcc7d58556ce7d2cc303c4e680f2180",
+      "2ce3bd81577ef538af809f08f27f6be302ae20d9ee9547b380decf9b8661dddd",
+      "de050655cba06fe48dd135d25c806847901ef489fecfde357dd17aa45a73d159"
+    ],
+    "clipper/tests/test_m2_installer.py": [
+      "b37d101dabe6ebad0e5f1975369f5d37d75b8dde0fea7e80979ad2a59398508f",
+      "d98aefebef863a9629a1295778c1a0eadeac208e37a7edc235d47dceb8485a07",
+      "edea73bc144fade22ab5d3b565f830f403c7b9d39de654276e4805d1504225e2"
+    ],
+    "clipper/tests/test_m2_sources.py": [
+      "9daa8c8b716dee80e3c8cc471a3bf398aa817c8d40349ea438859a12bf62d8af"
+    ],
+    "clipper/tests/test_m2_speech.py": [
+      "0f9d1a9e6dcf32efb4ed1f379703f6d4aa5aa337a005f3ecce9e093de2c4bb48"
+    ],
+    "clipper/tests/test_m2_transcripts.py": [
+      "57c08853b19be3a109b31d92aa59a97318552c5f46a3e85af761cb2a3d460cb7"
+    ],
+    "clipper/tests/test_recovery.py": [
+      "06d039720e524b373a1b7deea970b7ce7647ba9a76c3ca6d0c0c23782b3228c7",
+      "1dbbfa38f67c85e239a6426c960caf6014faf9cc79ed5148cbe66db5b01763c5"
+    ],
+    "clipper/tests/test_runtime_stage2.py": [
+      "3bc5bb40dd4ebe6ad5934d347a0cb72ab45b8a4dc9917ef1a7ab93b4ba8d8495",
+      "58ca56ba24b1aaf6949e3a115736e397139ed6e84de21776aed3b688f9eb7bc7"
+    ],
+    "clipper/tests/test_studio24.py": [
+      "0518c3ff356a43c073228edc43283f62a3b8278991f205881e6aa91674cfd2ba",
+      "e9eda3ba1637095e87e57e0f40da41d70324095e1c3c0c63f635fe6160f71f3f"
+    ],
+    "clipper/tests/test_typography22.py": [
+      "30f16d29b5b1b7c4d159fc5bc6c1bd6e9f2b717a0d066ff301e28c22aba5ed63",
+      "92d03951a4b23e9645c33d7be30e1c97918544876528b326be40244abf69c51d"
+    ],
+    "clipper/tests/test_upgrade32.py": [
+      "07e52fd2d4db6afb3f4c9138e0948f53104a4c1a24cbdc3af0a0ce2f8bd6d2d7",
+      "a112319a3542a89b2e9e583a1b72168991e1a6437397524fa3e52441d9682238"
+    ],
+    "clipper/tests/test_upgrade33.py": [
+      "04bff320228b95c6196d150bafa1aeccb43b6d3d16b9a2aa0e60eedb70a3e00f",
+      "1238fd3ad2c4a932d2b4ccd37d85ff083acaa3e4be8b4726032d98251a2085b6"
+    ],
+    "clipper/tests/test_visual4.py": [
+      "8c21f7e4ab6abe4a609cc82800ab31f87e669ac9a1fabeba4e2d59375657aa43",
+      "dc0257ef3ee76b5f41512bb363e005f1b4ab1537f7982fd9c84f98130bdab9a2"
+    ],
+    "clipper/tests/ui_loader.cjs": [
+      "7c82fd01e3fa193758828734a9d7fe58997eb22c7ac01540b021c4c6d6193b98"
+    ],
+    "clipper/tests/visual4_ui.cjs": [
+      "51315ec989075a75865ff1766ef253f0ee69857482dc4409a6e1646a7b9d171f",
+      "d602b405bf146ff91209caeafc3ec7530e2e5770c4d490d4a79e5ec7771e3902"
+    ],
+    "clipper/tests/workspace6_ui.cjs": [
+      "9762bf83e072d470c7dfd882949ec982ea9658a41ef1ec0bfb7fadd0483b0c27",
+      "f17e863cf1e23156eafcb7cff7cf16ac9dd95cd7b8156c8ddbea3a48f7a91adc"
+    ],
+    "clipper/transcribe.py": [
+      "8fe61222045973439fbf0a5e4c010251c19f5667732252c90f3b5057ae9f19ef",
+      "f50b13fc4b4217fefb5441cacfb8780a0401a884831a839e0869244b1dc38bc1"
+    ],
+    "clipper/transcript_service.py": [
+      "4fb6ff522e60ef893050b1a0736f5eb640d395ea1719844c61d9148ec47084b7",
+      "79584020794eb0c80c3dec2acc05f7e809ec5b1277e8be5749b7ecb856aa48cf"
+    ],
+    "clipper/transcript_tracks.py": [
+      "67ae53285e6a3075731aefddf74d37e3a4ae5dc5532b2837d7d145ce65223677",
+      "fec16e952ada24b6fa52638e251da0259191a096d343a24dcd9dc878c2a31153"
+    ],
+    "clipper/translation_m2.py": [
+      "05887aae543f9381fd234bee6d7473ff3fe1de76af5fc651abe9790271663e13"
+    ],
+    "clipper/visual4.py": [
+      "668352f52b5f5e2e86c69ca11bdb62299a9a17c8ffc2655ad40cc2aa53f97cda",
+      "991e20cbfde0721d6078ec3cdcef6419f3a74628464f6212f3c902fa779a1692",
+      "bc712dce5297d63020aa8f3ce76d8e79782a9a5de9d0305fc62d4bd94c4b2eae"
+    ],
+    "clipper/workflow6.py": [
+      "2a51b8d9d32a89315a770101cad888a8aa255efd9eae29323fe8b0a4323d697a",
+      "362b30d1e136c429f63df1da83ff1156bdbc4bce95fb1363515768c2dfceb7c3",
+      "3c5991e0a1a6dc472d07e24ce891f86e2adbce802ebf64e21a73ca251e6a5dc6",
+      "7afae762592dce3373f262814d9d2be25434527ee7c0fb91d048aa0847e5f523",
+      "92ec49bd6e23a521ba11be246d4e625300eeba316939c5258ab253c42f4c3152"
+    ],
+    "docs/M1_REQUIREMENTS.json": [
+      "022a3ee0f0251c6e835590f7c94673f7d962ed1adc825f9b80eba6f64282b03a"
+    ],
+    "docs/M2_REQUIREMENTS.json": [
+      "e937ae3abfe41049b266e52503c7a328d15b4c788e34fab982be4be5de779189"
+    ],
+    "docs/UPGRADE_4_0_11_M1.md": [
+      "c7a6fa578397c21eeb10081e242bd738405d88884aa9b60d99424a3357c30817"
+    ],
+    "docs/UPGRADE_4_0_12_M1.md": [
+      "847fed5423427c92a80e9bf2a05edb9f62f09ef02530009e910ee76963e8d9cb"
+    ],
+    "docs/UPGRADE_4_0_13_M2.md": [
+      "4fd6398302f06bd9e89c0d50355b16046e4dfe71de02148fa71323de9614b77c",
+      "9ef5427bd4045cfdccdeaf175d87f5e17e4f47f607b023979466356905ab8f9f"
+    ],
+    "docs/releases/m0_producer_fixture.zip": [
+      "d1116dd4d22ae9ebfc7f3047414b707a849279e0070a12980216bb2edaabe93f"
+    ],
+    "docs/releases/m1_base_hashes.json": [
+      "27d380baeb2347d2cc55b23dd8cd90db449725118b42e211696db7cf32e3c191",
+      "eef23ae55b73e6a12e0a22bec47fa8e89fba621431114f1df776bbfb498c999b"
+    ],
+    "docs/releases/m1_fixture.zip": [
+      "5c08918f4b118723bf4c4765995d63eedd3c09c965acfbf21a08a42b9e73dbfd"
+    ],
+    "docs/releases/m1_initial_fixture.zip": [
+      "3afa008603413e87bed8a4ef980db0af9d964433c610af4c1647087af78ba69d"
+    ],
+    "docs/releases/m2_base_hashes.json": [
+      "596b0df54e74e4f3c8edb850894f3db1f123db6146da6c115af23b8904229c29",
+      "be46d8c4349fec4416eb414fb434f8c55690180d899156d34f8e6399a7922a89"
+    ],
+    "docs/releases/m2_fixture_provenance.json": [
+      "618553de178af0e68ea0d73b8b0eb128687308b63ada37e7f42dd2e637c5e993"
+    ],
+    "docs/releases/m2_m1_fixture.zip": [
+      "7c1abdfac2791c14f6975b3f0a496b9ba38a5ae70ebe408872ee9cf25bf5bbcc"
+    ],
+    "static/editor1.css": [
+      "b0cafeb603e880c8f646cab2bdd4e6184cbe934ad5fe633fa376ab7ed6561b76"
+    ],
+    "static/features/analysis.js": [
+      "1846b4fb9efa0336f0a37537da91080980602bab720dbf222e8e337290627a4b",
+      "4133dfd2dbbb5a32253a98c4e637243cce7c4804e98645c4eb753afbe1717c9b",
+      "4fa042434160a46f8b2f72c5ad57cd69fee49f21c3a20152b18b1e5310aad532",
+      "735d613955f672c74fa20d75f17994481ebf489ffab481173da948bf65d64785",
+      "ba395840559ee59636878a99a1f9d7c12ff8e9870d3328950cdb4c632decb8dc"
+    ],
+    "static/features/draft_storage.js": [
+      "73b0ac0a2a6067d00b6d9850e24a6ef45290e1730dccdbf6879138115ddc0617",
+      "ae0f75da7735601bd5bbabf0dedb228f1f1d01632dab004f8091d9941f302305",
+      "e567c9b8a4b11da4cfa9744f31551c50526fafb68232b1a9c1af0c3c420d5810",
+      "fa09bb7d1d407677eca2205af010189320fa97cce13fdb82d5671879f05ff11c"
+    ],
+    "static/features/editor1.js": [
+      "63545082270a56c800b5c2b3f9716cd985472b501c18fd2162cf1460dcc0eeb7",
+      "a73df1c2c9405df156431e8d341d47c7014828515b7f02c6cd8392dd8c62366a",
+      "cf2292bf61840b5e34bd0373e8b6ea857df66775731fe1d6183e666aa34d07da"
+    ],
+    "static/features/editor_state.js": [
+      "01b2215465108be2d2fcc6981223672346e967c6df14bd76f9cb9f52fd8845a0",
+      "5bd52ecc988778acc57959db8c90286d7d44bb273ca2b6a3086cde1521ab754b",
+      "7cdd76cd28f8467980d9c2ebbe802efd1f33b243080e0ee8cc8060c99854296b",
+      "d957d4cc9b9277b9fabb961b27dbebd72d1b911a4e9869a08cad54afb5cb97f6",
+      "e9a883a9685a0216c0f2352511b1a62965511528bfdd98222b42133faa14e96e",
+      "f910c3519dbc0fe0d236043e5be4a524a65efb0e53c67c669d79b50c52a66178"
+    ],
+    "static/features/ingest2.js": [
+      "0f8befe8398f11c85d5365e5de48e6bda77aff7e547bb01858f61ae0b6139679",
+      "ccd7042ad535d2c9cf8cfc1ab0e4315b6f03875bf9a4c5888ec4de6b69054aba"
+    ],
+    "static/features/style5.js": [
+      "352c43986e1d678e189b6c3c90827f9c06f93ea5e9a37bc69401041f79910532",
+      "39ff1607ccee0602aef9e7eaf1eea8dac833680d67443ce2574ed50ed41d51fb",
+      "5ac195ac8ba5cf1946b67e391429bc9e6f3c70a778c940d8222fca2e841cbe16",
+      "6d3cfd362270c9a0f18397b1ea2516edace03a895b73524d2cbd36c4394a70f6",
+      "9f317ad80b4e8b535cce8491620a59d2689fdad7b9b58dc5e6158710639f4758"
+    ],
+    "static/features/transcript3.js": [
+      "3aa7681d7a88f26e1771d04cb0d060c8bdde036e208f38b984aae35e371949ed",
+      "8d1996853b46bacea03b61f44392248563424523816798a41936fd72c0627178",
+      "a9cf837a9a0a8ad4230dc67d4cc3950d772083644202c1880776e4e3579b0fb9",
+      "b69ea8c8f1b9ad6f9784df30b29b5924e9b881da80433e3d76319eca53e4e565",
+      "fdef3c16f4512005f971969d9781fc9476a2dfbf34a41c511ac8db8b426a5632"
+    ],
+    "static/features/visual4.js": [
+      "3efa3b393d73cd9240aa67b405bf3f4abfc77d7330d9c5d39b03ff37da31f251",
+      "4bcbe0c554198f1d92a858429f43a6a1037ed4772e129470466ebdf8d9313b51",
+      "56cf813f593a3d0d9cead0cf7c54bf36f1c968cf66cb6f98bd480bf27b1a28d8",
+      "b35176774ac3f691259f8e5534be8d484d0d18fc74a0b11b7fa4e9d6a2a84edf",
+      "baf0a07bbcbad51f00975edaed61b7ef26982319fd2ad748365e47d82f80f9a3",
+      "c1dbdb6ac51c920c2ac3e74f0963bbe34b53df6a4b455ad5d385f94c66f99000"
+    ],
+    "static/features/workspace6.js": [
+      "4d09e9b9b1e68af92b63252fafd7ae8801e318531a394c89661985258d066b3e",
+      "53c399bb83bd30de1492d2f4b88cd6c8d1058ddab8951f1f9aee6c7c91d2254c",
+      "54fb5a18ee8b3ad6cbeae96a02f54b4d3281243f8e6bbd56d9fccb0b97a4154b",
+      "6ebf8b1100ec3cddc5c1c59ce93e6a46468d78d492efccae44c329857e3361c9",
+      "bc751d9e4725523e7188e751c658e820ec2b0e2319def01edd19e8985bee69d0"
+    ],
+    "static/index.html": [
+      "64ef3f1934a085e7e002250c1a4ed16d2330d612e7d55f3bf38a24bda9be8708",
+      "694dee4891a5c402300b1582b273688fc4d9f5981208206114f9edda8b72260e",
+      "c52857a8878538fc1159612158df54eb282d1e66850e3b8a07b169eb507c0147",
+      "d3f204424999c0c997c87aab8665733a366a02780aa03663f9f3449c5ab0a63b",
+      "dd6fde64fef9cbe3f60f74653b634a6bbe12c22acd304bd79e86a903a8d29bfc",
+      "e3451a3c3ecae97f827f8320ecb49cdfa40b4a04cb541319fc5c9c908ceebab6",
+      "f64fb99d6cefb4a2c6a7ce12ecad993323f26728aa85c2b4d2663af691f44cf7"
+    ],
+    "static/ingest2.css": [
+      "85caa4cc0f4aff35c2b0446b614ad51e79dd9e30a5a028efa7a558f1be6a4e6e"
+    ],
+    "static/studio4.css": [
+      "160922372f3b80df67b4d430cb6b4a8229e2fd9a2efbec382951b578baf511da",
+      "9ad9d54b8d5bc064c86513353eed72590bc76ef2e6ef96ad7320c2a0d72ad8f7"
+    ],
+    "static/studio4.js": [
+      "0a94c620ffc13348d28e2b8c58453d2316b6840bde584b4621706818eae79dd0",
+      "0eb2973206fa7d36dc69ba7525a035bf74d489dda1bb032292dc0391b13ee550",
+      "19d139cb14994b3a0aaf00af68aff99aebff4af966e32d22cf99505dd7c66cee",
+      "1fc73d9ab673ecda607909b64230a3047b14c4f88daf0171b165c1abafc55c9a",
+      "2c1cd6e2fe2fe7869b6d5c461ecac0f81a1daac60e5d954ac5b998f1909c095e",
+      "37bbee1e788f8bb6c313aa8d402e0fa48ac93d0c6e85956262e497ae241d4c7c",
+      "c03d93f2d05c023052b19792f4bdec386eba7d202422ac6025f3f5af2d8b65db"
+    ],
+    "tools/build_m1_release.py": [
+      "37c8a9b875ba49b9d76706bda582124199d365ad9e9c4163bf0b0fce53d03d63",
+      "fe7e9f371acf76e176d6fd3efd1aa118ac19d939554c54901860468d04b2bf90"
+    ],
+    "tools/build_m2_release.py": [
+      "7e88ad067d94469538073bb34e10dd114e0faf74b8c1a6beedec3d54fa906762",
+      "8ffbcb5f8fc5e57f9d196dce2f39a573759aed05ee902ce094d0d8435add2935"
+    ],
+    "tools/complete_installer.py": [
+      "1d48ff81c4e364735a4bc7de7fe30b7f6c97cb602fb26d45713c6bdaf07ce733",
+      "2d97f3019b02c8b89e758d3f4a461999507c6286d0e9adea3c9e7faa5469a35c",
+      "4762b3dba60474eca1eca74d89bffee91eca8100621097f766ac156eacc3aadb",
+      "83929b9a1a718314fb6852e95e5df169baf554a499a13ecfdebb37f23489d6b9",
+      "88d39e6fb028c15e7b60c63858201b42cd4757a3d069931a04a0323c83bb1697",
+      "ccf52fca4feb28da7730ac13ad2ad58c691a0434b50b4c24b70564767134859b",
+      "d8b432790c07e59eb9fd4966161100572149276f99fc333b3d37b0c91965a932",
+      "ed84ead3aaccf934f80cdc18f8a18ebeaaa2bb3c0f29aa6a4aa932a54bd7cdc0"
+    ],
+    "JALANKAN_PRO.cmd": [
+      "c9adb79b10e729df439500cd2e074317667f41b360fad13f3fe02aeff93dc21f"
+    ],
+    "app.py": [
+      "ab581c9982821f247ac31bd33a49d6c1923d346d5a5d28af974a1109cd8e0758"
+    ],
+    "clipper/__init__.py": [
+      "27aab985e0d63283b9386d61b7126fdee70871d04136df12a08d41216293db53"
+    ],
+    "clipper/analysis_options.py": [
+      "7c09891607acb9c481ed1797e42d3ce93228bc351e51ed9c3a8489a99a6a966c"
+    ],
+    "clipper/api_analysis.py": [
+      "61740b7281171f208ff2349e41dae7ff892a16281cc0f457c4c66b5f439a4b32"
+    ],
+    "clipper/api_runtime.py": [
+      "2b995af7afdd9293265fa07fb582857ec4a1953f5bae4b7f1f51956f35b45099"
+    ],
+    "clipper/asset_rank.py": [
+      "09856e947b4141b59cbc555409cfc28163c90f5a72e250953502c0f7ffb780f2"
+    ],
+    "clipper/asset_review.py": [
+      "cd347cecc135216ade6e7ac85dee9c036dbee4b48c75892547a98aab5bcb07f1"
+    ],
+    "clipper/audio_quality.py": [
+      "268a3cab173efa313c79673022560d3c3a127d06fa7e959a81dd3966e16d0658"
+    ],
+    "clipper/batch7.py": [
+      "1775f104b351416310d5ae21b646174fce92bb2c782675382c2ef0f24cd117db",
+      "d5faa9a914688f440ad9ba5b8d0107ee9897d9ca82925e4c5099161a311a8449"
+    ],
+    "clipper/benchmark.py": [
+      "8e2e060e76b3b06e516987ac4f9e8cc7c1e382e13a95e41227bc2ac0452b77dc"
+    ],
+    "clipper/boundaries.py": [
+      "b3d605dd6ee81017c233d24ac0ea1145442ef2088ffd54395353b82e6ebd21ef"
+    ],
+    "clipper/broll.py": [
+      "190e4c578617e8447da554e25424d14351a3ba3796c3400d74f283329966029e"
+    ],
+    "clipper/capcut_worker7.py": [
+      "ee4fcbf611c37785bac43f557bf1ff2633126de334449ffab1d1e7d1cc90e81b"
+    ],
+    "clipper/caption_director.py": [
+      "bcaeb201d534e8354d53e9f2ed143fe4502edd1da9f333abc21d11c97e6e1d9d",
+      "d83c1beff7cd18288234de424e4339e7bf7e7f1f5418fbd0d661d48575309eb6"
+    ],
+    "clipper/caption_fit.py": [
+      "6f5f4d294632f32d119f0e7a7c2a5c6f06a01a97026e03b2c7e8d57c5b71f001"
+    ],
+    "clipper/caption_geometry.py": [
+      "aa42a40a1974f1f27898c93b04989ce5d4dec59d0b47624d30c3eb81cea637fe"
+    ],
+    "clipper/caption_readability.py": [
+      "9b99b01f2ce6a262ca44649c9a6ab67fc889ca277219a623e9da67e98c933adb"
+    ],
+    "clipper/caption_renderer.py": [
+      "362517bb3fd33d83bb7a3dbe49455803288348f6bc7df6689573b62db0f2d5ac"
+    ],
+    "clipper/captions.py": [
+      "c9367929f17f29795d5c72bd0a13916beaa3fc0c6b112d2546ac9ae1aecedb20"
+    ],
+    "clipper/captions_pro.py": [
+      "c68581d284d57310e1269a46663a664e9e624f7643ec576acf25f514f5e9d274"
+    ],
+    "clipper/composition.py": [
+      "4679184372eb70fc4fb840e7a7607aefd334792a455883f65b70180a6a896ddf"
+    ],
+    "clipper/contracts/__init__.py": [
+      "4e70701ca6d6f8abf820374e2e51a19b33b294dd5d9aade33cab803f3f456b2f"
+    ],
+    "clipper/correction_memory.py": [
+      "32871f5c341cbda0a256c89b0785fe318a634858527e11cb0801d5872db3c220"
+    ],
+    "clipper/discovery.py": [
+      "a23fed7efbc463b20941251a21edcdc74f224689d111f9ade0f404a7e826c7f0"
+    ],
+    "clipper/edit_styles.py": [
+      "9fd1040ec1f7bf465249ac0209f5078c78469b193113e70719449d927ac1610c"
+    ],
+    "clipper/editorial.py": [
+      "daa20b61ea7841172e1a3d54b7470fb77f49e2f60497edf204314f7ac25dfdac"
+    ],
+    "clipper/editplan.py": [
+      "1abdef5b8ae2553d6a713bcd2528a6ae8d7b341173f4fa96a35ab45aceeb2674",
+      "bb4311abbe5a60d0d8ff671723892bf86923d8b6473207056bf9098782876f56"
+    ],
+    "clipper/evaluation6.py": [
+      "26aedb0692caaed042b40297ae759fc9889c89fa9f95a890fde901d64a74524d"
+    ],
+    "clipper/evidence.py": [
+      "51d544fc35fc8913ce7561f88577700738e1be47ff5b4c30ad29e0ce7be52795"
+    ],
+    "clipper/explanation5.py": [
+      "9040ae7e43153ebb92c4c4a4e66f677c083f889bda30650c3e645ef803921e71"
+    ],
+    "clipper/export6.py": [
+      "622e06d92f6f4b5a9b9e9145d9697e58011e27e928a0d3b7aef4307963774b95"
+    ],
+    "clipper/export_verify.py": [
+      "174d89c3721abe32dfb9ad238bc3fe3112701cdf399ccd1607b2e8bc551562a3"
+    ],
+    "clipper/font_catalog.py": [
+      "642d14e8cae95f16610127a1647e477b55a7701fe8794870704d643f82a96c6f"
+    ],
+    "clipper/framing.py": [
+      "dc0b5bc2f6460252c76af787446352e18aacff0f7886baa9a1abd59b7a1a1ced"
+    ],
+    "clipper/illustration_catalog.py": [
+      "ac53f7dc4d48f8030d59215d30f89225738a9861b0f9438c58695688731856da"
+    ],
+    "clipper/illustration_schedule.py": [
+      "92925d2e4fc656dc15e763f32ace35f3cd89f9f62524b6ed53217e39b3f53dcf"
+    ],
+    "clipper/illustrations.py": [
+      "4302697d5e1515954f2a6e9ee4a4b33ae14094deea2afaec4543085cc1991c02"
+    ],
+    "clipper/intelligence/__init__.py": [
+      "69e15324c079156f0950e53fce523320e7c81b2dd8f39e358bb6256a3fac9b2d"
+    ],
+    "clipper/intelligence/core.py": [
+      "4b1ebd93085bb549926561ba24fc29dfa486bc7c765db1c2572fb180d27e943d"
+    ],
+    "clipper/job_queue.py": [
+      "f581938e26b7db9c3cd9ee63543d14238be3436b433f0b042b9443958d94929e"
+    ],
+    "clipper/layout.py": [
+      "a124ba15755dd25a56c16437a08e1b6b3c3aacba235d2bf2aa7b211879880a77"
+    ],
+    "clipper/library_paths.py": [
+      "bccefb50c11016c22d6687c9e4d14d40a17103422f313ae9a58f53e115c06f07"
+    ],
+    "clipper/looks.py": [
+      "16cfa34eba543a8ffa0fb877ab8c2b71bf746fd0274b249556a37629a095eb68"
+    ],
+    "clipper/metrics6.py": [
+      "869c8b4e3977de6d689345ebc5b97d0df9f88b23ef86626f01a1f405aa203946"
+    ],
+    "clipper/motion.py": [
+      "19ead6df5a83a22d313e164e66b411056fa47fee4ebc7253ab524d2cca1810e6"
+    ],
+    "clipper/placement.py": [
+      "42fddc016877d93ae88a80621c77b61b64451dbd81e0db0ad3bbcc53cd90c313",
+      "7af99ad87ffd6482709fecce0bddb721bd7936dc477ab88bb487cb9c94f3aa86"
+    ],
+    "clipper/project_install.py": [
+      "316593ae495b996fd2f01d4c08bc15c4361dd4068c9e09c067fd75c0643afdee"
+    ],
+    "clipper/qc.py": [
+      "c7bcd5b16fb1311dc958db92b794b213bf25b647cb464e1553cdcd96cdda1d48"
+    ],
+    "clipper/runtime/__init__.py": [
+      "f5d33faf1ba3c51db74cf05375479dc0f84798f71394df414e2afa31a2bfae88"
+    ],
+    "clipper/runtime/bridge.py": [
+      "86413ddee0bed3b6debb2e5b876b9e61edc04b4620b0919e8370da8de73bb5f6"
+    ],
+    "clipper/runtime/catalog.py": [
+      "e496b901b421601cc0039736ea221963f6262819014f93284af1c900d704dd62"
+    ],
+    "clipper/runtime/cli.py": [
+      "960920353a638c3b5bd32390532f1c686df2c7f796e5649db01137dce51d76e0"
+    ],
+    "clipper/runtime/download.py": [
+      "b058c51809f128173b1a3a74aa3b01655041a76546cbf2f80488b7b4b3babd91"
+    ],
+    "clipper/runtime/gpu.py": [
+      "21d6397ba533182aa85572eb0fc02cb1cced9a43a343084a9f760a32a720c8aa"
+    ],
+    "clipper/runtime/install.py": [
+      "3824fdad61b162dc0c7c808c149cb76285909b486ca1897b7e5aa2617ff39c76"
+    ],
+    "clipper/runtime/manager.py": [
+      "8df20c6fc051f115d48886178eb412aa7490132e8b6db719deab8ce20c77b6e9"
+    ],
+    "clipper/runtime/probe.py": [
+      "6002c05cb1ac549cde67670748a9ac7fd302dc1e7af36f11a4ff2578ba4b96a1"
+    ],
+    "clipper/runtime/samples/motion-canvas/vite.config.mjs": [
+      "c0e613d168a8b943bdfb7d525f989be6b851d2f9ef4864587a76cddca62d2063"
+    ],
+    "clipper/runtime/state.py": [
+      "ee50237a120d6be1ab764b1347ce0b3d2b39927976d431a9097f68a362783c82"
+    ],
+    "clipper/runtime/tasks.py": [
+      "80f058e0ea0fc980c3815891de9ab09dd22cb6bf0e4d8fde1bc5cfe9f15ae7b3"
+    ],
+    "clipper/runtime/templates/motion5/vite.config.mjs": [
+      "11ea20f40ee55ef7151a14aa7959e9f0d2927a79cae4b8bedad9fe55aa98c0e4"
+    ],
+    "clipper/runtime/templates/remotion5/caption_math.mjs": [
+      "25a3a1c46f4444eaa9b8f32abb84a0089bc7edc03733e89402b83cb489f06175"
+    ],
+    "clipper/runtime/templates/remotion5/index.jsx": [
+      "d1603a886fafc7ffb4a3dc8a24819802fbed75fd3bc8fe7e59496457098ef603"
+    ],
+    "clipper/score.py": [
+      "e53e47b5147f266a9f01633e7dd40c6bbee777d681479d6dd4d215283b074dd8"
+    ],
+    "clipper/segmentation.py": [
+      "80b5c0c32ae3a8e11b57b427c0f105de0b2ce8015a39e29f9d6402ce7cfecf2a"
+    ],
+    "clipper/semantic_rank.py": [
+      "476255979a02936eafc8fc292351bc0aa9eebf258e3d12d0bd07e6bfca6ad8cd"
+    ],
+    "clipper/source_assets.py": [
+      "4a7299c3aaf6d405773e41e40390bd26f8c48bec789f03979d3ecf43a564cc17"
+    ],
+    "clipper/speech_jobs.py": [
+      "6060c9035e869fd055c9b3ebf4c6e083a5e2de91252a0bb0ccc97b50ca84df6f"
+    ],
+    "clipper/stock.py": [
+      "238bd9d69f9579be278eac458dadc473914fcd7bdb17300d6424950bec3fb4ba"
+    ],
+    "clipper/storage.py": [
+      "fa784327b40aa54b0e2d7c0f8dca800b6bae46fcd57488a320c6fa28462294f7"
+    ],
+    "clipper/story.py": [
+      "fcea77143aa5f9ddabac90b0df0fd9f2c9b9438211d33817badbe99235e3eb36"
+    ],
+    "clipper/studio_storage.py": [
+      "f824b39a0907e19e0efe182041fb9a2b0b202b6dd1a3e2892174e792f5d2d337"
+    ],
+    "clipper/style5.py": [
+      "4abf3966aca47cb0760cdd00f21b8eee1d8e79a8b49f6649b8e58e161c10b044"
+    ],
+    "clipper/subtitle_edit.py": [
+      "7e5c037681199f3790867c58374be0945fecf885357d278b1f7f6091822d2073"
+    ],
+    "clipper/text_area.py": [
+      "8da2f1b86b83d05659e9fa3b4dffd2ff679a45868a898bfe2774f925869c37ed"
+    ],
+    "clipper/timebase.py": [
+      "e03ab3028e61c00580633c450fcaebda7474ffb2677d40be50951fcca4b7e0bd"
+    ],
+    "clipper/transcript_correction.py": [
+      "8e40db7446d2c5cd8f824f7be069593493161b86c4f913b8c2c12d8f9d626afa"
+    ],
+    "clipper/trim.py": [
+      "13b3b0abecee4b6a2344f8f8288c430af001128dad9d9f16483f2e814d2338b4"
+    ],
+    "clipper/typography.py": [
+      "ac13ed789c5c4d349f7834fe0949209cb00312b6bd8e8dc008461a6c1b2472ae",
+      "e8748fdef76a406f01c56e2cf9a553fbdc99950430c65d6b5ab40a2b7b15251f"
+    ],
+    "clipper/visual_worker.py": [
+      "3338a0c163b85f72e06a1ce32c5ad26e0b346dddc991182620e95ed17a34813b",
+      "7f5b38b655ffbc6333c409c1e595c7fe7aede6560671c28918b9b4d6f807dccc"
+    ],
+    "doctor_pro.py": [
+      "5fc746740043c927c192d3c3e0c800ba1e93db4676265e2fb294b7af5f4f85ed"
+    ],
+    "requirements-pro.txt": [
+      "c6e3d7ab10d1f4db1639ee2d75bbf6a73c6386316b78a9145dfbe832244c711e"
+    ],
+    "requirements.txt": [
+      "70f3ee477c0cea00ba35146a9dbdfbd077db335cbf9da940b8d3088e70f6e18b"
+    ],
+    "static/features/analysis.css": [
+      "b8d5f6a8b42a79cd254f4dc9b7361c449fb9cd20080f9072576b3a97f775ddab"
+    ],
+    "static/features/batch7.js": [
+      "31ede1e213ec183adafd50fb8bb2c2f0415c33e0c25e486130bc7be713f91076"
+    ],
+    "static/features/runtime.js": [
+      "ab0efb876cb250d8d6d5a0a64c3a9c247d2ec73d4a05abe4dec9e863ed7c70a8"
+    ],
+    "static/runtime.css": [
+      "304eb03c8f5341117b31502bbc4a6ddb8539e06c881582e8ab8302020f23026a"
+    ],
+    "static/studio.css": [
+      "58b0175c27340dc78e1797cdcdbabc049b3c568494178205c9e66356ed451b63"
+    ],
+    "static/studio.js": [
+      "55a20d7f7f2ca3f3e54b5c12b3bf6bc16252dcd8e9bc68febece0faf3e9965fd"
+    ],
+    "clipper/tests/test_m0_m2_repair_installer.py": [],
+    "clipper/tests/test_m0_m2_repairs.py": [
+      "c34463842392d9b6b617f716e66bb153f3fd6a7687cfd0ea44202e01dc4362e2"
+    ],
+    "clipper/tests/test_m2_fixture_integrity.py": [
+      "ae93213a67d4ea5d4bda79094cd4465699ad53d7735661d734e6c719e5e84ab5"
+    ],
+    "clipper/tests/test_m2_installer_contract.py": [
+      "c48595f2760a5c57d7f20d9ea495d616e10b7f4b5f137b9693b2a5a114a1a1ca"
+    ],
+    "docs/AUDIT_INSTALLER_M2_FIX1.md": [
+      "056589ee4445e1d881c31922e3df3ea9052afcdd3affbaed534bfadc9fa0d66f"
+    ],
+    "docs/M0_M2_REPAIRS_4_0_14.json": [],
+    "docs/UPGRADE_4_0_14_M0_M2.md": [],
+    "docs/releases/m0_m2_repair_base_hashes.json": [],
+    "docs/releases/m0_m2_repair_fixture_provenance.json": [
+      "9ba06d4cf4fb1e44aa3260657287b6f678ce7d906dc1e0f7009e9c16860776d7"
+    ],
+    "docs/releases/m0_m2_repair_m2_fixture.zip": [],
+    "docs/releases/m2_m0_fixture.zip": [
+      "84cad8719dcf52b30054b3b11351ce82b41486a72784fd82b936878f9ee3157c"
+    ],
+    "docs/releases/m2_m0_fixture_provenance.json": [
+      "a38ca960e0960e2f79640d8e4824147a9cec787c1776c7674d3a8d189f327353"
+    ],
+    "static/features/editor_clock.js": [
+      "7daba35ac01bb4540bcb8e6049994b4ed21e9a712cf4e326700ef356352593ae"
+    ],
+    "tools/build_m0_m2_repair_release.py": [],
+    "docs/releases/m0_m2_aud06_fixture.zip": [],
+    "docs/releases/m0_m2_aud06_provenance.json": [
+      "ad7137a6d82a5e28560300d34f47ec02df6b9dd5dc96f2b272308bb5543f9eb8"
+    ],
+    "clipper/api_selection.py": [
+      "7bf52e93bb4e2364a42463190e4bb7ffc0def1a39859ab5c289cdb175edd8315"
+    ],
+    "clipper/selection_contract.py": [
+      "7b07af2db912c855c86e4fe23a46e20c772e2183a4b5de9c57c66328653b45e2"
+    ],
+    "clipper/selection_engine.py": [
+      "25479351658d489e98913795fdb0572fdfec248f187fdf0b8bd639d6b3be3572"
+    ],
+    "clipper/selection_index.py": [
+      "600aa1b1b44381b1921ccc6d829b2f47186617064fea2c6f2817a13fd777d46a"
+    ],
+    "clipper/selection_service.py": [
+      "9b0e842df34aa85da4460c626f686a1e6393e898856c813e318040f902a15fdb"
+    ],
+    "clipper/selection_signals.py": [
+      "1d95cb5cea38a3efc8330da50d831fb45837b70f017421efe7097d56a3d7d8de"
+    ],
+    "clipper/tests/_m3_fixture.py": [
+      "7dc716d6603c118503fb1a3dd4811391dd586f15a6bf8cd293f3742b8de5a58d"
+    ],
+    "clipper/tests/m3_ui.cjs": [
+      "f2e6231c8e43483e6d71ff28b31cb26d5b5b217e5bbab9fae8987737af45c756"
+    ],
+    "clipper/tests/test_m3_contract.py": [
+      "744456fd25f0dc3782cbb9478a90855b9242df3c1c67dfa19dbb0d763b262bc4"
+    ],
+    "clipper/tests/test_m3_engine.py": [
+      "24768cccbcc744253e4628780b82a5bc82a132d045cad5d9cbea397d8b065d14"
+    ],
+    "clipper/tests/test_m3_index.py": [
+      "752f3ad8b1c9e4dcc37b1a4b35c6ced9c46614c62483c81a763bfc146234d457"
+    ],
+    "clipper/tests/test_m3_installer.py": [
+      "bafa4cc1bc4309cfa3aaacbd894bd2baa058f6e985c029fcaccadda8d762ec97",
+      "e1ebdfef3d40509b11618911835ff3e2a9fd80b8fb3efb5c861191a6b6a17dda"
+    ],
+    "clipper/tests/test_m3_media.py": [
+      "1a01791b88c17939f8cc472a9a9611ebb23c4d92d9ce15a1b984d5ce2f5a7399"
+    ],
+    "clipper/tests/test_m3_service.py": [
+      "eda5b39f0123ff2bc52e6e177d520dce831e292d93f5ec690c77267814d55c26"
+    ],
+    "clipper/tests/test_m3_signals.py": [
+      "fee01a6bf227ab4c725df57af9e3d51355c7b6fcfb93da323e4755a231cc98f1"
+    ],
+    "clipper/tests/test_m3_worker.py": [
+      "2806fde98bd666ea58b8add7848a3be81883e49231fb9655c3157c93543b4af8"
+    ],
+    "docs/LAPORAN_M3.md": [
+      "f5d85925ff1ccc1dfc0695db5d1aa65e4c53120408e89cdbff15d8418b43dd30"
+    ],
+    "docs/M3_REQUIREMENTS.json": [
+      "bce3a8e75692bd8674d4c0d4998e9df72a975b7f20ed260c5b93af92669bfd87"
+    ],
+    "docs/UPGRADE_4_0_14_M3.md": [
+      "eb7ae55dbe932ccd80961a1c76b2b0a8686e90e2fbac3107d5a1b294e073539d"
+    ],
+    "docs/releases/m3_base_hashes.json": [
+      "da9ba1ae1659c8f9c2be096c69fbba875ced553b24e151466f5074fe70d5eed9"
+    ],
+    "docs/releases/m3_m2_fixture_provenance.json": [
+      "d19f4e96e1d2528067d46f1878dff1052e7d41dd904cc75c2d8b465cb45945f3"
+    ],
+    "static/features/selection3.js": [
+      "6087b71b6aadef35f49c6753afe3298913c510dedc70b369704c44900b990bef"
+    ],
+    "static/selection3.css": [
+      "19be6330b6209fae79fc1bda6e70de11d4b9019cde579e2af95f153161d215d3"
+    ],
+    "tools/build_m0_release.py": [
+      "4a97fcb84cc8c01b7f84d03cd09e3e4960d9c321e1f31908440f664b5ad7657a",
+      "8138702933b1dc31d4aa2c753577af322537497fcfd65d4a288b9428ad395e1b"
+    ],
+    "tools/build_m3_release.py": [
+      "147a02ba369a787948152ccc8477f961215c490209e6342720b1228eabcc7dc6"
+    ],
+    "clipper/api_camera4.py": [
+      "cd18fa2bb4f49712faa8c91efcebb076dc0728be2e6bc44e428807e18b8a387e"
+    ],
+    "clipper/camera4_contract.py": [
+      "d2e15e03f36a9f72a27406176a9a98d17b89bc7e3d749cc322ecf1b0fa61feca"
+    ],
+    "clipper/camera4_observe.py": [
+      "ea82a68ce033738da048886d51cc1e80c39e96104d1d2ab4434413a14503b619"
+    ],
+    "clipper/camera4_plan.py": [
+      "0ed24383b7ac654770d25726b40d3a9c8e0e2db45d45c2a79c3929f62609912d"
+    ],
+    "clipper/camera4_render.py": [
+      "c2a985fe8771a5a8bb87db31562c9d99c3ddddaea5cea481b9acdd84d69da9f8"
+    ],
+    "clipper/camera4_service.py": [
+      "f7e7473132391c8cb9a73fc01bb4f84382f6a27ecb5a79131954c369f5ac66a8"
+    ],
+    "clipper/camera4_tracking.py": [
+      "bc9e31b0122cd29b9053fe9672b9ead9ec799fd352dde142069a2440a4b55a22"
+    ],
+    "clipper/tests/_m4_fixture.py": [
+      "a81959585f4a3d8062ff8c6292a13e909b2e9c56cb869515e0d31ee4e93b38fc"
+    ],
+    "clipper/tests/m4_ui.cjs": [
+      "2165415b4bf160d4234f8edd9b76162d79ffdfa01b6c0271b0254305fadf9015"
+    ],
+    "clipper/tests/test_m4_contract.py": [
+      "f9e339163f2f99e20bc4f7cc9c7b5278f5d63bc879e8967884fee42f1210d4c4"
+    ],
+    "clipper/tests/test_m4_evidence.py": [
+      "2cc796b75fc5e09c1f6fa63097718476256f800c9aa47a5c14dcfe699192dc8a"
+    ],
+    "clipper/tests/test_m4_installer.py": [
+      "9509836c2f30cc327a246e05fcb63b0844fa953708cff62b2501dca8aacabd12"
+    ],
+    "clipper/tests/test_m4_media.py": [
+      "3e55a1587cfca8ce8faebea9dbca88df94d9a79b0d853ebf03a375a2dd3d4051"
+    ],
+    "clipper/tests/test_m4_service.py": [
+      "4ac66b6ec94e65d68cd96b41754406ee20d1278b6d6cd101dcf9abda61c90222"
+    ],
+    "docs/LAPORAN_M4.md": [
+      "d06ac360f7c2497e13a0f169c9e400db63cd905ab14e6cc0fbff51d2f64a511e"
+    ],
+    "docs/M4_REQUIREMENTS.json": [
+      "1fa63eb859b4900fb9d307a9935a1ccede86e36084c5646fb37859a84060415a"
+    ],
+    "docs/UPGRADE_4_0_15_M4.md": [
+      "7c986e6745d8d693dbc769d3b40be78477ace3ebcfcd2050f019de79e2734a1b"
+    ],
+    "docs/releases/m4_base_hashes.json": [
+      "8502d7357d079776e70fe716297e2c1c880947da19e73717b21e4083fcda7661"
+    ],
+    "docs/releases/m4_m3_producer_provenance.json": [
+      "f307ffea2db94ce8a08edb006e1b7abb6f7d92291619b19886a0a6644e8fbc4f"
+    ],
+    "static/camera4.css": [
+      "f76c24152ffda933459ff4af06c1068c784250321c0bcadc01f322e75b002169"
+    ],
+    "static/features/camera4.js": [
+      "67c71bc06715f0136380cc28c1efd4a50faca0602c860be7013a63831296a141"
+    ],
+    "tools/build_m4_release.py": [
+      "5630febf8f805904308036a8f0a34ecc99dba3c0626b26670436b6525aef0934"
+    ]
+  },
+  "allowed_raw_hashes": {
+    "docs/releases/m0_producer_fixture.zip": [
+      "900f10c893000aae7dcd4347eac468442cb86687dda4469754dc89711930d499"
+    ],
+    "docs/releases/m1_fixture.zip": [
+      "9e073b739cb7779244c8ee2a797ef4311deed481a05a41e34b6e4257b8141c34"
+    ],
+    "docs/releases/m1_initial_fixture.zip": [
+      "d738219513e73a6212de7a80268983c497c7334453c432ad012701f92c47e141"
+    ],
+    "docs/releases/m2_m1_fixture.zip": [
+      "92314f0cb620da28106a48cfe9773cff817583e35309ff6c0b76f8968c1cb65b"
+    ],
+    "docs/releases/m2_m0_fixture.zip": [
+      "b2813575bcbaf6ccb795ef50e9f78c1b58c6bde51e0291151671a8a8447a1306"
+    ],
+    "docs/releases/m3_m2_fixture.zip": [
+      "26ab0971606f5bda37cfaa59dd8071736dcb1692516aa5e987a4bf78571b9fbd"
+    ],
+    "docs/releases/m4_m3_producer.zip": [
+      "83d2f052c63aebccf79565aa981b3c535605c9081b76567df9937a819d4fa79d"
+    ],
+    "docs/releases/m0_m2_aud06_fixture.zip": [
+      "8bdfa82844780efb7bf6cbfa3e07c2d0ba1d533f29ce820ec476b4cddcd067ef"
+    ],
+    "docs/releases/m0_m2_repair_m2_fixture.zip": [
+      "e1a3276da39ac66c9c05a1e99e7d566c87f4a6d9fa11343a6306d05b1865162d"
+    ]
+  },
+  "historical_fixture_preserved": "docs/releases/m0_fixture.zip"
+}

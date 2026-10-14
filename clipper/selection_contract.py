@@ -7,7 +7,7 @@ from collections import Counter
 from .contracts import fingerprint
 from .typography import STOP
 
-VERSION = '4.0.14-m3'
+VERSION = '4.0.15.1-m3'
 PROFILES = ('general', 'education', 'finance', 'podcast', 'gaming', 'screen')
 CONDITIONS = re.compile(r'\b(?:tetapi|tapi|namun|kecuali|hanya jika|asalkan|risiko|berisiko|bukan berarti|tidak selalu|unless|however|only if|risk)\b', re.I)
 CONCLUSION = re.compile(r'\b(?:jadi|kesimpulan|intinya|itulah|maka|oleh karena itu|jawabannya|in conclusion|therefore|in summary)\b', re.I)
@@ -83,6 +83,8 @@ def constraints(data, duration, cfg=None):
 
 def sentences(words, duration):
     if not isinstance(words,list) or len(words)>300000:raise ValueError('Transkrip tidak valid atau melebihi anggaran 300 ribu unit')
+    from .transcript_tracks import effective_units
+    words=effective_units(words,duration)
     normalized=[];seen=set()
     for i,w in enumerate(words):
         if not isinstance(w,dict) or not isinstance(w.get('word'),str) or not w['word'].strip():raise ValueError('Unit transkrip harus memiliki teks')

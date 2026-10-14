@@ -1,3 +1,7 @@
+## Perbaikan audit M0–M4 · 4.0.15.1
+
+Paket kumulatif memperbaiki 18 temuan yang direproduksi pada rilis GitHub M4. Paket lama M0–M2 tidak perlu dipasang lebih dahulu. Baca [panduan pemasangan](docs/UPGRADE_4_0_15_1_M0_M4.md). Acceptance G2/G3/G4 pada corpus asli dan perangkat tujuan masih perlu diselesaikan.
+
 # Clipper Pro 4.0.15 M4
 
 M4 menambah kamera/layout per shot, no-pan dan tracking opt-in, speaker fallback, grid/layar/PiP/gameplay, rasio tambahan, serta carrier mask kontinu ke compositor. Gunakan [panduan M4](docs/UPGRADE_4_0_15_M4.md), [laporan M4](docs/LAPORAN_M4.md) dan [register VF01–VF17](docs/M4_REQUIREMENTS.json). Komposisi perlu ditinjau sebelum aktif; G4 corpus/model native belum dinyatakan lulus. Paket kumulatif mengenali M3 serta M2 yang telah diverifikasi.
@@ -41,3 +45,8 @@ Alignment mengukur koreksi tersimpan tanpa menerapkan timing hasil uji. Benchmar
 Uji utama memakai `unittest`; pengujian HTTP/SDK tambahan memakai `pytest` pada lingkungan aplikasi yang lengkap. Fixture geometri terkontrol dipisahkan dari bukti detektor sebenarnya. Laporan QA dan alat replay berada dalam `docs/verification` dan `tools`.
 
 Model, video, runtime, `.venv`, `node_modules`, `.env.pro` dan cadangan lokal diabaikan oleh Git. Jangan memasukkan bobot model atau rahasia ke riwayat repository.
+
+
+## Perbaikan audit kumulatif 4.0.16.1 (M0-M5)
+
+Paket ini menggabungkan 18 perbaikan M0-M4 dan delapan temuan M5 pada basis GitHub 9dd8e73. Lihat `docs/UPGRADE_4_0_16_1_M0_M5.md` untuk pemasangan langsung, rollback, dan uji pada mesin pengguna. Ledger 26 temuan ada di `docs/M0_M5_REPAIRS_4_0_16_1.json`. Status perbaikan dibatasi pada regresi yang tercatat; corpus nyata, Windows/GPU dan G2-G5 masih perlu penerimaan.

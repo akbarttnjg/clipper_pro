@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.16-m5'
+RENDER_VERSION = '4.0.16.1'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -173,6 +173,7 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
     clip = {**clip, 'end': min(clip['end'], info['duration'])}
     if not info['has_audio']:
         raise ValueError('Sumber tidak mempunyai track audio.')
+    editplan.validate_source_words(words,info['duration'])
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
     words,plan=source_plan(media_path,words,clip,cfg,info,context_words=context_words)
@@ -239,7 +240,7 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
         map_layers(plan,cfg);decorations(plan,cfg,work)
         mix=censor_audio(plan,cfg,mix,work)
         from .finishing5_assets import font_info
-        used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']}
+        used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']} | {f['font_id'] for r in plan['finishing5']['layers'] for f in r.get('text_fonts',[])}
         plan['m5_fonts']=[{**font_info(cfg.fonts_dir,key),'path':str(Path(cfg.fonts_dir)/font_info(cfg.fonts_dir,key)['file'])} for key in sorted(used)]
         plan['finishing5']['font_assets']=cfg.finishing5.get('font_assets',[])
         credits=illustrations.credits(plan)

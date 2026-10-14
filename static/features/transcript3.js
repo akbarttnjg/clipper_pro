@@ -1,4 +1,4 @@
-import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.13-m2';
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.16.1';
 const localStorage=localDrafts,sessionStorage=sessionDrafts;
 /* Stage 3 review: bounded pages, original audio, explicit fact approvals. */
 const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e};

@@ -9,7 +9,7 @@ from fractions import Fraction
 
 from .contracts import fingerprint
 
-VERSION = '4.0.12-m1'
+VERSION = '4.0.15.1'
 SCHEMA_VERSION = 1
 TICKS_PER_SECOND = 1_000_000
 TRACKS = ('video', 'captions', 'illustration', 'voice', 'music', 'sfx')
@@ -259,6 +259,7 @@ def build_clock(segments, fps):
     if not frame_cursor or frame_cursor > fps*7200 or len(clock) > 600:
         raise ValueError('Timeline kosong atau terlalu rumit; batasi durasi/ramp atau pecah klip')
     return {'schema_version': SCHEMA_VERSION, 'time_base': {'numerator': 1, 'denominator': TICKS_PER_SECOND},
+            'boundary_policy': 'half_open_microsecond_ticks',
             'fps': fps, 'duration_frames': frame_cursor, 'duration': frame_cursor/fps,
             'slices': clock, 'digest': fingerprint([fps, clock])}
 
@@ -270,7 +271,11 @@ def source_to_output(clock, source_time, *, camera_id='primary'):
         a, b = row['source_start_tick'], row['source_end_tick']
         if row['camera_id'] == camera_id and a <= at < b:
             u = 0. if row['kind'] == 'freeze' else (b-at)/(b-a) if row['reverse'] else (at-a)/(b-a)
-            output.append((row['output_start_frame']+u*row['duration_frames'])/clock['fps'])
+            mapped = (row['output_start_frame']+u*row['duration_frames'])/clock['fps']
+            # Reverse source-start belongs to this slice, never the next one.
+            first = tick(row['output_start_frame']/clock['fps'])
+            last = tick(row['output_end_frame']/clock['fps'])-1
+            output.append(seconds(max(first,min(last,tick(mapped)))))
     return output
 
 
@@ -280,8 +285,8 @@ def output_to_source(clock, output_time):
         if row['output_start_frame'] <= frame < row['output_end_frame']:
             u = (frame-row['output_start_frame'])/row['duration_frames']
             a, b = row['source_start_tick'], row['source_end_tick']
-            at = a if row['kind'] == 'freeze' else min(b-1,b-(b-a)*u) if row['reverse'] else a+(b-a)*u
-            return {'source_time': seconds(at), 'camera_id': row['camera_id'], 'segment_id': row['logical_segment_id']}
+            at = a if row['kind'] == 'freeze' else b-(b-a)*u if row['reverse'] else a+(b-a)*u
+            return {'source_time': seconds(max(a,min(b-1,round(at)))), 'camera_id': row['camera_id'], 'segment_id': row['logical_segment_id']}
     return None
 
 

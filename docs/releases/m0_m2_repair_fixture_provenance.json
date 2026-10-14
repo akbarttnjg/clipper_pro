@@ -1,0 +1,8 @@
+{
+  "source_commit": "b8d12eb972b742a75379c39dc8fa7d35752b9e5e",
+  "source_tree": "10a7c77bf85fabba66f60439b468009d0e48f475",
+  "selection": "Exact public M2 Fix1 installer payload and guards, excluding historical ZIP archives; no future branch files",
+  "sha256": "e1a3276da39ac66c9c05a1e99e7d566c87f4a6d9fa11343a6306d05b1865162d",
+  "files": 189,
+  "bytes": 726671
+}

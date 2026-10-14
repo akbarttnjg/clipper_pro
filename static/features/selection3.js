@@ -1,4 +1,4 @@
-import {localDrafts} from './draft_storage.js?v=4.0.14-m3';
+import {localDrafts} from './draft_storage.js?v=4.0.16.1';
 
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
 const split=value=>value.split(',').map(x=>x.trim()).filter(Boolean);

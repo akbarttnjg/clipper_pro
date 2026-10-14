@@ -296,21 +296,9 @@ class SourceImports:
             elif kind=='direct':result=direct_download(request,folder)
             elif kind=='platform':result=platform_download(request,folder)
             else:result=connector_download(request,folder)
-            check();project=self.service.create(result['path'],request.get('settings'),request.get('name'));pid=project['project_id']
-            if project['source']['source_id']!=result['content_id']:raise ValueError('Sumber berubah sebelum pembuatan proyek')
-            def attach(doc):
-                doc['source']['import_receipt']=result['receipt'];doc['source']['import_id']=iid
-                if result.get('lineage'):doc['source']['lineage']=result['lineage']
-                if result.get('transcript_id'):
-                    raise ValueError('Assembly transcript tidak boleh merujuk proyek lain')
-            check();self.service.store.mutate(pid,project['revision'],iid+'-attach',{'import_id':iid,'receipt':result['receipt']},attach,'M2 identitas sumber impor')
-            if result.get('transcript'):
-                take=self.service.store.save_transcript(pid,result['transcript']);current=self.service.store.get(pid)
-                self.service.store.mutate(pid,current['revision'],iid+'-transcript',{'take':take},lambda d:d.update(transcript_id=take,transcript_revision=1),'M2 lineage transkrip gabungan')
+            check();project=self.service.create(result['path'],request.get('settings'),request.get('name'),
+                import_guard={'id':iid,'lease':lease},import_result=result);pid=project['project_id']
             result={k:v for k,v in result.items() if k!='transcript'};result['project_id']=pid
-            check()
-            with self.service.store.connect() as db:
-                if db.execute("UPDATE m2_imports SET status='completed',result=?,error=NULL,updated=? WHERE id=? AND status='running' AND lease=?",(dumps(result),time.time(),iid,lease)).rowcount!=1:raise ValueError('Impor tidak lagi aktif')
             if request.get('auto_analyze'):
                 try:self.service.enqueue(pid,'analyze')
                 except Exception as exc:result['asr_enqueue_error']=safe_error(exc)
@@ -321,8 +309,9 @@ class SourceImports:
 
     def cancel(self,iid):
         item=self.get(iid)
-        with self.service.store.connect() as db:db.execute("UPDATE m2_imports SET status='canceled',updated=? WHERE id=? AND status IN ('queued','running')",(time.time(),iid))
-        terminate_owned(item['pid'],item['birth']);return self.get(iid)
+        with self.service.store.connect() as db:changed=db.execute("UPDATE m2_imports SET status='canceled',updated=? WHERE id=? AND status IN ('queued','running')",(time.time(),iid)).rowcount
+        if changed:terminate_owned(item['pid'],item['birth'])
+        return self.get(iid)
 
     def resume(self,iid):
         with self.service.store.connect() as db:

@@ -1,6 +1,6 @@
 """Bounded M5 style, brand and layer schema; values are never silently dropped."""
 import copy,math,re
-VERSION='4.0.16-m5'
+VERSION='4.0.16.1'
 LEGACY=frozenset('font_main font_accent accent_hex base_hex caption_style style_preset caption_template_policy caption_composition caption_seed caption_position caption_align caption_scale caption_backdrop motion_intensity semantic_emphasis accent_font caption_renderer safe_placement'.split())
 DEFAULTS=dict(template_id='editorial',granularity='phrase',karaoke=False,emoji=False,speaker_color=False,speaker_labels=False,speaker_styles=[],emoji_map=[],fallback_fonts=['dejavu'],stroke_px=1.8,stroke_hex='#141821',shadow_px=2.,shadow_hex='#000000',glow_px=0.,glow_hex='#F6CF69',minimum_glyph_px=14.,display_width_px=360,motion_budget=.03,censor_mode='off',censor_terms=[],censor_approved=False,source_caption_mode='avoid',source_captions=[],manual_panel=None,builder=None)
 FIELDS=LEGACY|set(DEFAULTS)

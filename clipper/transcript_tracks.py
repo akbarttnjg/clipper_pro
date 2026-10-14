@@ -5,9 +5,24 @@ import json
 import math
 import re
 
-VERSION = '4.0.13-m2'
+VERSION = '4.0.15.1'
 MAX_BYTES = 10 * 1024 * 1024
 LANGUAGES = {'ind': 'id', 'eng': 'en', 'zho': 'zh', 'jpn': 'ja', 'kor': 'ko', 'indonesian':'id', 'english':'en', 'chinese':'zh', 'japanese':'ja', 'korean':'ko', 'arabic':'ar', 'spanish':'es', 'french':'fr', 'german':'de', 'portuguese':'pt', 'hindi':'hi', 'russian':'ru'}
+
+
+def effective_units(words, duration):
+    """Project a source-clock view without rewriting the immutable ASR take."""
+    from .stage3 import validate_alignment
+    result = copy.deepcopy(words)
+    for word in result:
+        if not isinstance(word, dict):raise ValueError('Unit transkrip harus berupa objek')
+        if word.get('aligned_words'):
+            aligned = validate_alignment(word['word'], word['aligned_words'], 0, duration,
+                method=word.get('alignment_method', 'manual'))
+            word['start'] = aligned[0]['start']
+            word['end'] = aligned[-1]['end']
+            word['aligned_words'] = aligned
+    return result
 
 
 def number(value, label='waktu'):
@@ -57,6 +72,7 @@ def parse(text, fmt, source_id, duration, *, source_language='und', offset=0, pr
         words = copy.deepcopy(data.get('words'))
         if not isinstance(words, list) or not words: raise ValueError('JSON harus memiliki words')
         cues = copy.deepcopy(data.get('cues', []))
+        if not isinstance(cues, list): raise ValueError('JSON cues harus berupa daftar')
         for w in words:
             if not isinstance(w, dict): raise ValueError('Baris kata tidak valid')
             w.setdefault('word', w.get('text')); w.setdefault('word_id', w.get('id'))
@@ -100,6 +116,14 @@ def parse(text, fmt, source_id, duration, *, source_language='und', offset=0, pr
         w.setdefault('source_word_ids', [wid]); w.setdefault('speaker_id', None)
         if not isinstance(w['source_word_ids'],list) or not w['source_word_ids'] or len(w['source_word_ids'])>250000:raise ValueError('Lineage kata tidak valid')
         for origin in w['source_word_ids']:identity(origin)
+        if len(set(w['source_word_ids']))!=len(w['source_word_ids']):raise ValueError('Lineage kata harus unik')
+        if w.get('aligned_words'):
+            from .stage3 import validate_alignment
+            aligned=copy.deepcopy(w['aligned_words'])
+            if not isinstance(aligned,list) or any(not isinstance(part,dict) for part in aligned):raise ValueError('Alignment JSON tidak valid')
+            for part in aligned:
+                part['start']=number(part.get('start'))+offset;part['end']=number(part.get('end'))+offset
+            w['aligned_words']=validate_alignment(w['word'],aligned,0,duration,method=w.get('alignment_method','manual'))
         speaker=w.get('speaker_id')
         if speaker is not None and (not isinstance(speaker,str) or not 1<=len(speaker)<=100 or '\n' in speaker):raise ValueError('Speaker track tidak valid')
     if any(words[i]['start'] < words[i-1]['start'] for i in range(1, len(words))): raise ValueError('Track tidak berurutan')
@@ -107,12 +131,13 @@ def parse(text, fmt, source_id, duration, *, source_language='und', offset=0, pr
     else:
         cue_seen = set()
         for c in cues:
+            if not isinstance(c, dict): raise ValueError('Baris cue tidak valid')
             cid = identity(c.get('cue_id'))
             if cid in cue_seen: raise ValueError('ID cue harus unik')
-            cue_seen.add(cid); c['start'] = number(c['start']) + offset; c['end'] = number(c['end']) + offset
+            cue_seen.add(cid); c['start'] = number(c.get('start')) + offset; c['end'] = number(c.get('end')) + offset
             if not 0 <= c['start'] < c['end'] <= duration + .00001: raise ValueError('Cue di luar durasi sumber')
             if not isinstance(c.get('text'), str) or not c['text'].strip(): raise ValueError('Teks cue kosong')
-            if set(c.get('origin_word_ids', [])) - (seen | {i for w in words for i in w['source_word_ids']}): raise ValueError('Cue merujuk kata yang tidak ada')
+        validate_cues(words, cues)
     overlaps = any(cues[i]['start'] < cues[i-1]['end'] for i in range(1, len(cues)))
     return {'words': words, 'raw_words': copy.deepcopy(words), 'heard_words': copy.deepcopy(words), 'cues': cues,
         'segments': copy.deepcopy(cues), 'duration': duration, 'language': lang, 'timebase': 'source_seconds',
@@ -164,8 +189,69 @@ def cues_from_words(words):
         'origin_word_ids': list(dict.fromkeys(x for w in g for x in w.get('source_word_ids', [w['word_id']])))} for i,g in enumerate(groups)]
 
 
+def cue_rows(words, cue):
+    refs=cue.get('origin_word_ids')
+    if not isinstance(refs,list) or not refs:raise ValueError('Cue harus mempunyai origin_word_ids')
+    for ref in refs:identity(ref)
+    if len(set(refs))!=len(refs):raise ValueError('Lineage cue harus unik')
+    refs=set(refs)
+    rows=[w for w in words if w['word_id'] in refs or set(w.get('source_word_ids',[w['word_id']]))<=refs]
+    linked={i for w in rows for i in [w['word_id'],*w.get('source_word_ids',[w['word_id']])]}
+    if not rows or refs-linked:raise ValueError('Lineage cue tidak menunjuk kata efektif yang lengkap')
+    return rows
+
+
+def validate_cues(words, cues):
+    """One source track cannot use different facts in its word and cue views."""
+    used=set()
+    for cue in cues:
+        rows=cue_rows(words,cue);ids={w['word_id'] for w in rows}
+        if used&ids:raise ValueError('Kata mempunyai cue ganda dalam track yang sama')
+        used.update(ids)
+        if ' '.join(cue['text'].split())!=' '.join(' '.join(w['word'] for w in rows).split()):
+            raise ValueError('Teks cue berbeda dari words yang dirujuk; periksa track JSON')
+        if abs(cue['start']-min(w['start'] for w in rows))>.00101 or abs(cue['end']-max(w['end'] for w in rows))>.00101:
+            raise ValueError('Waktu cue berbeda dari words yang dirujuk; periksa clock sumber')
+        speakers={w.get('speaker_id') for w in rows}
+        if len(speakers)!=1 or cue.get('speaker_id')!=next(iter(speakers)):
+            raise ValueError('Speaker cue berbeda dari words yang dirujuk')
+    if used!={w['word_id'] for w in words}:raise ValueError('Cue belum mencakup seluruh words')
+
+
+def effective_cues(track):
+    """Project current text/time/speakers without rewriting the immutable take.
+
+    Preserve imported cue IDs while their lineage still partitions the words.
+    Speaker changes can split a cue, with an explicit parent reference.
+    """
+    words=track['words'];original=track.get('cues') or []
+    if not original:return cues_from_words(words)
+    result=[];used=set()
+    try:
+        for cue in original:
+            rows=cue_rows(words,cue);ids={w['word_id'] for w in rows}
+            if used&ids:raise ValueError('Cue lineage overlaps')
+            used.update(ids);groups=[]
+            for row in rows:
+                if not groups or groups[-1][-1].get('speaker_id')!=row.get('speaker_id'):groups.append([])
+                groups[-1].append(row)
+            for index,group in enumerate(groups):
+                value={**copy.deepcopy(cue),'start':min(w['start'] for w in group),'end':max(w['end'] for w in group),
+                    'text':' '.join(w['word'] for w in group),'speaker_id':group[0].get('speaker_id'),
+                    'origin_word_ids':list(dict.fromkeys(i for w in group for i in w.get('source_word_ids',[w['word_id']])))}
+                if len(groups)>1:
+                    value['parent_cue_id']=cue['cue_id']
+                    value['cue_id']='cue-'+hashlib.sha256(json.dumps([cue['cue_id'],index,value['origin_word_ids']],ensure_ascii=False).encode()).hexdigest()[:24]
+                result.append(value)
+        if used!={w['word_id'] for w in words}:raise ValueError('Cue lineage incomplete')
+    except (KeyError,TypeError,ValueError):
+        result=cues_from_words(words)
+        for cue in result:cue['parent_cue_ids']=[c['cue_id'] for c in original if isinstance(c,dict) and 'cue_id' in c and set(c.get('origin_word_ids',[]))&set(cue['origin_word_ids'])]
+    return sorted(result,key=lambda c:c['start'])
+
+
 def export_track(track, fmt, *, metadata=None):
-    cues = track.get('cues') or cues_from_words(track['words']); meta = {**track.get('metadata', {}), **(metadata or {})}
+    cues = effective_cues(track); meta = {**track.get('metadata', {}), **(metadata or {})}
     if fmt == 'json':
         return json.dumps({'schema_version': 1, 'source_id': track['source_id'], 'timebase': 'source_seconds',
             'language': track['language'], 'duration': track['duration'], 'words': track['words'], 'cues': cues,

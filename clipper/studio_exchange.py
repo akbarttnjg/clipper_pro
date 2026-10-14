@@ -7,6 +7,10 @@ from .dependency_cache import asset_id,content_id
 
 
 def render_words(transcript,document,clip,cfg):
+    from .editplan import validate_source_words
+    source_duration=document.get('source',{}).get('info',{}).get('duration',transcript.get('duration'))
+    if source_duration is None:raise ValueError('Durasi sumber diperlukan untuk memvalidasi coverage kata')
+    validate_source_words(transcript['words'],source_duration)
     translated=transcript.get('m2_translation')
     if translated and translated['display_mode']=='translation':
         return [copy.deepcopy(w) for w in translated['words'] if w['end']>clip['start'] and w['start']<clip['end']]

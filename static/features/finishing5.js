@@ -1,4 +1,4 @@
-import {localDrafts} from './draft_storage.js?v=4.0.16-m5';
+import {localDrafts} from './draft_storage.js?v=4.0.16.1';
 // Each tab owns string drafts; only changed fields are submitted to the engine.
 export async function mountFinishing5(host,{project,clipId,variantId,api,onChange=()=>{},isActive=()=>true,onDraftStatus=()=>{}}){
  let destroyed=false,preview=null,corrupt=false,draft=null;
@@ -100,7 +100,17 @@ export async function mountFinishing5(host,{project,clipId,variantId,api,onChang
  if(report){j.append(e('p',`${report.stale?'Laporan lama · ':''}${report.issue_count||0} catatan pengukuran. Penilaian estetika dan makna pada video asli tetap terpisah.`));
   if(report.raster_qc){const raster=report.raster_qc;j.append(e('p',`Sampel kontras final: ${raster.contrast_ratio==null?'belum terukur':raster.contrast_ratio.toFixed(2)+':1'} · ${raster.decoded_frames||0} frame · ${raster.status}. Ini pengukuran sampel paint; latar bergerak tetap perlu ditinjau.`));}
   for(const phrase of report.phrases||[])j.append(e('p',`${phrase.text} · ${phrase.characters_per_second??'?'} karakter/detik · hold ${Math.min(...(phrase.clear_time_metrics||[]).map(r=>r.longest_contiguous_clear)).toFixed(2)} detik`));}
- button(host,'Simpan perubahan M5',async()=>{if(corrupt)throw Error('Pulihkan/buang draf rusak dahulu');const changed=values();const ops=[];if('decorations' in changed){ops.push({op:'m5_layers',values:changed.decorations});delete changed.decorations}if(Object.keys(changed).length)ops.unshift({op:'m5_style',values:changed});if(!ops.length){status.textContent='Tidak ada perubahan';return}const req=request(ops);req.expected_revision=draft?.revision??state.revision;await api('/changes',req);localDrafts.removeItem(key);draft=null;if(live()){onDraftStatus();await onChange()}});
+ button(host,'Simpan perubahan M5',async()=>{if(corrupt)throw Error('Pulihkan/buang draf rusak dahulu');const changed=values();const ops=[];if('decorations' in changed){ops.push({op:'m5_layers',values:changed.decorations});delete changed.decorations}if(Object.keys(changed).length)ops.unshift({op:'m5_style',values:changed});if(!ops.length){status.textContent='Tidak ada perubahan';return}const captured=Object.fromEntries(Object.entries(fields).filter(([k,{node}])=>node.value!==node.dataset.baseline).map(([k,{node}])=>[k,node.value]));const req=request(ops);req.expected_revision=draft?.revision??state.revision;const result=await api('/changes',req);
+  // Advance saved baselines, consuming only exact captured strings. Edits made
+  // while the request was pending remain owned by this tab and revision.
+  state.revision=result.revision??result.project?.revision??(req.expected_revision+1);
+  for(const [k,value] of Object.entries(captured))fields[k].node.dataset.baseline=value;
+  const remaining={};
+  if(live()){for(const [k,{node}] of Object.entries(fields))if(node.value!==node.dataset.baseline)remaining[k]=node.value;}
+  else {try{const stored=JSON.parse(localDrafts.getItem(key)||'null');if(stored){if(!stored.fields||typeof stored.fields!=='object'||Array.isArray(stored.fields))return;Object.assign(remaining,stored.fields);for(const [k,value] of Object.entries(captured))if(remaining[k]===value)delete remaining[k];}}catch{return}}
+  draft=Object.keys(remaining).length?{revision:state.revision,fields:remaining}:null;
+  if(draft)localDrafts.setItem(key,JSON.stringify(draft));else localDrafts.removeItem(key);
+ if(live()){onDraftStatus();await onChange()}});
  button(host,'Unduh salinan draf M5',async()=>download('draf-M5.json',localDrafts.getItem(key)||'{}'));
  button(host,'Buang draf M5',async()=>{localDrafts.removeItem(key);draft=null;corrupt=false;if(live()){onDraftStatus();await onChange()}});
  button(host,'Muat revisi terbaru untuk draf M5',async()=>{if(corrupt)throw Error('Draf rusak perlu dipulihkan dahulu');const latest=await api(`/projects/${project.project_id}`);if(draft){draft.revision=latest.revision;localDrafts.setItem(key,JSON.stringify(draft))}if(live())status.textContent='Draf dipertahankan. Tinjau kembali nilainya sebelum menyimpan.'});

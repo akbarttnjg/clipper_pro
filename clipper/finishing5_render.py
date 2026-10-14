@@ -63,7 +63,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 else:runs.append((a['t'],b['t'],state))
             for a,b,k in runs:
                 left=p['start']+a;right=min(p['end'],p['start']+b)
-                tags=(f"\\an5\\pos({w['x']+k['dx']:.3f},{w['y']+k['dy']:.3f})\\fn{w['family']}\\fs{w['ass_size']}\\b{int(w['bold'])}\\i{int(w['italic'])}"
+                tags=(f"\\an5\\pos({w['x']+k['dx']:.3f},{w['y']+k['dy']:.3f})\\fn{w.get('ass_font_name',w['family'])}\\fs{w['ass_size']}\\b{int(w['bold'])}\\i{int(w['italic'])}"
                     f"\\c{color(k.get('color',w['color']))}\\alpha&H{round((1-k['opacity'])*255):02X}&\\bord{paint['stroke']:.3f}\\shad{paint['shadow']:.3f}\\3c{color(paint['stroke_color'])}\\4c{color(paint['shadow_color'])}\\blur0")
                 if paint['glow']:event(1,left,right,tags+f"\\c{color(paint['glow_color'])}\\3c{color(paint['glow_color'])}\\bord{paint['stroke']+paint['glow']/2:.3f}\\blur{paint['glow']/2:.3f}\\shad0",safe(w['text']))
                 event(2,left,right,tags,safe(w['text']))
@@ -89,7 +89,27 @@ def raster(plan,cfg,folder,duration):
 def decorations(plan,cfg,folder):
     rows=plan.get('finishing5',{}).get('layers',[])
     if not rows:return
-    images={};videos={};raw_paths=[]
+    images={};videos={};raw_paths=[];text_layouts={}
+    from .finishing5_assets import choose_font
+    from .finishing5_contract import effective
+    style=effective(cfg)
+    for r in rows:
+        if r['kind'] in ('logo','image','video'):continue
+        w,h=r['output_rect'][2:];items=r.get('items',[r.get('text','')]);values=r.get('values')
+        if values:items=[f"{label}: {value:g} {r.get('unit','')}".strip() for label,value in zip(items,values)]
+        chosen=[]
+        for value in items:
+            meta=choose_font(cfg.fonts_dir,cfg.font_main,style['fallback_fonts'],value)
+            size=max(8,math.ceil(plan['width']/style['display_width_px']*style['minimum_glyph_px']/.53))
+            f=font(str(Path(cfg.fonts_dir)/meta['file']),size)
+            while min(f.getbbox('H')[3]-f.getbbox('H')[1],f.getbbox('a')[3]-f.getbbox('a')[1])*style['display_width_px']/plan['width']<style['minimum_glyph_px']:
+                size+=1;f=font(str(Path(cfg.fonts_dir)/meta['file']),size)
+            box=f.getbbox(value,anchor='lt')
+            if box[2]-min(0,box[0])>w*.90:raise ValueError('Teks layer terlalu panjang; perbesar area, teks tidak dipotong')
+            if max(box[3],size*1.8)*len(items)>h*.9:raise ValueError('Area teks layer terlalu pendek pada minimum glyph layar kecil')
+            chosen.append((value,f,meta))
+        r['text_fonts']=[{**meta,'path':str(Path(cfg.fonts_dir)/meta['file'])} for _,_,meta in chosen]
+        text_layouts[id(r)]=chosen
     try:
         for r in rows:
             if r['kind'] in ('logo','image'):
@@ -119,13 +139,9 @@ def decorations(plan,cfg,folder):
                     if len(buf)!=w*h*4:raise ValueError('Decoder B-roll berhenti sebelum interval selesai')
                     plate=Image.frombytes('RGBA',(w,h),buf)
                 else:
-                    d=ImageDraw.Draw(plate);d.rounded_rectangle((0,0,w-1,h-1),radius=max(2,round(h*.06)),fill=(14,22,34,245));items=r.get('items',[r.get('text','')]);values=r.get('values')
-                    if values:items=[f"{label}: {value:g} {r.get('unit','')}".strip() for label,value in zip(items,values)]
-                    size=max(8,math.ceil(plan['width']/360*14/.53));f=font(str(Path(cfg.fonts_dir)/'DMSans-SemiBold.ttf'),size)
-                    if size*len(items)*1.8>h*.9:raise ValueError('Area teks layer terlalu pendek pada minimum glyph layar kecil')
-                    if any(f.getlength(v)>w*.90 for v in items):raise ValueError('Teks layer terlalu panjang; perbesar area, teks tidak dipotong')
-                    for i,v in enumerate(items):
-                        yy=h*.10+i*h*.80/max(1,len(items));d.text((w*.05,yy),v,font=f,fill='white')
+                    d=ImageDraw.Draw(plate);d.rounded_rectangle((0,0,w-1,h-1),radius=max(2,round(h*.06)),fill=(14,22,34,245));values=r.get('values');chosen=text_layouts[id(r)]
+                    for i,(v,f,meta) in enumerate(chosen):
+                        size=f.size;yy=h*.10+i*h*.80/max(1,len(chosen));box=f.getbbox(v,anchor='lt');d.text((w*.05-min(0,box[0]),yy),v,font=f,anchor='lt',fill='white')
                         if values:
                             maximum=max(abs(n) for n in values) or 1;bar=abs(values[i])/maximum*w*.8;d.rectangle((w*.05,yy+size*1.2,w*.05+bar,yy+size*1.38),fill='#F6CF69')
                 alpha=r['opacity'];u=min(t-r['start'],r['end']-t);tr=r['transition'];dur=r['transition_s']

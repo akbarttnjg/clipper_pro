@@ -42,7 +42,7 @@ def readiness(cfg):
 
 
 def signature(cfg):
-    if cfg.finishing5:return [cfg.caption_renderer,'4.0.16-m5',readiness(cfg) if cfg.caption_renderer in ('auto','remotion') else 'local']
+    if cfg.finishing5:return [cfg.caption_renderer,'4.0.16.1',readiness(cfg) if cfg.caption_renderer in ('auto','remotion') else 'local']
     if cfg.caption_renderer=='ass':return ['ass','4.0.7']
     status=readiness(cfg)
     return [cfg.caption_renderer,'4.0.7',status['status'],status.get('generation'),status.get('browser')]

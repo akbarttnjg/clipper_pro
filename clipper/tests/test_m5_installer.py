@@ -3,7 +3,7 @@ import contextlib,hashlib,io,json,shutil,sqlite3,tempfile,unittest,zipfile
 from pathlib import Path
 from unittest.mock import patch
 from tools import build_m5_release,complete_installer as installer
-from .frozen_release import restore_m2,restore_m3_producer,restore_m4_producer
+from .frozen_release import restore_m2,restore_m3_producer,restore_m4_producer,restore_m5_producer
 def baseline(path,version='m4'):
     restore_m2(path)
     if version in ('m3','m4'):restore_m3_producer(path)
@@ -13,7 +13,8 @@ class M5InstallerCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.shared=tempfile.TemporaryDirectory();cls.package=Path(cls.shared.name)/'M5-test-package'
-        with contextlib.redirect_stdout(io.StringIO()):cls.built=build_m5_release.build(cls.package,'0'*40)
+        producer=restore_m5_producer(Path(cls.shared.name)/'producer')
+        with patch.object(build_m5_release,'ROOT',producer),contextlib.redirect_stdout(io.StringIO()):cls.built=build_m5_release.build(cls.package,'0'*40)
     @classmethod
     def tearDownClass(cls):cls.shared.cleanup()
     def setUp(self):

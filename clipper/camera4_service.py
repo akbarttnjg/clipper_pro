@@ -28,11 +28,12 @@ def effective_controls(service,doc,cid,vid):
 
 def signature(service,doc,cid,vid):
     from .editor_contract import segments_for,render_inputs
+    from .transcript_tracks import effective_units
     variant=service.variant(doc,cid,vid);clip=doc['clips'][cid]
     data=service.transcript(doc,cid,vid) if doc.get('transcript_id') else {'words':[]}
     return fingerprint([c.VERSION,doc['source']['source_id'],spans_for(service,doc,cid,vid),segments_for(clip,variant),
         render_inputs(variant.get('editor',{})),doc.get('diarization'),doc.get('manual_speakers'),
-        [[w['start'],w['end'],w.get('speaker_id'),w.get('speaker_provenance')] for w in data['words']],
+        [[w['start'],w['end'],w.get('speaker_id'),w.get('speaker_provenance'),w.get('aligned_words'),w.get('alignment_method')] for w in effective_units(data['words'],doc['source']['info']['duration'])],
         effective_controls(service,doc,cid,vid),content_id(variant['camera4_controls']['attachment']['path'],fresh=True) if variant.get('camera4_controls',{}).get('attachment') else None,
         service.config(doc,cid,vid).audio_stream_index])
 
@@ -169,7 +170,8 @@ def execute(service,job):
         request=settings['mask'];result=backend('sam2',{'source':str(source),'source_content_id':content_id(source,fresh=True),
             'time':request['time'],'span':[request['start'],request['end']],'box':c.pixels(request['box'],*report['source_size'])},cfg,folder/'mask')
         report['matte']=camera4_tracking.matte(result,source,request,report['source_size'],folder/'matte')
-    report['segments']=camera4_plan.build(report,settings,data['words'],active)
+    from .transcript_tracks import effective_units
+    report['segments']=camera4_plan.build(report,settings,effective_units(data['words'],doc['source']['info']['duration']),active)
     if report.get('matte'):
         for segment in report['segments']:
             if segment['start']<report['matte']['end'] and segment['end']>report['matte']['start']:

@@ -1,4 +1,4 @@
-import {localDrafts} from './draft_storage.js?v=4.0.15-m4';
+import {localDrafts} from './draft_storage.js?v=4.0.16.1';
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
 const names={auto:'Otomatis per adegan',fit:'Frame utuh',subject:'Subjek terpilih',grid:'Grid pembicara',screen:'Layar / papan',pip:'Picture-in-picture',gameplay:'Gameplay + facecam'};
 const reviews={speaker_identity:'Speaker dan wajah sudah saya cocokkan',material_hud:'Materi, angka, cursor dan HUD tetap terlihat',motion_no_pan:'Gerak dan no-pan sesuai pilihan saya',safe_area:'Area caption dan platform sudah diperiksa',source_order:'Waktu dan urutan sumber sudah diperiksa',continuous_mask:'Mask sepanjang rentang sudah saya periksa',tracking_drift:'Lintasan dan drift sudah saya periksa'};

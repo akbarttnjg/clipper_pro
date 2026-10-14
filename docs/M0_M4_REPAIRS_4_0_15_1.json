@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "version": "4.0.15.1",
+  "baseline_commit": "e6ed7006a67cf323b63eb943f3ff4924843e6e78",
+  "repair_findings": [
+    {
+      "id": "M2-01",
+      "contract_test": "test_matroska_origin_is_not_content_duration",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Durasi konten MKV",
+      "severity": "P1",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M2-02",
+      "contract_test": "test_json_cue_cannot_disagree_with_canonical_words",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Satu fakta JSON words/cues",
+      "severity": "P1",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M2-03",
+      "contract_test": "RepairsServiceCase.test_assembly_rebases_nested_alignment_and_render_keeps_all_words",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Rebase nested alignment assembly",
+      "severity": "P1",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M2-04",
+      "contract_test": "RepairsServiceCase.test_assembly_commit_fault_rolls_back_project_take_and_words",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Publikasi impor atomik dan idempoten",
+      "severity": "P1",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M2-05",
+      "contract_test": "m2_ui.cjs: scope/format/legacy draft groups",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Draf cakupan dan format subtitle",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M2-06",
+      "contract_test": "RepairsServiceCase.test_project_timing_cannot_overlap_a_narrower_override",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Validasi timing seluruh lapisan turunan",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M2-07",
+      "contract_test": "RepairsServiceCase.test_whole_source_export_uses_effective_speaker_and_preserves_take",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Speaker efektif pada ekspor",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "AUD-01",
+      "contract_test": "editor_complete_ui.cjs: selective snapshot consumption",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Draf snapshot per proyek",
+      "severity": "P1",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "AUD-02",
+      "contract_test": "test_offset_changes_cached_camera_pixels",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Cache offset kamera",
+      "severity": "P1",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "AUD-03",
+      "contract_test": "test_track_lock_owns_each_changed_field",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Kepemilikan lock field",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "AUD-04",
+      "contract_test": "editor_complete_ui.cjs: restored X keyframe",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Atribut kurva dipulihkan",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "AUD-05",
+      "contract_test": "test_reverse_mapping_stays_in_its_half_open_slice + editor_clock.js DOM",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Batas reverse half-open",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "AUD-06",
+      "contract_test": "test_frozen_aud06_fullhd_render_keeps_original_ids_and_qc",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Ink/stroke dalam area subtitle",
+      "severity": "P2",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M3-01",
+      "title": "Timing manual dan signature kandidat",
+      "severity": "P2",
+      "contract_test": "test_m3_source_signature_tracks_manual_alignment",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M4-01",
+      "title": "Perintah kamera menghormati lock video",
+      "severity": "P2",
+      "contract_test": "test_m4_controls_respect_video_track_lock",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M4-02",
+      "title": "Safe area gambar dan panel subtitle",
+      "severity": "P2",
+      "contract_test": "test_m4_caption_panel_honors_right_safe_margin",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M4-03",
+      "title": "Kepala subjek tetap dalam crop/keyframe",
+      "severity": "P1",
+      "contract_test": "test_m4_manual_path_cannot_remove_the_selected_subject_head",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true
+    },
+    {
+      "id": "M4-04",
+      "title": "Timing pada rasio tambahan",
+      "severity": "P2",
+      "contract_test": "test_m4_extra_ratio_can_save_variant_word_timing",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true
+    }
+  ],
+  "m0_guard": "source bounds before clipping plus word mapping coverage",
+  "pending_gate": [
+    "G2 original speech/model acceptance",
+    "G3 blind real clipping corpus",
+    "G4 real composition corpus",
+    "Windows/browser/GPU target validation"
+  ],
+  "no_live_provider_inference_claim": true,
+  "verification": {
+    "tests": 1476,
+    "passed": 1454,
+    "skipped": 22,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 190.767,
+    "repair_cases": 77,
+    "dom_suites_passed": 13
+  }
+}

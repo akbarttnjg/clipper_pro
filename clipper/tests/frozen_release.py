@@ -113,3 +113,38 @@ def restore_m4_producer(root):
     for name,data in binary:
         target=_fixture_path(root,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
     return root
+
+
+def restore_m4_audit(root):
+    """Restore exact e6ed700 code for cumulative repair installation tests."""
+    fixture=RELEASES/'m0_m4_repair_m4_fixture.zip'
+    expected=json.loads(fixture.with_name('m0_m4_repair_m4_provenance.json').read_text())
+    external=[]
+    for name,digest in expected['external_files'].items():
+        source=Path(__file__).resolve().parents[2]/name
+        data=source.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=digest:raise ValueError('Frozen M4 external archive changed: '+name)
+        external.append((name,data))
+    root=_restore(root,fixture,expected)
+    for name,data in external:
+        dest=_fixture_path(root,name);dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
+    return root
+
+
+def restore_repair_producer(root,stem):
+    fixture=RELEASES/(stem+'.zip');expected=json.loads(fixture.with_name(stem+'_provenance.json').read_text())
+    external=[]
+    for name,digest in expected['external_files'].items():
+        source=Path(__file__).resolve().parents[2]/name;data=source.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=digest:raise ValueError('Frozen repair producer external archive changed: '+name)
+        external.append((name,data))
+    root=_restore(root,fixture,expected)
+    for name,data in external:
+        target=_fixture_path(root,name);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+    return root
+
+
+def restore_m5_producer(root):return restore_repair_producer(root,'m0_m5_repair_m5')
+
+
+def restore_m4_fixed_producer(root):return restore_repair_producer(root,'m0_m5_repair_m4_fixed')

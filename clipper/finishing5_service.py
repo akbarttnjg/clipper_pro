@@ -72,6 +72,21 @@ def snapshot(service,pid,cid,vid):
     if cover:cover['url']=service.register_file(pid,cover.get('path'));cover['stale']=cover.get('dependency')!=service.dependency(d,cid,vid)
     asset_rows=[{**r,'url':service.register_file(pid,r['path'])} for r in a.list()]
     return dict(version=VERSION,project_id=pid,revision=d['revision'],enabled=state.get('enabled',False),style=effective(cfg),origins=origins(service,d,cid,vid),decorations=state.get('decorations',[]),fonts=fonts,assets=asset_rows,kits=a.kits(),templates=TEMPLATES,presets=PRESETS,gallery=gallery,cover=cover,source_caption_detection=source_caption_candidates(service,d,cid,vid,cfg))
+def affected_tracks(service,doc,cid,vid,op):
+    """Check all destinations with the exact effective audio/layer change."""
+    command={k:v for k,v in op.items() if k not in ('targets','scope')}
+    before=service.config(doc,cid,vid);candidate=copy.deepcopy(doc)
+    apply_command(service,candidate,cid,vid,command,doc.get('revision',0))
+    after=service.config(candidate,cid,vid)
+    tracks={'illustration'} if op['op']=='m5_layers' else {'captions'}
+    def audio(cfg):
+        values=effective(cfg)
+        return (values['censor_terms'],values['censor_approved']) if cfg.finishing5 and cfg.finishing5.get('enabled') and values['censor_mode']=='bleep_mask' else None
+    if audio(before)!=audio(after):tracks.add('voice')
+    def decorations(cfg):return cfg.finishing5.get('decorations',[]) if cfg.finishing5 and cfg.finishing5.get('enabled') else []
+    if decorations(before)!=decorations(after) or op['op']=='m5_kit' and op.get('include_layers',True):tracks.add('illustration')
+    return tracks
+
 def apply_command(service,doc,cid,vid,op,revision):
     kind=op.get('op','')
     if not kind.startswith('m5_'):return None
@@ -185,11 +200,24 @@ def map_layers(plan,cfg):
             spoken=' '.join(w['word'] for w in plan.get('display_words',plan.get('words',[])))
             exact=lambda needle,haystack:re.search(r'(?<!\w)'+re.escape(needle)+r'(?!\w)',haystack,re.I) is not None
             if not exact(r['quote'],spoken) or any(not exact(t,r['quote']) for t in r['items']):raise ValueError('Diagram harus memakai seluruh item dari kutipan sumber')
-            def numeric(value):
-                token=format(value,'.15g')
-                return any(re.search(r'(?<![\w+\-.,])'+re.escape(t)+r'(?:[.,]0+)?(?!\w|[.,]\d)',r['quote']) for t in {token,token.replace('.',',')})
-            if r.get('values') and any(not numeric(v) for v in r['values']):raise ValueError('Angka diagram tidak ada dalam kutipan sumber')
-            r['provenance']={'quote':r['quote'],'items':r['items'],'values':r.get('values')}
+            pairs=[]
+            if r.get('values'):
+                # Every label owns the number immediately following it, up to
+                # the next label. Mere membership cannot establish association.
+                occurrences=[]
+                for label,value in zip(r['items'],r['values']):
+                    matches=list(re.finditer(r'(?<!\w)'+re.escape(label)+r'(?!\w)',r['quote'],re.I))
+                    if len(matches)!=1:raise ValueError('Pasangan label/nilai diagram ambigu; perjelas kutipan sumber')
+                    occurrences.append((matches[0].start(),matches[0].end(),label,value))
+                ordered=sorted(occurrences)
+                for i,(a,b,label,value) in enumerate(ordered):
+                    end=ordered[i+1][0] if i+1<len(ordered) else len(r['quote'])
+                    tail=r['quote'][b:end]
+                    numbers=list(re.finditer(r'(?<![\w.,])[+\-]?\d+(?:[.,]\d+)?(?!\w|[.,]\d)',tail))
+                    if len(numbers)!=1 or float(numbers[0].group().replace(',','.'))!=value or not re.fullmatch(r'[\s:=,;]*(?:(?:adalah|sebesar|sebanyak|bernilai|nilainya|yaitu|sekitar|mencapai)[\s:=,;]+)?',tail[:numbers[0].start()].casefold()):
+                        raise ValueError('Angka / pasangan label-nilai diagram tidak cocok dengan kutipan sumber')
+                    match=numbers[0];pairs.append({'label':label,'value':value,'label_span':[a,b],'value_span':[b+match.start(),b+match.end()]})
+            r['provenance']={'quote':r['quote'],'items':r['items'],'values':r.get('values'),'label_value_evidence':pairs}
     for frame in range(round(plan['duration']*plan['fps'])):
         t=frame/plan['fps'];active=[r for r in out if r['start']<=t<r['end']]
         if len(active)>4:raise ValueError('Budget maksimal empat layer bersamaan')

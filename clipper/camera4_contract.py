@@ -3,7 +3,7 @@ import copy
 import math
 from .contracts import fingerprint
 
-VERSION='4.0.15-m4'
+VERSION = '4.0.15.1-m4'
 LAYOUTS=('auto','fit','subject','grid','screen','pip','gameplay')
 PROFILES=('general','education','podcast','screen','gaming')
 

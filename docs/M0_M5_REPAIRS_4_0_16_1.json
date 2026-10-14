@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "version": "4.0.16.1",
+  "milestone": "M0-M5 cumulative repairs",
+  "baseline_commit": "9dd8e73d11c8612a365d3ea96c59b969131307a2",
+  "baseline_tree": "d77207849342cba65118471f6896321ef3257a40",
+  "prior_repair_commit": "384bc533ae983dc08efd783cd0bac2e06ebb10ea",
+  "prior_repair_tree": "8cc020a0271358b9e6fcebf7e296d1ca857ead8b",
+  "repair_findings": [
+    {
+      "id": "M2-01",
+      "contract_test": "test_matroska_origin_is_not_content_duration",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Durasi konten MKV",
+      "severity": "P1",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M2-02",
+      "contract_test": "test_json_cue_cannot_disagree_with_canonical_words",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Satu fakta JSON words/cues",
+      "severity": "P1",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M2-03",
+      "contract_test": "RepairsServiceCase.test_assembly_rebases_nested_alignment_and_render_keeps_all_words",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Rebase nested alignment assembly",
+      "severity": "P1",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M2-04",
+      "contract_test": "RepairsServiceCase.test_assembly_commit_fault_rolls_back_project_take_and_words",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Publikasi impor atomik dan idempoten",
+      "severity": "P1",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M2-05",
+      "contract_test": "m2_ui.cjs: scope/format/legacy draft groups",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Draf cakupan dan format subtitle",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M2-06",
+      "contract_test": "RepairsServiceCase.test_project_timing_cannot_overlap_a_narrower_override",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Validasi timing seluruh lapisan turunan",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M2-07",
+      "contract_test": "RepairsServiceCase.test_whole_source_export_uses_effective_speaker_and_preserves_take",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Speaker efektif pada ekspor",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "AUD-01",
+      "contract_test": "editor_complete_ui.cjs: selective snapshot consumption",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Draf snapshot per proyek",
+      "severity": "P1",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "AUD-02",
+      "contract_test": "test_offset_changes_cached_camera_pixels",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Cache offset kamera",
+      "severity": "P1",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "AUD-03",
+      "contract_test": "test_track_lock_owns_each_changed_field",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Kepemilikan lock field",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "AUD-04",
+      "contract_test": "editor_complete_ui.cjs: restored X keyframe",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Atribut kurva dipulihkan",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "AUD-05",
+      "contract_test": "test_reverse_mapping_stays_in_its_half_open_slice + editor_clock.js DOM",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Batas reverse half-open",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "AUD-06",
+      "contract_test": "test_frozen_aud06_fullhd_render_keeps_original_ids_and_qc",
+      "status": "closed_in_recorded_regression_scope",
+      "title": "Ink/stroke dalam area subtitle",
+      "severity": "P2",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M3-01",
+      "title": "Timing manual dan signature kandidat",
+      "severity": "P2",
+      "contract_test": "test_m3_source_signature_tracks_manual_alignment",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M4-01",
+      "title": "Perintah kamera menghormati lock video",
+      "severity": "P2",
+      "contract_test": "test_m4_controls_respect_video_track_lock",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M4-02",
+      "title": "Safe area gambar dan panel subtitle",
+      "severity": "P2",
+      "contract_test": "test_m4_caption_panel_honors_right_safe_margin",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M4-03",
+      "title": "Kepala subjek tetap dalam crop/keyframe",
+      "severity": "P1",
+      "contract_test": "test_m4_manual_path_cannot_remove_the_selected_subject_head",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M4-04",
+      "title": "Timing pada rasio tambahan",
+      "severity": "P2",
+      "contract_test": "test_m4_extra_ratio_can_save_variant_word_timing",
+      "status": "closed_in_recorded_regression_scope",
+      "reproduced_on_m4": true,
+      "carried_from": "4.0.15.1 exact repair tree 8cc020a0271358b9e6fcebf7e296d1ca857ead8b"
+    },
+    {
+      "id": "M5-01",
+      "title": "Lock ilustrasi dan suara dapat dilewati",
+      "severity": "P2",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Ownership dihitung dari perubahan efektif pada salinan dokumen; voice dan illustration ikut diperiksa untuk sensor/kit/enable. Semua tujuan dicek sebelum mutasi.",
+      "contract_test": "test_kit_cannot_replace_a_locked_illustration_track; test_existing_bleep_audio_is_owned_by_voice; test_project_kit_checks_second_ratio_before_mutation",
+      "requirements": [
+        "BR03",
+        "BR04",
+        "BR05",
+        "TX11"
+      ]
+    },
+    {
+      "id": "M5-02",
+      "title": "Penggabungan frasa mengubah speaker kata berikutnya",
+      "severity": "P1",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Pergantian speaker dan provenance memutus unit/frasa; leaf clock dipertahankan saat wrap. ASR asli tidak diubah.",
+      "contract_test": "test_atomic_meaning_unit_must_not_reassign_speaker",
+      "requirements": [
+        "TX07",
+        "TX10",
+        "TX18"
+      ]
+    },
+    {
+      "id": "M5-03",
+      "title": "Diagram dapat menukar nilai antar label sumber",
+      "severity": "P1",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Label dan angka dibuktikan sebagai pasangan dengan span kutipan, bukan membership. Label ambigu, nilai tertukar dan angka alternatif ditolak.",
+      "contract_test": "test_diagram_records_proven_pair_spans; test_diagram_rejects_ambiguous_or_inverted_evidence",
+      "requirements": [
+        "FX07",
+        "M5.6"
+      ]
+    },
+    {
+      "id": "M5-04",
+      "title": "Impor kit gagal tetapi parent kit baru tertinggal",
+      "severity": "P2",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Seluruh aset dan rantai parent/child divalidasi dalam staging privat. Publikasi assets/kits/history satu transaksi; fault membatalkan DB dan file baru.",
+      "contract_test": "test_failed_pack_import_does_not_publish_a_partial_parent; test_pack_publish_fault_rolls_back_assets_parents_and_retries",
+      "requirements": [
+        "BR01",
+        "BR02",
+        "BR10"
+      ]
+    },
+    {
+      "id": "M5-05",
+      "title": "Teks dekorasi melewati validasi glyph dan font brand",
+      "severity": "P2",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Semua teks dekoratif memakai font utama/fallback yang dipilih, cmap dan ink terukur. Font aktual dicatat dan dibekukan ke ArtifactSet.",
+      "contract_test": "test_all_text_layers_check_actual_font_before_render; test_actual_render_freezes_fallback_font_used_only_by_decoration",
+      "requirements": [
+        "TX03",
+        "TX05",
+        "BR04",
+        "BR05",
+        "FX07"
+      ]
+    },
+    {
+      "id": "M5-06",
+      "title": "ASS memilih Regular saat font Medium yang dipilih",
+      "severity": "P2",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Parser membaca nama lengkap face; ASS memakai face tersebut dengan bold/italic eksplisit. Face ambigu ditolak dan metadata aset lama dibaca ulang dari file immutable.",
+      "contract_test": "test_ASS_preserves_selected_face_in_same_family [Regular,Medium,SemiBold,Bold,Italic]; 12 existing ASS/Pillow parity cases",
+      "requirements": [
+        "TX03",
+        "TX05",
+        "TX17"
+      ]
+    },
+    {
+      "id": "M5-07",
+      "title": "Edit baru hilang ketika penyimpanan sedang berjalan",
+      "severity": "P1",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Simpan mengonsumsi string field yang telah dikirim saja, memperbarui revisi draf tersisa, dan mempertahankan edit dari panel yang dipasang ulang.",
+      "contract_test": "clipper/tests/m5_repair_ui.cjs: new-field, same-field, revert, remounted-panel, revision-aware retry",
+      "requirements": [
+        "M1 draft contract",
+        "M5 UI"
+      ]
+    },
+    {
+      "id": "M5-08",
+      "title": "Sensor kata ikut membunyikan bleep pada negasi di sebelahnya",
+      "severity": "P1",
+      "status": "closed_in_recorded_regression_scope",
+      "repair": "Interval bleep diturunkan dari exact source-token match, terpisah dari unit makna visual. Partial cue tanpa alignment ditolak; bilingual audio hanya mengikuti track sumber.",
+      "contract_test": "test_censor_preserves_exact_leaf_clocks_and_logical_coverage; test_actual_plan_censor_preserves_neighboring_negation_audio; test_bilingual_censor_audio_uses_source_clock_only",
+      "requirements": [
+        "TX11",
+        "AT08",
+        "M5.3"
+      ]
+    }
+  ],
+  "counts": {
+    "inherited": 18,
+    "new_M5": 8,
+    "total": 26
+  },
+  "validation": "See verification in the released package for immutable JUnit, DOM, FFmpeg/font/audio and native installer results. Scope is recorded regression, not exhaustive correctness.",
+  "pending_acceptance": [
+    "G2/G3/G4/G5 real Indonesian and code-switch corpus",
+    "Actual Windows browser / two tabs / 150 percent zoom",
+    "Target i5-12500H, RTX3050 4GB and NVENC",
+    "Live model/platform/OAuth acceptance",
+    "Remotion M5 parity",
+    "Native CapCut 4.7.0 / Resolve text regression"
+  ]
+}

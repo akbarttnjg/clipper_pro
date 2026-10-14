@@ -14,7 +14,7 @@ def scope_group(doc, cid, vid, scope, stem):
     if not cid:raise ValueError('Pilih klip untuk cakupan ini')
     if scope=='clip':return doc.setdefault('clip_'+stem,{}).setdefault(cid,{})
     if scope in ('variant','phrase'):
-        if vid not in ('portrait','landscape'):raise ValueError('Rasio tidak valid')
+        if vid not in doc.get('clips',{}).get(cid,{}).get('variants',{}):raise ValueError('Rasio tidak valid')
         return doc.setdefault('variant_'+stem,{}).setdefault(cid,{}).setdefault(vid,{})
     raise ValueError('Cakupan tidak valid')
 
@@ -39,6 +39,26 @@ def project_words(words, doc, cid=None, vid=None):
             patch=doc.get('manual_speakers',{}).get(dumps(wid))
             if patch and patch['transcript_id']==take:row.update(speaker_id=patch['speaker_id'],speaker_provenance='user_review')
     return words
+
+
+def validate_timing_targets(service, before, after, cid, vid, scope, ids):
+    """Validate the effective layers changed by a broad patch, not just one tab."""
+    if scope in ('project','shared_utterance'):
+        targets=[(None,None)]+[(c,v) for c in after['clips'] for v in [None,*after['clips'][c]['variants']]]
+    elif scope=='clip':targets=[(cid,v) for v in [None,*after['clips'][cid]['variants']]]
+    else:targets=[(cid,vid)]
+    ids=set(ids)
+    for c,v in targets:
+        previous=service.transcript(before,c,v)['words'];rows=service.transcript(after,c,v)['words']
+        for word in rows:
+            origins=set(word.get('source_word_ids',[word['word_id']]))
+            if not origins&ids:continue
+            old=next((w for w in previous if w.get('source_word_ids',[w['word_id']])==word.get('source_word_ids',[word['word_id']])),None)
+            if old and (old['start'],old['end'])==(word['start'],word['end']):continue
+            for other in rows:
+                if set(other.get('source_word_ids',[other['word_id']]))&origins:continue
+                if other.get('speaker_id')==word.get('speaker_id') and word['start']<other['end'] and word['end']>other['start']:
+                    raise ValueError('Waktu bertumpang tindih dengan kata speaker yang sama pada '+(f'{c}/{v or "kedua rasio"}' if c else 'sumber proyek'))
 
 
 def apply_command(service,doc,cid,vid,op,revision):
@@ -70,15 +90,15 @@ def apply_command(service,doc,cid,vid,op,revision):
         if len(selected)!=1:raise ValueError('Edit waktu per unit transkrip; frasa impor tetap satu unit cue')
         start=tracks.number(op.get('start'));end=tracks.number(op.get('end'));duration=doc['source']['info']['duration']
         if not 0<=start<end<=duration:raise ValueError('Waktu di luar durasi sumber')
-        if cid and op.get('scope','clip')!='project' and not doc['clips'][cid]['start']<=start<end<=doc['clips'][cid]['end']:raise ValueError('Waktu di luar batas klip')
-        for i,w in enumerate(rows):
-            if i in positions:continue
-            if w.get('speaker_id')==selected[0].get('speaker_id') and start<w['end'] and end>w['start']:raise ValueError('Waktu bertumpang tindih dengan kata speaker yang sama')
+        scope=op.get('scope','clip')
+        if cid and scope not in ('project','shared_utterance') and not doc['clips'][cid]['start']<=start<end<=doc['clips'][cid]['end']:raise ValueError('Waktu di luar batas klip')
+        before=copy.deepcopy(doc)
         patch={'transcript_id':doc['transcript_id'],'origin_word_ids':ids,'start':start,'end':end,'provenance':'user_source_time_review'}
         group=scope_group(doc,cid,vid,op.get('scope','clip'),'source_timing_overrides')
         for key in list(group):
             if set(group[key]['origin_word_ids'])&set(ids):del group[key]
         group[fingerprint(ids)]=patch
+        validate_timing_targets(service,before,doc,cid,vid,scope,ids)
     return {'touched':[(cid,vid)] if cid else [],'transcript_changed':True}
 
 
@@ -185,7 +205,7 @@ class TranscriptService:
             clip=doc['clips'][cid];track['words']=[w for w in track['words'] if w['end']>clip['start'] and w['start']<clip['end']]
             for w in track['words']:w['start']=max(w['start'],clip['start']);w['end']=min(w['end'],clip['end'])
             track['cues']=tracks.cues_from_words(track['words'])
-        elif any(w.get('manually_edited') or w.get('speaker_provenance')=='user_review' for w in track['words']):track['cues']=tracks.cues_from_words(track['words'])
+        else:track['cues']=tracks.effective_cues(track)
         fmt=data['format'];metadata={'project_id':pid,'revision':doc['revision'],'transcript_revision':doc['transcript_revision'],
             'track_id':tid or doc['transcript_id'],'clip_id':cid,'variant_id':vid,'timebase':'source_seconds',
             'chapters':[{'clip_id':k,'start':c['start'],'end':c['end'],'title':c.get('title','')} for k,c in doc['clips'].items()],

@@ -1,0 +1,10 @@
+{
+  "sha256": "8bdfa82844780efb7bf6cbfa3e07c2d0ba1d533f29ce820ec476b4cddcd067ef",
+  "origin": "Frozen M1 AUD-06 reused for M2 audit; exact original database and synthetic source bytes, SQLite backup merges WAL",
+  "project_id": "59b7bc9d014d",
+  "clip_id": "clip-78bc3217f2b8470caa23",
+  "revision": 2,
+  "seed": 2026,
+  "speed": 1.25,
+  "source_sha256": "0a392bcf6f905189b8679834e88bfca1179604fe8c2589d6272858be3a085654"
+}

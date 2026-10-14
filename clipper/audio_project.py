@@ -39,6 +39,7 @@ def draw(source,plan,cfg,ass,target,mix,on_progress=None):
 def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
     started=time.monotonic();info=ffmpeg_util.probe(source)
     if not info['has_audio'] or not 0<=clip['start']<clip['end']<=info['duration']+.01:raise ValueError('Batas klip audio tidak valid')
+    editplan.validate_source_words(words,info['duration'])
     # VAD reports pauses. Audio clipping preserves them unless operator supplies explicit spans.
     plan=editplan.build(words,clip,replace(cfg,trim_silence=False,cold_open=False));plan.update(source_kind='audio',source={'path':str(source),'kind':'audio'},
         visual_summary={'status':'not_applicable','face_detection':'not_applicable','reason':'audio_only_source'},
@@ -71,7 +72,7 @@ def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
         plan['caption_renderer']=caption_renderer.render(plan['captions'],cfg,work,plan['duration'])
         map_layers(plan,cfg);decorations(plan,cfg,work);mix=censor_audio(plan,cfg,mix,work)
         plan['finishing5']['font_assets']=cfg.finishing5.get('font_assets',[])
-        used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']}
+        used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']} | {f['font_id'] for r in plan['finishing5']['layers'] for f in r.get('text_fonts',[])}
         plan['m5_fonts']=[{**font_info(cfg.fonts_dir,k),'path':str(Path(cfg.fonts_dir)/font_info(cfg.fonts_dir,k)['file'])} for k in used]
     target=draw(source,plan,cfg,ass,work/(name+'.mp4'),mix,lambda p:on_progress(30+round(p*60),'Encoding audiogram'))
     checked=qc.inspect(target,cfg,plan['duration']);plan['status']='done';plan['render_seconds']=time.monotonic()-started
@@ -98,7 +99,7 @@ def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
         'ass_url':library_paths.url(library_paths.relative(cfg,text_base.with_suffix('.ass'))),'srt_url':library_paths.url(library_paths.relative(cfg,text_base.with_suffix('.srt'))),
         'credits_url':library_paths.url(library_paths.relative(cfg,report_base.with_suffix('.credits.txt'))),'title':clip['title'],'reason':clip.get('reason',''),
         'start':clip['start'],'end':clip['end'],'length':checked['duration'],'width':cfg.target_w,'height':cfg.target_h,'fps':cfg.output_fps,
-        'encoder':plan['encoder'],'revision':clip.get('revision',0),'plan_path':str(path),'render_version':'4.0.16-m5' if cfg.finishing5 else '4.0.13-m2','broll_count':0,
+        'encoder':plan['encoder'],'revision':clip.get('revision',0),'plan_path':str(path),'render_version':'4.0.16.1' if cfg.finishing5 else '4.0.13-m2','broll_count':0,
         'subtitle_flags':0,'render_seconds':plan['render_seconds'],'selection_source':clip.get('selection_source'),'qc':checked,'warnings':plan['warnings']}
 
 

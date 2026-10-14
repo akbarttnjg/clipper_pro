@@ -141,7 +141,7 @@ class StudioService:
         if clip_id not in doc.get('clips',{}) or variant_id not in doc['clips'][clip_id]['variants']:raise KeyError('Klip atau rasio tidak ditemukan')
         return doc['clips'][clip_id]['variants'][variant_id]
 
-    def create(self,path,settings=None,name=None):
+    def create(self,path,settings=None,name=None,*,import_guard=None,import_result=None):
         from .media_context import inspect
         path=Path(path).expanduser().resolve()
         if not path.is_file():raise ValueError('Sumber video/audio tidak ditemukan')
@@ -151,6 +151,7 @@ class StudioService:
         document={'name':str(name or path.stem)[:160],'settings':{**{k:v for k,v in asdict(self.base).items() if k not in PRIVATE},**settings},
             'source':{'path':str(path),'source_id':content_id(path,fresh=True),'info':info},
             'clips':{},'aliases':[],'shared_corrections':{},'clip_corrections':{},'transcript_revision':0,'exports':[]}
+        if import_guard is not None:return self.store.create_import(document,import_guard['id'],import_guard['lease'],import_result)
         return self.store.create(document)
 
     def add_candidates(self,doc,candidates):

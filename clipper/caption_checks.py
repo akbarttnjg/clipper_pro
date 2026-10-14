@@ -85,7 +85,10 @@ def inspect_caption_plan(plan, cfg, expected_words=None):
             left = min(w['x']-w['width']/2 for w in row)
             right = max(w['x']+w['width']/2 for w in row)
             observed = left if align == 'left' else right if align == 'right' else (left+right)/2
-            expected = x if align == 'left' else x+width if align == 'right' else x+width/2
+            ax,ay,aw,ah=phrase.get('alignment_panel',phrase['panel'])
+            if not(x-.01<=ax and ax+aw<=x+width+.01 and y-.01<=ay and ay+ah<=y+height+.01 and aw>0 and ah>0):
+                issues.append('Area perataan subtitle berada di luar area teks.')
+            expected = ax if align == 'left' else ax+aw if align == 'right' else ax+aw/2
             if abs(observed-expected) > 1:
                 issues.append('Tepi baris subtitle belum sejajar.')
     if issues:

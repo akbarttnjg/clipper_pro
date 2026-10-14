@@ -1,5 +1,15 @@
 """Frame-aligned editorial decisions shared by the renderer and project exporters."""
 from . import trim
+import math
+
+
+def validate_source_words(words,duration):
+    """Do not let clipping hide invalid source/alignment timestamps from QC."""
+    for word in words:
+        for row in [word,*(word.get('aligned_words') or [])]:
+            a,b=row.get('start'),row.get('end')
+            if type(a) not in (int,float) or type(b) not in (int,float) or not math.isfinite(a) or not math.isfinite(b) or not 0<=a<b<=duration+.001:
+                raise ValueError('Timing kata di luar clock sumber; periksa alignment sebelum render: '+str(row.get('word',''))[:100])
 
 
 def build(words, clip, cfg):
@@ -35,6 +45,7 @@ def build(words, clip, cfg):
         else:
             warnings.append('Kutipan pembuka dilewati: perlu kalimat utuh dan penutup tetap utuh. Urutan sumber dipertahankan.')
     segments, mapped, cursor = [], [], 0
+    expected_indices=set();mapped_indices=set()
     for kind, a, b in raw:
         # Membership follows the exact source interval. Frame rounding must not
         # duplicate the tail of a word into the following body span.
@@ -45,11 +56,14 @@ def build(words, clip, cfg):
         segments.append({'kind': kind, 'source_start': a, 'source_end': b,
                          'start_frame': cursor, 'duration_frames': count,
                          'start': cursor / fps, 'end': (cursor + count) / fps})
-        for w in words:
+        for index,w in enumerate(words):
             if w['end'] <= source_a or w['start'] >= source_b:
                 continue
             left, right = max(a, w['start']), min(b, w['end'])
+            in_preview=cfg.preview_seconds<=0 or cursor/fps+max(0,w['start']-a)<round(cfg.preview_seconds*fps)/fps
+            if in_preview:expected_indices.add(index)
             if right > left:
+                if in_preview:mapped_indices.add(index)
                 mapped.append({**w, 'source_start': w['start'], 'source_end': w['end'],
                     'start': cursor / fps + left - a, 'end': cursor / fps + right - a,
                     'part': kind})
@@ -78,8 +92,12 @@ def build(words, clip, cfg):
             kept.append(span)
         segments, cursor = kept, limit
         mapped = [{**w, 'end': min(w['end'], cursor / fps)} for w in mapped if w['start'] < cursor / fps]
+    missing=expected_indices-mapped_indices
+    if missing:raise ValueError('Kata sumber tidak terpetakan pada clock frame; periksa batas/timing: '+', '.join(str(words[i]['word']) for i in sorted(missing))[:300])
     return {'version': 2, 'fps': fps, 'duration_frames': cursor, 'duration': cursor / fps,
             'width': cfg.target_w, 'height': cfg.target_h, 'spans': segments, 'words': mapped,
             'title': clip['title'], 'keywords': clip.get('keywords', []), 'shots': [],
+            'source_word_coverage':{'passed':True,'expected_source_words':len(expected_indices),'mapped_source_words':len(mapped_indices),
+                'basis':'input_words_intersect_retained_source_spans_before_frame_mapping'},
             'revision': clip.get('revision', 0), 'warnings': warnings,
             'intelligence': clip.get('intelligence', {})}

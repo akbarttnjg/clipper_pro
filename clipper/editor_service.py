@@ -69,27 +69,76 @@ def targets(service, doc, cid, vid, op, *, temporal=False):
     return result
 
 
+def field_tracks(keys):
+    """Ownership is per field, including mixed audio/video commands."""
+    result = set()
+    video = {'layout','split_ratio','background_path','framing_x','material_share','material_rect','speaker_rect',
+             'punch_zoom','zoom_amount','zoom_gap','output_fps','trim_silence','silence_max','silence_keep',
+             'cold_open','title_card','source_kind','preserve_material_pauses','visual_enabled','segmentation_enabled'}
+    for key in keys:
+        if key in video or key.startswith('visual_'):result.add('video')
+        if key.startswith('broll') or key in ('illustration_mode','pexels_key'):result.add('illustration')
+        if key.startswith('music_'):result.add('music')
+        if key.startswith('sfx_'):result.add('sfx')
+        if key.startswith('audio_') or key=='join_fade_ms':result.add('voice')
+        if key in STYLE_FIELDS-{'layout','framing_x','material_share'} or key.startswith(('caption_','font_','editorial_')) or key in ('words_per_caption','accent_font'):result.add('captions')
+        if key in ('trim_silence','silence_max','silence_keep','output_fps'):result.update(('voice','captions'))
+    return result
+
+
 def check_lock(service, doc, cid, vid, op):
     kind = op.get('op')
-    tracks = {'m2_timing':'captions','m2_speaker':'captions','m2_track_display':'captions','correct_word': 'captions', 'correct_token': 'captions', 'correct_phrase': 'captions', 'align_words': 'captions',
-        'caption_visibility': 'captions', 'cut_speech': 'video', 'timeline': 'video', 'bounds': 'video',
-        'editor_segments': 'video', 'segment_edit': 'video', 'keyframes': 'video', 'visual_controls': 'video',
-        'asset_enabled': 'illustration', 'asset_timing': 'illustration', 'asset_replace': 'illustration', 'asset_metadata': 'illustration'}
-    track = tracks.get(kind)
+    direct = {'m2_timing':{'captions'},'m2_speaker':{'captions'},'m2_track_display':{'captions'},
+        'correct_word':{'captions'},'correct_token':{'captions'},'correct_phrase':{'captions'},
+        'align_words':{'captions'},'caption_visibility':{'captions'},
+        'cut_speech':{'video','voice','captions'},'timeline':{'video','voice','captions'},
+        'bounds':{'video','voice','captions'},'editor_segments':{'video','voice','captions'},
+        'segment_edit':{'video','voice','captions'},'keyframes':{'video'},'visual_controls':{'video'},
+        'asset_enabled':{'illustration'},'asset_timing':{'illustration'},'asset_replace':{'illustration'},'asset_metadata':{'illustration'},
+        'design_alternative':{'captions'},
+        'm4_controls':{'video'},'m4_decide':{'video'},'m4_disable':{'video'},'m4_copy':{'video'}}
+    affected = direct.get(kind, set())
+    if kind in ('settings','analysis_settings','inherit_field','reset_overrides','paste_attributes'):
+        affected = field_tracks(set(op.get('values',{}))|set(op.get('keys',[])))
+    elif kind == 'style':
+        from .edit_styles import recipe
+        affected = field_tracks(recipe(op['style_id']))
+    elif kind == 'profile':
+        affected = field_tracks(ec.PROFILES.get(op.get('profile_id'),{}).get('settings',{}))
+    elif kind == 'preset_batch':affected = {'captions'}
+    elif kind == 'brand_apply':affected = field_tracks(service.workspace.kit(op.get('kit_id'))['settings'])
     if kind.startswith('m5_'):
-        track='illustration' if kind=='m5_layers' else 'captions'
-    elif kind in ('settings', 'style', 'profile', 'preset_batch', 'brand_apply', 'paste_attributes', 'reset_overrides'):
-        keys = set(op.get('values', {})) | set(op.get('keys', []))
-        track = 'music' if keys and keys <= set(ATTRIBUTE_GROUPS['audio']) else 'captions'
-    if not track or not cid:
-        return
-    requested = op.get('targets') or [{'clip_id': cid, 'variant_id': vid}]
-    if kind in ('editor_segments', 'segment_edit', 'cut_speech', 'bounds', 'caption_visibility') and not op.get('separate_editorial_version'):
-        requested = [{'clip_id': cid, 'variant_id': v} for v in ('portrait', 'landscape')]
-    for target in requested:
-        variant = service.variant(doc, target['clip_id'], target['variant_id'])
-        if ec.track_state(variant.get('editor', {}))[track]['locked']:
-            raise ValueError('Track '+track+' terkunci. Buka kunci sebelum mengedit.')
+        from .finishing5_service import affected_tracks
+        affected = affected_tracks(service,doc,cid,vid,op)
+    if not affected:return
+
+    corrections = ('correct_word','correct_token','correct_phrase','m2_timing','align_words')
+    whole_project = (kind=='analysis_settings' or kind=='settings' and op.get('scope')=='project'
+        or kind in corrections and op.get('scope') in ('project','shared_utterance') or kind=='m2_speaker')
+    if whole_project:
+        requested = [(c,v) for c,clip in doc.get('clips',{}).items() for v in clip['variants']]
+    elif kind=='m4_copy':
+        requested = [(cid,v) for v in op.get('variant_ids',[])]
+    elif kind=='preset_batch':
+        from .batch7 import targets as batch_targets
+        requested = [(r['clip_id'],r['variant_id']) for r in batch_targets(doc)]
+    elif kind=='brand_apply' and op.get('scope')=='project' and op.get('targets') is None:
+        requested = [(c,v) for c,clip in doc['clips'].items() if clip.get('included',True) or op.get('include_excluded',False) for v in clip['variants']]
+    elif kind in ('editor_segments','segment_edit','cut_speech','caption_visibility'):
+        requested = targets(service,doc,cid,vid,op,temporal=True)
+    elif kind=='bounds' or kind in corrections and op.get('scope','clip')=='clip':
+        requested = [(cid,v) for v in doc['clips'][cid]['variants']]
+    elif kind in ('profile','inherit_field','paste_attributes','brand_apply'):
+        requested = targets(service,doc,cid,vid,op)
+    else:
+        requested = [(r['clip_id'],r['variant_id']) for r in op.get('targets',[])] or [(cid,vid)]
+    for c,v in requested:
+        if kind.startswith('m5_'):
+            affected = affected_tracks(service,doc,c,v,op)
+        variant = service.variant(doc,c,v)
+        locked = ec.track_state(variant.get('editor',{}))
+        for track in sorted(affected):
+            if locked[track]['locked']:raise ValueError('Track '+track+' terkunci. Buka kunci sebelum mengedit.')
 
 
 def _set_segments(service, doc, c, v, rows):

@@ -94,6 +94,40 @@ class ProjectStore:
             db.execute('INSERT INTO projects VALUES(?,?,?,?,?)',(project_id,0,dumps(value),now,now))
         return self.get(project_id)
 
+    def create_import(self,document,import_id,lease,result):
+        """Commit source project, derived take and import completion together.
+
+        Cancellation and recovery observe either the entire result or none of
+        it. A stable project identity also protects recovery after commit.
+        """
+        project_id=fingerprint(['source-import-project',import_id])[:12]
+        value=copy.deepcopy(document);value.update(project_id=project_id,schema_version=4)
+        if value['source']['source_id']!=result['content_id']:raise ValueError('Sumber berubah sebelum pembuatan proyek')
+        if result.get('transcript_id'):raise ValueError('Assembly transcript tidak boleh merujuk proyek lain')
+        value['source'].update(import_receipt=result['receipt'],import_id=import_id)
+        if result.get('lineage'):value['source']['lineage']=copy.deepcopy(result['lineage'])
+        transcript=result.get('transcript');take_id='assembly-'+fingerprint(import_id)[:32] if transcript else None
+        if transcript:value.update(transcript_id=take_id,transcript_revision=1)
+        published={k:v for k,v in result.items() if k!='transcript'};published['project_id']=project_id
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                item=db.execute('SELECT status,lease,result FROM m2_imports WHERE id=?',(import_id,)).fetchone()
+                if item and item['status']=='completed':
+                    prior=json.loads(item['result']);db.commit();return self.get(prior['project_id'])
+                if not item or item['status']!='running' or item['lease']!=lease:raise JobLeaseLost('Impor dibatalkan atau worker berubah; proyek tidak dipublikasikan')
+                now=time.time()
+                db.execute('INSERT INTO projects VALUES(?,?,?,?,?)',(project_id,0,dumps(value),now,now))
+                if transcript:
+                    metadata,records=self._transcript_records(transcript,take_id)
+                    db.execute('INSERT INTO transcripts VALUES(?,?,?,?)',(take_id,project_id,dumps(metadata),now))
+                    db.executemany('INSERT INTO words VALUES(?,?,?,?,?,?,?,?)',records)
+                if db.execute("UPDATE m2_imports SET status='completed',result=?,error=NULL,updated=? WHERE id=? AND status='running' AND lease=?",
+                        (dumps(published),time.time(),import_id,lease)).rowcount!=1:raise JobLeaseLost('Impor tidak lagi aktif')
+                db.commit()
+            except BaseException:db.rollback();raise
+        return self.get(project_id)
+
     def get(self,project_id):
         with self.connect() as db:row=db.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
         if row is None:raise KeyError('Proyek tidak ditemukan')
@@ -296,9 +330,8 @@ class ProjectStore:
         words=[json.loads(row[0]) for row in found]
         return {'words':words,'total':total,'offset':offset,'next_offset':offset+len(words) if offset+len(words)<total else None,'view_key':view_key,'search_mode':search_mode}
 
-    def save_transcript(self,project_id,transcript,take_id=None):
-        """Insert once; later word edits live in sparse project corrections."""
-        take_id=take_id or 'asr-'+uuid.uuid4().hex
+    @staticmethod
+    def _transcript_records(transcript,take_id):
         metadata={k:v for k,v in transcript.items() if k not in ('words','raw_words')}
         records=[]
         for kind,words in [('display',transcript.get('words',[])),('heard',transcript.get('raw_words',transcript.get('words',[])))]:
@@ -306,6 +339,12 @@ class ProjectStore:
                 w={**w,'word_id':w.get('word_id',i)}
                 if not 0<=float(w['start'])<float(w['end']):raise ValueError('Waktu kata tidak valid')
                 records.append((take_id,kind,i,dumps(w['word_id']),w['start'],w['end'],w['word'],dumps(w)))
+        return metadata,records
+
+    def save_transcript(self,project_id,transcript,take_id=None):
+        """Insert once; later word edits live in sparse project corrections."""
+        take_id=take_id or 'asr-'+uuid.uuid4().hex
+        metadata,records=self._transcript_records(transcript,take_id)
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             try:

@@ -1,4 +1,4 @@
-import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.13-m2';
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.16.1';
 const localStorage=localDrafts,sessionStorage=sessionDrafts;
 // Workspace controls use saved revisions. Opening a panel performs read-only calls.
 const LABELS6={talking_head:'Pembicara',chart:'Chart',board:'Papan',multispeaker:'Beberapa pembicara',graphics:'Sumber bergrafis'};

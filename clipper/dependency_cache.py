@@ -9,7 +9,7 @@ from .contracts import fingerprint
 
 _HASHES={};_LOCK=threading.RLock()
 _SCOPE=ContextVar('clipper_content_scope',default=None)
-VERSION='studio4-content-v13-m2-reviewed-source-tracks'
+VERSION = 'studio4-content-v16-audited-m0-m4'
 
 
 @contextmanager

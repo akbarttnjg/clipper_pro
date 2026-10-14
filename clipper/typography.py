@@ -331,7 +331,7 @@ def display_units(words):
              'token_ids':list(original.get('token_ids',[original.get('token_id',original.get('word_id'))]))}
         if units:
             prior = units[-1]; a, b = prior['word'], w['word']
-            close = w['start'] - prior['end'] <= .65 and w.get('part') == prior.get('part')
+            close = w['start'] - prior['end'] <= .65 and all(w.get(k)==prior.get(k) for k in ('part','speaker_id','origin_project_id','origin_source_id','source_instance_id'))
             currency = a.lower() in ('rp','rp.','$','usd') and bool(re.match(r'^\d', b))
             decimal = bool(re.search(r'\d[.,]?$', a) and re.fullmatch(r'[.,]\d+[.,]?', b))
             suffix = bool(re.search(r'\d[.,]?$', a)) and token(b) in suffixes
@@ -342,6 +342,7 @@ def display_units(words):
             if close and (currency or decimal or suffix or percent or hyphen):
                 prior['word'] = (a.rstrip('.') if currency else a.rstrip('.,') if decimal else a) + ('' if currency or decimal or percent or hyphen else ' ') + b
                 prior['end'] = max(prior['end'], w['end'])
+                if '_m5_leaves' in prior:prior['_m5_leaves'] += w.get('_m5_leaves',[])
                 prior['word_ids'] += w['word_ids']
                 prior['token_ids'] += w['token_ids']
                 prior['meaning_emphasis'] = prior.get('meaning_emphasis',False) or w.get('meaning_emphasis',False)
@@ -399,13 +400,19 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
                 continue
             ink=[ink_metrics(font(cfg.fonts_dir,sizes[i],families[i]),w['word'],measures[i]) for i,w in enumerate(phrase)]
             padding=min(W,H)/1080*5 if cfg.caption_backdrop else min(W,H)/1080
+            # Reserve glyph overhang and stroke in the settled layout itself.
+            # Quiet compositions can then replace motion with zero-offset holds
+            # without discarding the correction needed by italic edge glyphs.
+            margin_left=max(0.,max(-measures[i]/2-ink[i][0][0]+padding for i in range(len(phrase))))+.01 if directed else 0.
+            margin_right=max(0.,max(ink[i][0][2]-measures[i]/2+padding for i in range(len(phrase))))+.01 if directed else 0.
+            content_width=width-margin_left-margin_right
             gap=fs*.16
             row_ink=[(min(ink[i][2][0] for i in row),max(ink[i][2][1] for i in row)) for row in rows]
             heights=[bottom-top+gap for top,bottom in row_ink] if directed else [max(sizes[i] for i in row)*1.18 for row in rows]
             measured_height=(sum(heights)-gap)*1.08+padding*2 if directed else sum(heights)
-            if len(rows)<=3 and measured_height<=height*.96 and max(measures)<=width*.88:
+            if len(rows)<=3 and measured_height<=height*.96 and max(measures)<=width*.88 and max(sum(measures[i] for i in row)+space*(len(row)-1) for row in rows)<=content_width:
                 break
-        if rows is None or len(rows)>3 or max(measures)>usable_width or measured_height>height:
+        if rows is None or len(rows)>3 or max(measures)>usable_width or measured_height>height or max(sum(measures[i] for i in row)+space*(len(row)-1) for row in rows)>content_width:
             raise ValueError('Frasa terlalu panjang. Pecah teks pada transkrip atau kurangi ukuran teks.')
         start = phrase[0]['start']
         following = phrases[idx+1][0]['start'] if idx+1<len(phrases) else phrase[-1]['end']+.12
@@ -418,7 +425,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
         placed=[]
         for row_index,(row,rh) in enumerate(zip(rows,heights)):
             row_width=sum(measures[i] for i in row)+space*(len(row)-1)
-            cx=row_left(x,width,row_width,alignment(cfg,pos))
+            cx=row_left(x+margin_left,content_width,row_width,alignment(cfg,pos))
             reveal=0. if getattr(cfg,'_whole_phrase',False) else max(0,min(phrase[i]['start'] for i in row)-start-.055)
             for i in row:
                 w=phrase[i]; size=sizes[i]
@@ -456,6 +463,7 @@ def kinetic_plan(words, cfg, keywords=(), position='bottom', anchors=None, *, _p
                 cx+=measures[i]+space
             cy+=rh
         plans.append({'start':start,'end':end,'position':pos,'panel':list(panel_box),'alignment':alignment(cfg,pos),
+                      **({'alignment_panel':[x+margin_left,y,content_width,height]} if directed else {}),
                       'composition':getattr(cfg,'_composition','legacy'),'measured_height':round(measured_height,3),
                       'placement_source':'auto' if cfg.caption_position == 'auto' else 'manual',
                       'protected': anchor.get('protected', []) if use_anchor else [], 'words':placed})

@@ -4,7 +4,7 @@ The director never rewrites speech. typography.py measures the geometry.
 """
 from dataclasses import replace
 
-VERSION='caption-director-4.0.10'
+VERSION='caption-director-4.0.14-ink-margin'
 
 
 def focus(words,keywords=()):

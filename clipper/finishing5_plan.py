@@ -21,20 +21,24 @@ def role(rows):
 def units(words):
     from .typography import display_units,token
     from .transcript_correction import PROTECTED
-    source=display_units(copy.deepcopy(words));out=[];i=0
+    source=display_units([{**copy.deepcopy(w),'_m5_leaves':[copy.deepcopy(w)]} for w in words]);out=[];i=0
     while i<len(source):
         r=source[i];i+=1
-        while i<len(source) and source[i]['start']-r['end']<=.65 and r.get('part')==source[i].get('part'):
+        while i<len(source) and source[i]['start']-r['end']<=.65 and all(r.get(k)==source[i].get(k) for k in ('part','speaker_id','origin_project_id','origin_source_id','source_instance_id')):
             n=source[i];ts=r['word'].split();last=token(ts[-1]);technical=bool(re.search(r'\d[.,%]?$',r['word'])) and token(n['word']) in {'kg','gram','km','m','cm','mm','ms','detik','liter','mb','gb','kb','hz','volt','watt','°c'}
             neg=last in PROTECTED or token(ts[0]) in PROTECTED and len(ts)<3 and (len(ts)==1 or bool(re.search(r'\d',n['word'])) or last in {'ada','punya','pernah','mau'})
             if not (technical or neg):break
-            r['word']+=' '+n['word'];r['end']=max(r['end'],n['end']);r['word_ids']+=n.get('word_ids',[]);r['token_ids']+=n.get('token_ids',[]);i+=1
+            r['_m5_leaves']+=n['_m5_leaves'];r['word']+=' '+n['word'];r['end']=max(r['end'],n['end']);r['word_ids']+=n.get('word_ids',[]);r['token_ids']+=n.get('token_ids',[]);i+=1
         out.append(r)
     return out
 def phrases(words,cfg,s):
     from .typography import groups
     rows=units(words)
-    return [[r] for r in rows] if s['granularity']=='word' else groups(rows,replace(cfg,style_preset='rapi',editorial_words=4,editorial_phrase_s=3.2))
+    runs=[]
+    for row in rows:
+        if not runs or any(row.get(k)!=runs[-1][-1].get(k) for k in ('speaker_id','part','origin_project_id','origin_source_id','source_instance_id')):runs.append([])
+        runs[-1].append(row)
+    return [[r] for r in rows] if s['granularity']=='word' else [phrase for run in runs for phrase in groups(run,replace(cfg,style_preset='rapi',editorial_words=4,editorial_phrase_s=3.2))]
 def template_for(rows,cfg,s):
     r=role(rows);key=s['template_id']
     if cfg.caption_template_policy=='auto' and key!='custom':key={'conclusion':'quote','list':'stack','number_or_warning':'focus','narration':'editorial'}[r]
@@ -67,17 +71,47 @@ def mask_text(t,s):
     for term in sorted(s['censor_terms'],key=len,reverse=True):
         t,n=re.subn(r'(?<!\w)'+re.escape(term)+r'(?!\w)',lambda m:'•'*len(m.group()),t,flags=re.I);changed|=bool(n)
     return t,changed
+def censor_spans(words,s):
+    """Only exact source-token intervals may alter speech; no phrase expansion."""
+    if s['censor_mode']!='bleep_mask':return []
+    if not s['censor_approved']:raise ValueError('Tinjau dan setujui kamus sensor dahulu')
+    spans=[];runs=[]
+    for word in words:
+        if not runs or any(word.get(k)!=runs[-1][-1].get(k) for k in ('speaker_id','part','origin_project_id','origin_source_id','source_instance_id')) or word['start']-runs[-1][-1]['end']>.65:runs.append([])
+        runs[-1].append(word)
+    for run in runs:
+        value='';offsets=[]
+        for word in run:
+            if value:value+=' '
+            start=len(value);value+=word['word'];offsets.append((start,len(value),word))
+        for term in s['censor_terms']:
+            for match in re.finditer(r'(?<!\w)'+re.escape(term)+r'(?!\w)',value,re.I):
+                touched=[(a,b,w) for a,b,w in offsets if a<match.end() and b>match.start()]
+                for a,b,w in touched:
+                    # A cue containing several unaligned words is not a word clock.
+                    if (match.start()>a or match.end()<b) and len(w['word'].split())>1:
+                        raise ValueError('Sensor audio memerlukan alignment kata tepat; tinjau timing kata sebelum bleep')
+                    spans.append([w['start'],w['end']])
+    result=[]
+    for a,b in sorted(spans):
+        if result and a<=result[-1][1]:result[-1][1]=max(b,result[-1][1])
+        else:result.append([a,b])
+    return result
+
 def fit(rows,panel,pos,cfg,s,template,selected,extra):
     x,y,w,h=panel;W=cfg.target_w;entries=[]
     # A semantic atomic unit may wrap visually, but remains in one phrase with
     # one logical owner. Continuation glyphs never duplicate transcript IDs.
     for i,row in enumerate([*rows,*extra]):
         value,censored=mask_text(row['word'],s);emph=i in selected
+        leaf_fragments=[(part,leaf) for leaf in row.get('_m5_leaves',[]) for part in leaf['word'].split()]
         for j,fragment in enumerate(value.split()):
             r={**row,'continuation':j>0}
+            if len(leaf_fragments)==len(value.split()) and j<len(leaf_fragments):
+                leaf=leaf_fragments[j][1];r.update(start=leaf['start'],end=leaf['end'])
             if j:r.update(word_id=None,word_ids=[],token_ids=[])
             meta=choose_font(cfg.fonts_dir,cfg.font_accent if emph and cfg.accent_font else cfg.font_main,s['fallback_fonts'],fragment)
-            entries.append((r,fragment,meta,emph,censored))
+            entries.append((r,fragment,meta,emph,censored and '•' in fragment))
     align=cfg.caption_align if cfg.caption_align!='auto' else pos if pos in ('left','right') else 'center'
     from .typography import balanced_rows
     for size in range(round(W*.095*cfg.caption_scale),max(7,math.floor(W/s['display_width_px']*s['minimum_glyph_px']))-1,-1):
@@ -101,7 +135,7 @@ def fit(rows,panel,pos,cfg,s,template,selected,extra):
         return placed,align,motion
     return None
 def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
-    s=effective(cfg);parts=phrases(words,cfg,s);out=[];previous=None
+    s=effective(cfg);audio_censor=censor_spans(words,s);parts=phrases(words,cfg,s);out=[];previous=None
     from .caption_director import focus
     while parts:
         rows=parts.pop(0);a=rows[0]['start'];spoken_end=max(r['end'] for r in rows);following=parts[0][0]['start'] if parts else max(spoken_end+.14,max((r.get('end',0) for r in anchors or []),default=0));end=min(following,spoken_end+.18)
@@ -131,7 +165,7 @@ def caption_plan(words,cfg,keywords=(),position='bottom',anchors=None):
                 samples.append(dict(frame=f,t=round(f/cfg.output_fps,6),scale=1.,dx=round(motion*(1-ease),3) if template['motion']=='slide' else 0.,dy=round(motion*(1-ease),3) if template['motion']=='rise' else 0.,opacity=.98+.02*ease if template['motion']=='fade' else 1.,blur=0.,color=color))
             samples.append(dict(frame=last,t=round(last/cfg.output_fps,6),scale=1.,dx=0.,dy=0.,opacity=0.,blur=0.,color=w['color']));w.update(keyframes=samples,motion=template['motion'],meaning_role=template['role'],emphasis_evidence={'source':'semantic_phrase' if w['emphasis'] else 'none','original_text':w['original_text']})
         out.append(dict(start=a,end=end,phrase_id=fingerprint([VERSION,[(r.get('token_ids'),r['word'],r['start']) for r in rows]])[:24],words=placed,panel=panel,alignment=align,position=cfg.caption_position if locked else pos,protected=protected,placement_source='manual' if locked else 'final_ink_search',design=dict(template=template['id'],role=template['role'],alignment=align,reveal='whole_phrase',seed=cfg.caption_seed,policy=cfg.caption_template_policy),source_word_ids=[i for r in rows for i in r.get('word_ids',[])]))
-    result=dict(version=6,m5_version=VERSION,timebase='output_seconds',keyframe_interpolation='hold',fps=cfg.output_fps,width=cfg.target_w,height=cfg.target_h,font_main=cfg.font_main,font_accent=cfg.font_accent,template=s['template_id'],contrast=cfg.caption_backdrop,phrases=out,effective_style=s,cues=dict(emphasis=sum(w['emphasis'] for p in out for w in p['words']),karaoke=sum(len(p['words']) for p in out) if s['karaoke'] else 0,emoji=sum(w.get('decorative',False) and w['text'] in [r['icon'] for r in s['emoji_map']] for p in out for w in p['words']) if s['emoji'] else 0,speaker_color=s['speaker_color'],speaker_labels=s['speaker_labels'],censor=sum(w['censored'] for p in out for w in p['words']) if s['censor_mode']!='off' else 0),censor_intervals=[[w['start'],w['end']] for p in out for w in p['words'] if w['censored']] if s['censor_mode']=='bleep_mask' else [])
+    result=dict(version=6,m5_version=VERSION,timebase='output_seconds',keyframe_interpolation='hold',fps=cfg.output_fps,width=cfg.target_w,height=cfg.target_h,font_main=cfg.font_main,font_accent=cfg.font_accent,template=s['template_id'],contrast=cfg.caption_backdrop,phrases=out,effective_style=s,cues=dict(emphasis=sum(w['emphasis'] for p in out for w in p['words']),karaoke=sum(len(p['words']) for p in out) if s['karaoke'] else 0,emoji=sum(w.get('decorative',False) and w['text'] in [r['icon'] for r in s['emoji_map']] for p in out for w in p['words']) if s['emoji'] else 0,speaker_color=s['speaker_color'],speaker_labels=s['speaker_labels'],censor=sum(w['censored'] for p in out for w in p['words']) if s['censor_mode']!='off' else 0),censor_intervals=audio_censor)
     result['m5_checks']=check(result,cfg,words);return result
 def check(plan,cfg,expected=None):
     s=effective(cfg);issues=[];rows=[];actual=[];warnings=[]
@@ -171,6 +205,7 @@ def bilingual(source,translation,cfg,anchors=None):
         try:
             for i,words in enumerate((source,translation)):
                 state=copy.deepcopy(cfg.finishing5);state['style']['manual_panel']=[x/cfg.target_w*100,(y+h*i/2)/cfg.target_h*100,w/cfg.target_w*100,(h/2)/cfg.target_h*100]
+                if i==1 and s['censor_mode']=='bleep_mask':state['style']['censor_mode']='mask'
                 # Both independent tracks keep the chosen typography and exact
                 # output clock. Each receives half the protected caption area.
                 local=replace(cfg,finishing5=state)

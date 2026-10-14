@@ -29,11 +29,13 @@ def sfnt(path,digest):
         for i in range(u16(at+2)):
             platform,enc,lang,key,size,off=struct.unpack_from('>6H',data,at+6+i*12)
             if strings+off+size>at+n:raise ValueError('Nama font terpotong')
-            if key in (1,2,16,17):
+            if key in (1,2,4,6,16,17):
                 value=data[strings+off:strings+off+size].decode('utf-16-be' if platform in (0,3) else 'mac_roman',errors='replace').strip();pri=(platform==3,lang==0x409)
                 if value and (key not in names or pri>names[key][0]):names[key]=(pri,value)
         family=names.get(16,names.get(1,(None,'')))[1];face=names.get(17,names.get(2,(None,'Regular')))[1]
         if not family or any(c in family for c in '\\{},\r\n'):raise ValueError('Family font tidak aman')
+        ass_name=names.get(4,names.get(6,(None,family)))[1]
+        if any(c in ass_name for c in '\\{},\r\n'):raise ValueError('Nama face font tidak aman')
         weight=400;italic='italic' in face.lower()
         if 'OS/2' in tables:
             at,n=tables['OS/2'];weight=u16(at+4)
@@ -66,7 +68,7 @@ def sfnt(path,digest):
                         if g:glyphs.add(code)
         if not glyphs:raise ValueError('Unicode cmap font belum didukung')
         ImageFont.truetype(str(p),40).getbbox('Clipper')
-        return dict(family=family,style=face,weight=weight,bold=weight>=700,italic=italic,sha256=digest,glyphs=frozenset(glyphs))
+        return dict(family=family,style=face,ass_font_name=ass_name,weight=weight,bold=weight>=700,italic=italic,sha256=digest,glyphs=frozenset(glyphs))
     except (struct.error,KeyError,OSError,UnicodeError) as exc:raise ValueError('Struktur font tidak terbaca') from exc
 def font_info(folder,key):
     from .font_catalog import FONTS
@@ -141,9 +143,11 @@ class Assets:
         for k,v in FONTS.items():
             src=Path(base)/v['file'];dest=folder/v['file']
             if not dest.exists() or sha(dest)!=sha(src):shutil.copyfile(src,dest)
-            m=font_info(base,k);faces[(m['family'],m['style'])]=m['sha256']
+            m=font_info(base,k);faces[(m['family'],m['style'])]=m['sha256'];faces[('ass_name',m['ass_font_name'].casefold())]=m['sha256']
         for r in custom:
-            m=r['metadata'];face=(m['family'],m['style'])
+            m={**r['metadata'],**{k:v for k,v in sfnt(str(Path(r['path']).resolve()),r['sha256']).items() if k!='glyphs'}};face=(m['family'],m['style']);ass_face=('ass_name',m['ass_font_name'].casefold())
+            if ass_face in faces and faces[ass_face]!=r['sha256']:raise ValueError('Nama lengkap face font ambigu; gunakan nama unik')
+            faces[ass_face]=r['sha256']
             if face in faces and faces[face]!=r['sha256']:raise ValueError('Family/style font ambigu: gunakan family unik agar renderer konsisten')
             faces[face]=r['sha256'];dest=folder/Path(r['path']).name
             if not dest.exists() or sha(dest)!=r['sha256']:shutil.copyfile(r['path'],dest)
@@ -243,12 +247,53 @@ class Assets:
             kits=[*m.get('parents',[]),m['kit']]
             if len(kits)>30:raise ValueError('Rantai sub-brand terlalu panjang')
             for k in kits:style(k['style']);layers(k['layers'])
-            for r,data in records:
-                pending=self.root/(uuid.uuid4().hex+Path(r['file']).suffix)
-                try:
-                    pending.write_bytes(data);self.register(pending,{k:r.get(k,[] if k in ('tags','collections') else '') for k in 'name origin license permission attribution tags collections speaker_id object text'.split()})
-                finally:pending.unlink(missing_ok=True)
-            mapping={};last=None
-            for k in kits:
-                value={f:v for f,v in k.items() if f in ('name','style','layers','glossary','asset_ids','license')};value['parent_id']=mapping.get(k.get('parent_id'));last=self.save_kit(value);mapping[k['id']]=last['id']
-            return last
+            # Validate in a private database and directory. The live registry
+            # sees no parent, child or asset until the entire chain is ready.
+            import tempfile
+            from types import SimpleNamespace
+            from .project_store import ProjectStore
+            with tempfile.TemporaryDirectory(prefix='.pack-',dir=self.root) as folder:
+                staging=Path(folder);staged=Assets(SimpleNamespace(work=staging,store=ProjectStore(staging/'staging.sqlite3')))
+                for r,data in records:
+                    pending=staging/(uuid.uuid4().hex+Path(r['file']).suffix)
+                    pending.write_bytes(data)
+                    record=staged.register(pending,{k:r.get(k,[] if k in ('tags','collections') else '') for k in 'name origin license permission attribution tags collections speaker_id object text'.split()})
+                    if record['id']!=r['id']:raise ValueError('Identitas aset portable tidak cocok')
+                mapping={};last=None
+                for k in kits:
+                    if k['id'] in mapping or k.get('parent_id') and k['parent_id'] not in mapping:raise ValueError('Rantai parent kit tidak lengkap/berulang')
+                    value={f:v for f,v in k.items() if f in ('name','style','layers','glossary','asset_ids','license')};value['parent_id']=mapping.get(k.get('parent_id'));last=staged.save_kit(value);mapping[k['id']]=last['id']
+                return self._publish_pack(staged,last['id'])
+
+    def _publish_pack(self,staged,last_id):
+        """Publish validated assets and every kit in one SQLite transaction."""
+        created=[]
+        with self.store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                for row in staged.list():
+                    current=db.execute('SELECT data FROM assets5 WHERE id=?',(row['id'],)).fetchone()
+                    if current:
+                        existing=json.loads(current['data'])
+                        if existing['sha256']!=row['sha256'] or not Path(existing['path']).is_file() or sha(existing['path'])!=row['sha256']:raise ValueError('Aset lokal berubah saat import')
+                        if existing['permission']=='unknown':raise ValueError('Lengkapi izin aset lokal sebelum import kit')
+                        continue
+                    src=Path(row['path']);dest=self.root/src.name
+                    if dest.exists() and sha(dest)!=row['sha256']:raise ValueError('File aset lokal bertabrakan')
+                    if not dest.exists():
+                        pending=dest.with_name(dest.name+'.pending-'+uuid.uuid4().hex)
+                        try:
+                            shutil.copyfile(src,pending)
+                            if sha(pending)!=row['sha256']:raise ValueError('Aset berubah saat publikasi kit')
+                            pending.replace(dest);created.append(dest)
+                        finally:pending.unlink(missing_ok=True)
+                    row={**row,'path':str(dest)};db.execute('INSERT INTO assets5 VALUES(?,?)',(row['id'],dumps(row)))
+                for row in staged.kits():
+                    db.execute('INSERT INTO kits5 VALUES(?,?,?)',(row['id'],row['revision'],dumps(row)))
+                    db.execute('INSERT INTO kit_history5 VALUES(?,?,?)',(row['id'],row['revision'],dumps(row)))
+                db.commit()
+            except BaseException:
+                db.rollback()
+                for path in created:path.unlink(missing_ok=True)
+                raise
+        return self.kit(last_id)

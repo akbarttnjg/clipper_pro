@@ -122,44 +122,60 @@ def build(observation,settings,words,active):
 def layers(segment,W,H,settings):
     width,height=segment['source_size'];area=[0,0,width,height];kind=segment['layout'];people=segment['subjects'];main=segment['material'];result=[]
     # Reserve a real caption band before M5. Material and heads stay out of it.
-    caption_height=round(H*.18/2)*2;canvas=round((H*(1-settings['safe_margins'][3])-caption_height)/2)*2
+    left,top,right,bottom=settings['safe_margins']
+    sx=math.ceil(W*left/2)*2;sy=math.ceil(H*top/2)*2
+    ex=math.floor(W*(1-right)/2)*2;ey=math.floor(H*(1-bottom)/2)*2
+    cw=ex-sx;safe_height=ey-sy
+    caption_height=round(H*.18/2)*2;canvas=safe_height-caption_height
+    if cw<2 or canvas<2:raise ValueError('Area aman terlalu kecil untuk gambar dan subtitle')
+    def head(subject):
+        return next((p['box'] for p in segment['protected_source'] if p['kind']=='face' and p['id']==subject['id']),subject['box'])
     def add(region,viewport,subject=None):
         region=c.box(region,width,height);x,y,w,h=region;left=int(x)//2*2;top=int(y)//2*2;right=min(width,math.ceil((x+w)/2)*2);bottom=min(height,math.ceil((y+h)/2)*2)
         region=[left,top,max(2,right-left),max(2,bottom-top)]
         path=[]
         if settings['motion']=='track' and subject and subject.get('observations'):
             first=subject['observations'][0]['box'];region=c.crop(area,first,viewport[2]/viewport[3]);path=c.smoothed_path(subject['observations'],region,settings,width,height)
-            if any(c.intersection(row['box'],observation['box'])!=observation['box'] for row,observation in zip(path,subject['observations'])):region=area;path=[]
+            if any(c.intersection(row['box'],head(subject))!=head(subject) for row in path):region=area;path=[]
         if settings['motion']=='manual' and settings['keyframes']:path=[{'time':r['time'],'box':c.pixels(r['box'],width,height)} for r in settings['keyframes']]
-        result.append({'source_crop':region,'viewport':[int(v)//2*2 for v in viewport],'path':path,'subject_id':subject['id'] if subject else None})
+        if subject:
+            required=head(subject)
+            if c.intersection(region,required)!=required:
+                if segment.get('crop_lock'):raise ValueError('Crop terkunci memotong kepala subjek yang dipilih')
+                region=area
+            if any(c.intersection(point['box'],required)!=required for point in path):raise ValueError('Keyframe memotong kepala subjek yang dipilih; periksa kamera manual')
+        viewport=[int(v)//2*2 for v in viewport];viewport[0]+=sx;viewport[1]+=sy
+        if not (viewport[2]>=2 and viewport[3]>=2 and sx<=viewport[0] and sy<=viewport[1] and viewport[0]+viewport[2]<=ex and viewport[1]+viewport[3]<=sy+canvas):raise ValueError('Viewport kamera keluar dari area aman')
+        result.append({'source_crop':region,'viewport':viewport,'path':path,'subject_id':subject['id'] if subject else None})
     if segment.get('crop_lock'):
         locked=segment['crop_lock']
         if any(p['kind'] in ('material','hud','ocr','protected') and c.intersection(locked,p['box'])!=p['box'] for p in segment['protected_source']):raise ValueError('Crop terkunci memotong materi/area terlindungi; periksa area manual sebelum render')
-        add(locked,[0,0,W,canvas])
+        selected=next((p for p in people if p['id']==segment['speaker']['selected']),None)
+        add(locked,[0,0,cw,canvas],selected)
     elif kind=='grid':
-        columns=2 if W>=H or len(people)>2 else 1;rows=math.ceil(len(people)/columns);vw=W//columns//2*2;vh=canvas//rows//2*2
+        columns=2 if W>=H or len(people)>2 else 1;rows=math.ceil(len(people)/columns);vw=cw//columns//2*2;vh=canvas//rows//2*2
         for i,p in enumerate(people):
             region=p['box'] if p.get('identity')=='human_source_region' else head_region(p['box'],width,height)
             add(region,[(i%columns)*vw,(i//columns)*vh,vw,vh],p)
     elif kind in ('screen','gameplay'):
         if people:
             if W>=H:
-                side=W*.27;add(main,[side,0,W-side,canvas]);add(c.crop(area,people[0]['box'],side/canvas),[0,0,side,canvas],people[0])
+                side=cw*.27;add(main,[side,0,cw-side,canvas]);add(c.crop(area,head(people[0]),side/canvas),[0,0,side,canvas],people[0])
             else:
-                top=canvas*.65;add(main,[0,0,W,top]);add(c.crop(area,people[0]['box'],W/(canvas-top)),[0,top,W,canvas-top],people[0])
-        else:add(main,[0,0,W,canvas])
+                split=canvas*.65;add(main,[0,0,cw,split]);add(c.crop(area,head(people[0]),cw/(canvas-split)),[0,split,cw,canvas-split],people[0])
+        else:add(main,[0,0,cw,canvas])
     elif kind=='pip':
-        add(main,[0,0,W,canvas]);inset=[W*.73,canvas*.04,W*.23,canvas*.28]
-        projected=[c.projected(main,[0,0,W,canvas],p['box']) for p in segment['protected_source']]
+        add(main,[0,0,cw,canvas]);inset=[cw*.73,canvas*.04,cw*.23,canvas*.28]
+        projected=[c.projected(main,[0,0,cw,canvas],p['box']) for p in segment['protected_source']]
         if any(p and c.intersection(p,inset)[2]*c.intersection(p,inset)[3]>0 for p in projected):
             # Do not cover source HUD or writing with an inset; use separate tile.
-            side=W*.26;result=[];add(main,[0,0,W-side,canvas]);add(c.crop(area,people[0]['box'],side/canvas),[W-side,0,side,canvas],people[0])
-        else:add(c.crop(area,people[0]['box'],inset[2]/inset[3]),inset,people[0])
+            side=cw*.26;result=[];add(main,[0,0,cw-side,canvas]);add(c.crop(area,head(people[0]),side/canvas),[cw-side,0,side,canvas],people[0])
+        else:add(c.crop(area,head(people[0]),inset[2]/inset[3]),inset,people[0])
     elif kind=='subject':
-        chosen=next(p for p in people if p['id']==segment['speaker']['selected']);region=c.crop(area,chosen['box'],W/canvas)
-        if c.intersection(region,chosen['box'])!=chosen['box'] or any(p['kind']!='face' and c.intersection(region,p['box'])!=p['box'] for p in segment['protected_source']):add(area,[0,0,W,canvas])
-        else:add(region,[0,0,W,canvas],chosen)
-    else:add(area,[0,0,W,canvas])
+        chosen=next(p for p in people if p['id']==segment['speaker']['selected']);region=c.crop(area,head(chosen),cw/canvas)
+        if c.intersection(region,head(chosen))!=head(chosen) or any(p['kind']!='face' and c.intersection(region,p['box'])!=p['box'] for p in segment['protected_source']):add(area,[0,0,cw,canvas],chosen)
+        else:add(region,[0,0,cw,canvas],chosen)
+    else:add(area,[0,0,cw,canvas])
     for p in segment['protected_source']:
         if p['kind'] in ('material','hud','ocr','protected') and not any(all(c.intersection(r,p['box'])==p['box'] for r in [layer['source_crop'],*[point['box'] for point in layer['path']]]) for layer in result):raise ValueError('Crop/keyframe memotong area materi atau HUD; periksa kamera sebelum mengaktifkannya')
     protected=[]
@@ -170,8 +186,10 @@ def layers(segment,W,H,settings):
             for p in segment['protected_source']:
                 projected=c.projected(region,layer['viewport'],p['box'])
                 if projected:protected.append({'kind':p['kind'],'box':projected})
-    left,top,right,bottom=segment['safe_margins'];safe=[W*left,H*top,W*(1-left-right),H*(1-top-bottom)]
-    panel=[max(W*.07,safe[0]),canvas+H*.01,min(W*.86,safe[2]),max(2,caption_height-H*.03)]
+    safe=[sx,sy,cw,safe_height]
+    panel_left=max(W*.07,sx);panel_right=min(W*.93,ex)
+    panel_top=sy+canvas+H*.01;panel_bottom=min(ey,sy+canvas+caption_height-H*.02)
+    panel=[panel_left,panel_top,panel_right-panel_left,panel_bottom-panel_top]
     return {'layers':result,'protected_output':protected,'caption_panel':panel,'caption_height':caption_height,'safe_rect':safe}
 
 

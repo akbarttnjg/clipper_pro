@@ -9,6 +9,38 @@ from .transcript_tracks import number,cues_from_words
 from .project_store import Conflict
 
 
+def instance_word_id(index, original):
+    return 'instance-'+str(index)+':'+fingerprint(original)[:24]
+
+
+def mapped_word(word,index,row,cursor,duration):
+    """Map both outer and nested manual/measured times into the new source."""
+    value=copy.deepcopy(word);aligned=value.get('aligned_words');left=row['start'];right=min(row['end'],left+duration)
+    if aligned:
+        from .stage3 import validate_alignment
+        aligned=validate_alignment(value['word'],aligned,aligned[0]['start'],aligned[-1]['end'],method=value.get('alignment_method','manual'))
+        selected=[{**part,'start':max(left,part['start']),'end':min(right,part['end'])} for part in aligned if part['end']>left and part['start']<right]
+        if not selected:return None
+        a=min(p['start'] for p in selected);b=max(p['end'] for p in selected)
+        partial=len(selected)!=len(aligned) or any(p['start']<left or p['end']>right for p in aligned)
+        value['origin_aligned_words']=copy.deepcopy(aligned)
+        value['origin_text']=value['word'];value['word']=' '.join(p['word'] for p in selected)
+        value['aligned_words']=[{**p,'start':cursor+p['start']-left,'end':cursor+p['end']-left} for p in selected]
+        value['alignment_provenance']={**value.get('alignment_provenance',{}),'origin_source_id':row['source_id'],
+            'source_time_mapping':{'source_start':left,'output_start':cursor}}
+    else:
+        a=max(word['start'],left);b=min(word['end'],right)
+        if b<=a:return None
+        partial=a>word['start'] or b<word['end']
+    origins=word.get('source_word_ids',[word['word_id']])
+    value.update(word_id=instance_word_id(index,word['word_id']),source_word_ids=[instance_word_id(index,i) for i in origins],
+        origin_project_id=row['project_id'],origin_source_id=row['source_id'],origin_word_ids=origins,
+        origin_source_start=a,origin_source_end=b,origin_original_bounds=[word['start'],word['end']],
+        start=cursor+a-left,end=cursor+b-left)
+    if partial:value['timing_status']='partial_word_needs_review'
+    return value
+
+
 def validate_segments(service,segments):
     if not isinstance(segments,list) or not 1<=len(segments)<=20:raise ValueError('Pilih 1–20 segmen sumber')
     rows=[];kinds=set()
@@ -43,14 +75,26 @@ def assemble(service,request,folder,check=lambda:None):
             'source_end_used':min(row['end'],row['start']+duration),'timebase':'source_seconds','source_layer':'baked'})
         if doc.get('transcript_id'):
             take=service.transcript(doc);languages.add(take.get('language','und'))
-            for field,out in (('words',words),('raw_words',raw)):
-                for w in take.get(field,[]):
-                    a=max(w['start'],row['start']);b=min(w['end'],row['start']+duration,row['end'])
-                    if b<=a:continue
-                    identity=f'instance-{i}:'+str(w['word_id']);out.append({**copy.deepcopy(w),'word_id':identity,'source_word_ids':[identity],
-                        'origin_project_id':row['project_id'],'origin_source_id':row['source_id'],'origin_word_ids':w.get('source_word_ids',[w['word_id']]),
-                        'origin_source_start':a,'origin_source_end':b,'start':cursor+a-row['start'],'end':cursor+b-row['start'],
-                        'timing_status':'partial_word_needs_review' if a>w['start'] or b<w['end'] else w.get('timing_status','asr_estimated')})
+            selected=[]
+            for word in take['words']:
+                mapped=mapped_word(word,i,row,cursor,duration)
+                if mapped:selected.append(mapped)
+            words.extend(selected)
+            needed={origin for word in selected for origin in word['origin_word_ids']}
+            for word in take.get('raw_words',take['words']):
+                if word['word_id'] not in needed:continue
+                mapped=mapped_word(word,i,row,cursor,duration)
+                if mapped is None:
+                    # A reviewed alignment may move beyond the original ASR span.
+                    # Keep the heard text/ID and original bounds as evidence, while
+                    # explicitly relocating its derived view to the manual span.
+                    linked=[w for w in selected if word['word_id'] in w['origin_word_ids']]
+                    mapped=mapped_word({**word,'start':row['start'],'end':row['start']+duration,
+                        'aligned_words':None},i,row,cursor,duration)
+                    mapped.update(start=min(w['start'] for w in linked),end=max(w['end'] for w in linked),
+                        origin_original_bounds=[word['start'],word['end']],source_time_basis='reviewed_span_for_original_heard_lineage',
+                        timing_status='partial_word_needs_review')
+                raw.append(mapped)
         cursor+=duration
     check();validate_segments(service,rows)
     listing=folder/'concat.txt';listing.write_text(''.join("file '"+str(p.resolve()).replace("'","'\\''")+"'\n" for p in files))
@@ -63,6 +107,7 @@ def assemble(service,request,folder,check=lambda:None):
     result={'path':str(target),'info':info,'content_id':sid,'lineage':lineage,'receipt':{'provider':'multi_source_assembly','source_content_id':sid,
         'source_count':len(rows),'lineage_digest':fingerprint(lineage),'complete_media_probed':True}}
     if words:
+        words.sort(key=lambda w:w['start']);raw.sort(key=lambda w:w['start'])
         result['transcript']={'words':words,'raw_words':raw or copy.deepcopy(words),'cues':cues_from_words(words),'duration':info['duration'],
             'language':next(iter(languages)) if len(languages)==1 else 'mul','source_id':sid,'timebase':'source_seconds','source_lineage':lineage,
             'runtime_receipt':{'provider':'derived_source_tracks','inference_performed':False,'actual_model':None,'actual_device':None}}

@@ -17,6 +17,48 @@ def rational(value, default='30/1'):
     return {'numerator': f.numerator, 'denominator': f.denominator}
 
 
+def stream_duration(path, stream, container):
+    """Stream duration is a length; container/tag duration may be an endpoint.
+
+    For streams without a duration, read their actual tail packet timestamps.
+    Nonzero origins and audio longer than video must not inflate video bounds.
+    """
+    value=stream.get('duration')
+    if value not in (None,'N/A'):
+        duration=float(value)
+        if math.isfinite(duration) and duration>0:return duration,'stream_duration'
+    origin=float(stream.get('start_time',container.get('start_time',0)))
+    reported=float(container.get('duration') or 0);start=float(container.get('start_time',0))
+    ends={reported,start+reported}
+    tag=stream.get('tags',{}).get('DURATION','')
+    try:
+        h,m,s=tag.split(':');ends.add(float(h)*3600+float(m)*60+float(s))
+    except (ValueError,TypeError):pass
+    for endpoint in sorted(ends,reverse=True):
+        if not math.isfinite(endpoint) or endpoint<=origin:continue
+        seek=max(origin,endpoint-10.)
+        probe=subprocess.run(['ffprobe','-v','error','-select_streams',str(stream['index']),
+            '-read_intervals',f'{seek:.9f}%', '-show_packets',
+            '-show_entries','packet=pts_time,dts_time,duration_time','-of','json',str(path)],
+            capture_output=True,text=True,timeout=45)
+        if probe.returncode:continue
+        packets=json.loads(probe.stdout).get('packets',[]);bounds=[]
+        for packet in packets:
+            value=packet.get('pts_time',packet.get('dts_time'))
+            if value in (None,'N/A'):continue
+            t=float(value);d=float(packet.get('duration_time') or 0)
+            if math.isfinite(t) and math.isfinite(d) and d>=0:bounds.append((t,d))
+        if not bounds:continue
+        times=sorted(set(t for t,_ in bounds));gaps=[b-a for a,b in zip(times,times[1:]) if b>a]
+        fallback=sorted(gaps)[len(gaps)//2] if gaps else 0.
+        if not fallback and stream.get('codec_type')=='video':
+            rate=rational(stream.get('avg_frame_rate') or stream.get('r_frame_rate'))
+            fallback=rate['denominator']/rate['numerator']
+        end=max(t+(d or fallback) for t,d in bounds);duration=end-origin
+        if math.isfinite(duration) and duration>0:return duration,'tail_packet_timestamps'
+    raise ValueError('Durasi konten stream belum dapat dibuktikan dari timestamp sumber')
+
+
 def inspect(path):
     p = Path(path).resolve()
     data = json.loads(subprocess.run(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(p)],
@@ -29,9 +71,14 @@ def inspect(path):
         'start_time': float(s.get('start_time', 0))}
         for i,s in enumerate(s for s in streams if s['codec_type'] == 'audio')]
     if not video and not audio: raise ValueError('Berkas tidak mempunyai video atau audio')
-    duration = float((video or {}).get('duration') or data.get('format', {}).get('duration') or 0)
+    container=data.get('format',{})
+    if video:duration,duration_basis=stream_duration(p,video,container)
+    else:
+        durations=[(s,stream_duration(p,s,container)) for s in streams if s['codec_type']=='audio']
+        duration=max(float(s.get('start_time',0))+d[0] for s,d in durations)-float(container.get('start_time',0))
+        duration_basis='audio_stream_bounds'
     if not math.isfinite(duration) or duration <= 0: raise ValueError('Durasi media tidak valid')
-    info = {'path': str(p), 'kind': 'video' if video else 'audio', 'duration': duration, 'audio_tracks': audio,
+    info = {'path': str(p), 'kind': 'video' if video else 'audio', 'duration': duration, 'duration_basis':duration_basis,'audio_tracks': audio,
         'format_start_time': float(data.get('format', {}).get('start_time', 0)),
         'subtitle_tracks': [{'index': s['index'], 'codec': s.get('codec_name'), 'language': s.get('tags', {}).get('language', 'und')}
             for s in streams if s['codec_type'] == 'subtitle']}
