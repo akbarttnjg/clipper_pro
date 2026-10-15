@@ -132,6 +132,9 @@ def render_key(media,words,clip,cfg,*,fresh=False):
     for key in irrelevant:settings.pop(key,None)
     fonts=[(p.name,content_id(p,fresh=fresh)) for p in sorted(Path(cfg.fonts_dir).iterdir()) if p.suffix.lower() in ('.ttf','.otf')]
     assets=[asset_id(cfg.music_path,fresh=fresh),asset_id(cfg.sfx_path,fresh=fresh)]
+    if cfg.audio6:
+        from .audio6_contract import asset_signature
+        assets.append(asset_signature(cfg.audio6,fresh=fresh))
     recipe=active_recipe(clip.get('_broll_recipe',{}),cfg)
     for scene in recipe.get('scenes',[]):assets.append(asset_id(scene.get('asset',{}).get('path'),fresh=fresh))
     # Runtime metadata and result paths do not affect rendered pixels.

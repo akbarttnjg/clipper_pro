@@ -103,7 +103,7 @@ class Assets:
     def register(self,path,meta):
         p=Path(str(path).strip().strip('"\'')).expanduser().resolve()
         if not p.is_file() or p.stat().st_size>512*1024*1024:raise ValueError('Aset harus file lokal maksimal 512 MB')
-        kind={'.ttf':'font','.otf':'font','.png':'image','.jpg':'image','.jpeg':'image','.webp':'image','.mp4':'video','.mov':'video','.mkv':'video','.webm':'video','.wav':'audio','.mp3':'audio','.m4a':'audio'}.get(p.suffix.lower())
+        kind={'.ttf':'font','.otf':'font','.png':'image','.jpg':'image','.jpeg':'image','.webp':'image','.mp4':'video','.mov':'video','.mkv':'video','.webm':'video','.wav':'audio','.mp3':'audio','.m4a':'audio','.flac':'audio','.ogg':'audio','.aac':'audio','.aiff':'audio'}.get(p.suffix.lower())
         keys='name origin license permission attribution tags collections speaker_id object text'.split()
         if not kind or not isinstance(meta,dict) or set(meta)-set(keys):raise ValueError('Format/metadata aset tidak valid')
         permission=meta.get('permission','unknown')

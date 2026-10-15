@@ -22,6 +22,10 @@ def waveform(source,duration,bins=600):
 
 
 def inspect(path,cfg):
+    if cfg.audio6:
+        from .audio6_meter import measure
+        from .audio6_contract import effective
+        return measure(path,effective(cfg),fps=cfg.output_fps)
     result=subprocess.run(['ffmpeg','-nostdin','-hide_banner','-i',str(path),'-vn','-af',
         f'loudnorm=I={cfg.audio_target_lufs}:TP={cfg.audio_peak_db}:LRA=11:print_format=json','-f','null','-'],capture_output=True,text=True)
     matches=re.findall(r'\{\s*"input_i".*?\}',result.stderr,re.S)

@@ -53,6 +53,13 @@ def capture_plan_files(txn,plan,work):
             if value and Path(value).is_file():paths.add(Path(value).resolve())
     for row in plan.get('m5_fonts',[]):
         if row.get('path') and Path(row['path']).is_file():paths.add(Path(row['path']).resolve())
+    if plan.get('audio6'):
+        for row in plan['audio6'].get('asset_refs',[]):
+            if row.get('path') and Path(row['path']).is_file():paths.add(Path(row['path']).resolve())
+        for value in plan.get('audio',{}).get('stems',{}).values():
+            if value and Path(value).is_file():paths.add(Path(value).resolve())
+        for value in plan.get('audio6_source',{}).values():
+            if isinstance(value,str) and Path(value).is_file():paths.add(Path(value).resolve())
     for row in plan.get('finishing5',{}).get('layers',[]):
         value=row.get('asset',{}).get('path')
         if value and Path(value).is_file():paths.add(Path(value).resolve())

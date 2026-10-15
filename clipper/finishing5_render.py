@@ -161,6 +161,7 @@ def decorations(plan,cfg,folder):
         for stream,_ in videos.values():stream.close()
         for p in raw_paths:p.unlink(missing_ok=True)
 def censor_audio(plan,cfg,mix,folder):
+    if cfg.audio6 and plan.get('audio6',{}).get('censor_applied'):return mix
     intervals=plan.get('captions',{}).get('censor_intervals',[])
     if not intervals:return mix
     from .render import run_audio

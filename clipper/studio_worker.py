@@ -79,6 +79,9 @@ def execute(service,job):
 
 
 def _execute(service,job):
+    if job['kind']=='audio_m6':
+        from .audio6_jobs import execute
+        return execute(service,job)
     if job['kind'] in ('gallery_m5','cover_m5'):
         from .finishing5_jobs import execute
         return execute(service,job)
@@ -270,6 +273,8 @@ def _execute(service,job):
                 if camera:clip['_m4_camera']=camera
                 from .editor_media import prepare
                 render_source,render_display,render_clip,render_cfg,edit_receipt=prepare(service,doc,cid,vid,source,words,clip,cfg,progress)
+                if render_cfg.audio6:
+                    render_clip['_audio6_context']={'project_id':pid,'clip_id':cid,'variant_id':vid,'input_revision':doc['revision'],'dependency':dependency}
                 result=pipeline.render_clip(render_source,render_display,render_clip,name,render_cfg,progress,
                     context_words=render_display if edit_receipt else transcript['words'])
                 if edit_receipt:result['editor_receipt']=edit_receipt

@@ -1,3 +1,7 @@
+# Clipper Pro 4.0.17 · M6 audio, musik dan mix
+
+M6 melanjutkan perbaikan M0–M5 4.0.16.1. Lima paket audio mencakup master loudness/limiter, restoration dan Demucs lokal opsional, musik/ducking, track SFX/voiceover/dubbing, serta cleanup yang ditinjau dan audiogram. Baca [panduan M6](docs/UPGRADE_4_0_17_M6.md), [laporan M6](docs/LAPORAN_M6.md) dan [AU01–AU15](docs/M6_REQUIREMENTS.json). G6 uji dengar video asli dan model/native target masih pending.
+
 ## Perbaikan audit M0–M4 · 4.0.15.1
 
 Paket kumulatif memperbaiki 18 temuan yang direproduksi pada rilis GitHub M4. Paket lama M0–M2 tidak perlu dipasang lebih dahulu. Baca [panduan pemasangan](docs/UPGRADE_4_0_15_1_M0_M4.md). Acceptance G2/G3/G4 pada corpus asli dan perangkat tujuan masih perlu diselesaikan.

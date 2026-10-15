@@ -191,6 +191,7 @@ class Config:
     visual_backend_timeout: int = 240
     visual_cache_dir: str = ''
     audio_cache_dir: str = ''
+    audio6: dict | None = None  # M6 is explicitly enabled per variant.
     visual_runtime_root: str = ''
     visual_overrides: dict | None = None
     visual_runtime_signature: list | None = None

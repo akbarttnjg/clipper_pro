@@ -1,0 +1,226 @@
+{
+  "version": "4.0.17-m6",
+  "baseline_github_commit": "9681af5fdb4529e7da96212fbdc6bd48ef905dd4",
+  "specification_sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+  "pages": [
+    52,
+    63,
+    101,
+    102
+  ],
+  "gate_g6": "pending_real_corpus_listening",
+  "E06": "M6 technical switch/PCM/measurement behavior verified; listening acceptance remains pending",
+  "requirements": [
+    {
+      "id": "AU01",
+      "package": "M6.1",
+      "implementation": "Normalisasi terlihat dan target aktif hanya ketika on",
+      "modules": [
+        "clipper/audio6_contract.py",
+        "clipper/audio6.py",
+        "clipper/audio6_meter.py"
+      ],
+      "tests": [
+        "test_normalization_off_target_does_not_change_PCM_or_claim_an_active_target",
+        "test_two_pass_normalization_changes_actual_full_mix_by_target_and_measures_final"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU02",
+      "package": "M6.2",
+      "implementation": "Denoise FFT/NLmeans dan hum 50/60 Hz; before/after terpisah",
+      "modules": [
+        "clipper/audio6.py"
+      ],
+      "tests": [
+        "test_actual_restoration_filter_paths_preserve_finite_samples_clock_and_original"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU03",
+      "package": "M6.2",
+      "implementation": "Enhancement dan WPE lokal; sumber dan hasil dipertahankan",
+      "modules": [
+        "clipper/audio6.py",
+        "clipper/audio6_dsp.py"
+      ],
+      "tests": [
+        "test_WPE_zero_strength_is_identity_and_processing_preserves_finite_clock",
+        "test_actual_restoration_filter_paths_preserve_finite_samples_clock_and_original"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU04",
+      "package": "M6.1",
+      "implementation": "EQ, compressor dan limiter final 4x oversampling",
+      "modules": [
+        "clipper/audio6.py"
+      ],
+      "tests": [
+        "test_final_limiter_prevents_clipping_after_large_gain_and_added_tracks"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU05",
+      "package": "M6.2",
+      "implementation": "Demucs repo lokal eksplisit dan provenance bobot",
+      "modules": [
+        "clipper/audio6_models.py"
+      ],
+      "tests": [
+        "test_unavailable_separation_blocks_before_spawning_or_downloading",
+        "test_model_availability_requires_selected_model_and_all_bag_members"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU06",
+      "package": "M6.3",
+      "implementation": "Ducking dari ucapan efektif dan jadwal narasi",
+      "modules": [
+        "clipper/audio6_plan.py",
+        "clipper/audio6_dsp.py"
+      ],
+      "tests": [
+        "test_music_ducking_follows_quiet_words_and_releases_in_gaps"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU07",
+      "package": "M6.3",
+      "implementation": "Indeks aset lokal/stock milik pengguna dengan mood, durasi, asal dan izin",
+      "modules": [
+        "clipper/api_audio6.py",
+        "clipper/finishing5_assets.py"
+      ],
+      "tests": [
+        "test_local_music_index_filters_by_mood_and_duration_without_network"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU08",
+      "package": "M6.3",
+      "implementation": "Loop crossfade, fade dan snap grid BPM eksplisit",
+      "modules": [
+        "clipper/audio6.py",
+        "clipper/audio6_dsp.py",
+        "clipper/audio6_plan.py"
+      ],
+      "tests": [
+        "test_loop_crossfade_removes_discontinuous_seam_and_keeps_sample_count",
+        "test_beat_snap_records_requested_and_effective_start_without_duration_growth"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU09",
+      "package": "M6.4",
+      "implementation": "SFX opt-out nol cue; review overlap angka/negasi",
+      "modules": [
+        "clipper/audio6_contract.py",
+        "clipper/audio6_plan.py"
+      ],
+      "tests": [
+        "test_disabled_sfx_and_muted_track_create_zero_events_and_no_asset_reference",
+        "test_unreviewed_SFX_on_negation_or_number_is_rejected"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU10",
+      "package": "M6.4",
+      "implementation": "Track voiceover/reaction terpisah dari transkrip sumber",
+      "modules": [
+        "clipper/audio6.py",
+        "clipper/audio6_service.py"
+      ],
+      "tests": [
+        "test_reviewed_dubbing_replaces_only_source_interval_keeps_separate_stem_and_transcript",
+        "test_M6_settings_are_scoped_and_do_not_rewrite_heard_transcript"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU11",
+      "package": "M6.4",
+      "implementation": "Pitch lokal dan dubbing dengan bahasa/speaker/gain/review",
+      "modules": [
+        "clipper/audio6.py",
+        "clipper/audio6_contract.py"
+      ],
+      "tests": [
+        "test_dubbing_has_own_language_speaker_review_and_does_not_edit_source",
+        "test_actual_restoration_filter_paths_preserve_finite_samples_clock_and_original"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU12",
+      "package": "M6.5",
+      "implementation": "Usulan filler, celah transkrip dan retake; persetujuan sebelum cut A/V",
+      "modules": [
+        "clipper/audio6_cleanup.py"
+      ],
+      "tests": [
+        "test_reviewed_cleanup_changes_both_ratio_video_audio_together_and_preserves_heard_source",
+        "test_cleanup_rejects_unreviewed_stale_or_locked_other_ratio_before_any_change",
+        "test_repeated_negation_and_numbers_are_never_suggested_as_retake"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU13",
+      "package": "M6.5",
+      "implementation": "Microfade di jeda dekat cut; clock/durasi tidak ditumpuk",
+      "modules": [
+        "clipper/audio6.py"
+      ],
+      "tests": [
+        "test_fade_does_not_shift_content_and_has_exact_endpoints",
+        "test_M1_speed_reverse_freeze_and_M6_audio_job_use_same_output_clock"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU14",
+      "package": "M6.5",
+      "implementation": "Audio-only dan audiogram lewat jalur render bersama",
+      "modules": [
+        "clipper/audio_project.py"
+      ],
+      "tests": [
+        "test_audio_only_source_audiogram_M5_M6_has_same_duration_and_final_meter"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    },
+    {
+      "id": "AU15",
+      "package": "M6.1",
+      "implementation": "Meter final WAV/MP4 dan ZIP stem terikat snapshot/revisi",
+      "modules": [
+        "clipper/audio6_meter.py",
+        "clipper/audio6_jobs.py",
+        "clipper/artifact_store.py"
+      ],
+      "tests": [
+        "test_actual_audio_job_publishes_AB_and_stems_without_ASR_or_replacing_final",
+        "test_actual_video_M4_M5_M6_keeps_source_freezes_audio_and_measures_encoded_AAC"
+      ],
+      "status": "implemented_target_acceptance_pending"
+    }
+  ],
+  "limits": [
+    "Demucs real inference untested; complete local repo required",
+    "Transcript gaps are review proposals, not measured silence",
+    "BPM/offset is user supplied; no beat detector",
+    "TTS and voice cloning belong to M9",
+    "M6 master nonlinear: preserved export plus pre-master stem ZIP; hybrid/native blocked",
+    "No original-video listening or native Windows/GPU acceptance claim"
+  ]
+}

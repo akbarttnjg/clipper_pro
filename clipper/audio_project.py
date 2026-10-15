@@ -37,6 +37,7 @@ def draw(source,plan,cfg,ass,target,mix,on_progress=None):
 
 
 def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
+    if cfg.audio6 and not cfg.audio6.get('enabled',True):cfg=replace(cfg,audio6=None)
     started=time.monotonic();info=ffmpeg_util.probe(source)
     if not info['has_audio'] or not 0<=clip['start']<clip['end']<=info['duration']+.01:raise ValueError('Batas klip audio tidak valid')
     editplan.validate_source_words(words,info['duration'])
@@ -44,6 +45,7 @@ def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
     plan=editplan.build(words,clip,replace(cfg,trim_silence=False,cold_open=False));plan.update(source_kind='audio',source={'path':str(source),'kind':'audio'},
         visual_summary={'status':'not_applicable','face_detection':'not_applicable','reason':'audio_only_source'},
         selected_alignment={'status':'not_run','reason':'source_timestamp_preserved; request alignment explicitly'})
+    if cfg.audio6:plan['audio6_context']=clip.get('_audio6_context',{'source_revision':clip.get('revision',0),'direct_render':True})
     plan['shots']=[{**s,'mode':'audiogram','rect':[0,0,cfg.target_w,cfg.target_h],'zoom_at':None,'image_height':cfg.target_h,
         'composition_reason':'actual_audio_waveform; no_face_detection'} for s in plan['spans']]
     if clip.get('_editor_clock'):plan['editor']={'schema_version':1,'clock':clip['_editor_clock'],'tracks':clip['_editor_tracks'],
@@ -74,10 +76,18 @@ def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
         plan['finishing5']['font_assets']=cfg.finishing5.get('font_assets',[])
         used={w['font_id'] for p in plan['captions']['phrases'] for w in p['words']} | {f['font_id'] for r in plan['finishing5']['layers'] for f in r.get('text_fonts',[])}
         plan['m5_fonts']=[{**font_info(cfg.fonts_dir,k),'path':str(Path(cfg.fonts_dir)/font_info(cfg.fonts_dir,k)['file'])} for k in used]
+    if cfg.audio6:
+        from .audio6 import finalize
+        mix=finalize(plan,cfg,mix,work)
     target=draw(source,plan,cfg,ass,work/(name+'.mp4'),mix,lambda p:on_progress(30+round(p*60),'Encoding audiogram'))
     checked=qc.inspect(target,cfg,plan['duration']);plan['status']='done';plan['render_seconds']=time.monotonic()-started
     from .audio_quality import inspect
     plan['audio_quality']=inspect(target,cfg)
+    if cfg.audio6:
+        from .audio6_meter import measure
+        from .audio6_contract import effective
+        plan['audio6']['meter_encoded']=measure(target,effective(cfg),expected_duration=plan['duration'],fps=plan['fps'])
+        plan['audio_quality']=plan['audio6']['meter_encoded']
     from .style5 import readability
     plan['style_report']=readability(plan['captions'],cfg);plan['render_config']={};plan['style']={'font_main':cfg.font_main,'font_accent':cfg.font_accent}
     if cfg.finishing5:
@@ -99,7 +109,7 @@ def render_clip(source,words,clip,name,cfg,on_progress=lambda p,m:None):
         'ass_url':library_paths.url(library_paths.relative(cfg,text_base.with_suffix('.ass'))),'srt_url':library_paths.url(library_paths.relative(cfg,text_base.with_suffix('.srt'))),
         'credits_url':library_paths.url(library_paths.relative(cfg,report_base.with_suffix('.credits.txt'))),'title':clip['title'],'reason':clip.get('reason',''),
         'start':clip['start'],'end':clip['end'],'length':checked['duration'],'width':cfg.target_w,'height':cfg.target_h,'fps':cfg.output_fps,
-        'encoder':plan['encoder'],'revision':clip.get('revision',0),'plan_path':str(path),'render_version':'4.0.16.1' if cfg.finishing5 else '4.0.13-m2','broll_count':0,
+        'encoder':plan['encoder'],'revision':clip.get('revision',0),'plan_path':str(path),'render_version':'4.0.17-m6' if cfg.audio6 else '4.0.16.1' if cfg.finishing5 else '4.0.13-m2','broll_count':0,
         'subtitle_flags':0,'render_seconds':plan['render_seconds'],'selection_source':clip.get('selection_source'),'qc':checked,'warnings':plan['warnings']}
 
 
@@ -110,13 +120,13 @@ def edited_source(service,doc,cid,vid,source,words,clip,cfg,progress=lambda *_:N
     if any(editor.get('curves',{}).values()):raise ValueError('Sumber audio tidak mempunyai gambar untuk keyframe visual')
     clock=ec.build_clock(ec.segments_for(doc['clips'][cid],service.variant(doc,cid,vid)),cfg.output_fps)
     if any(r['camera_id']!='primary' for r in clock['slices']):raise ValueError('Sumber audio tidak mempunyai kamera')
-    key=fingerprint([content_id(source,fresh=True),clock,tracks]);folder=service.work/doc['project_id']/'audio-editor'/key[:32];folder.mkdir(parents=True,exist_ok=True)
+    key=fingerprint([content_id(source,fresh=True),clock,tracks,bool(cfg.audio6)]);folder=service.work/doc['project_id']/'audio-editor'/key[:32];folder.mkdir(parents=True,exist_ok=True)
     output=folder/'edited.wav';cached=read_json(folder/'receipt.json',{})
     if not output.is_file() or cached.get('content_id')!=content_id(output,fresh=True):
         files=[]
         for i,row in enumerate(_chunks(clock)):
             a=ec.seconds(row['source_start_tick']);b=ec.seconds(row['source_end_tick']);duration=row['duration_frames']/clock['fps'];path=folder/f'chunk-{i}.wav'
-            if row['kind']=='freeze' or not tracks['voice']['enabled']:
+            if row['kind']=='freeze' or not tracks['voice']['enabled'] and not cfg.audio6:
                 command=['ffmpeg','-v','error','-nostdin','-y','-f','lavfi','-i','anullsrc=r=48000:cl=stereo','-t',str(duration),'-c:a','pcm_s16le',str(path)]
             else:
                 rate=(b-a)/duration;filters=['asetpts=PTS-STARTPTS']

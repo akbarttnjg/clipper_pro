@@ -1,4 +1,4 @@
-import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.16.1';
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.17-m6';
 const localStorage=localDrafts,sessionStorage=sessionDrafts;
 /* A-owned review component. Host B injects services and owns project revisions. */
 export function mountAnalysis(root,{api,target,revision,onChange=()=>{},onListen=()=>{},onPreview=null}){

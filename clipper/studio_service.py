@@ -134,7 +134,9 @@ class StudioService:
         values['visual_evidence_signature']=content_id(evidence_path) if evidence_path.is_file() else None
         cfg=Config(**{k:v for k,v in values.items() if k in CONFIG_FIELDS})
         from .finishing5_service import configure
-        return configure(self,doc,clip_id,variant_id,cfg)
+        cfg=configure(self,doc,clip_id,variant_id,cfg)
+        from .audio6_service import configure as audio_configure
+        return audio_configure(self,doc,clip_id,variant_id,cfg)
 
     @staticmethod
     def variant(doc,clip_id,variant_id):
@@ -281,7 +283,7 @@ class StudioService:
                 signature(self,doc,'display'),signature(self,doc,'raw'),doc.get('m3_markers',[]),
                 cfg.audio_stream_index,cfg.model,cfg.ollama_url,cfg.ollama_num_ctx,cfg.ollama_num_gpu,cfg.ollama_timeout,
                 cfg.visual_runtime_signature])
-        if clip_id and kind in ('render','preview','export','evaluation','style_review','visual_review','gallery_m5','cover_m5'):
+        if clip_id and kind in ('render','preview','export','evaluation','style_review','visual_review','gallery_m5','cover_m5','audio_m6'):
             from .dependency_cache import render_key,fresh_scope
             from .studio_exchange import render_words
             with fresh_scope():
@@ -440,6 +442,10 @@ class StudioService:
             from .editor_service import apply_editor_command, check_lock
             check_lock(self,doc,cid,vid,op)
             kind=op.get('op')
+            from .audio6_service import apply_command as apply_audio
+            audio=apply_audio(self,doc,cid,vid,op,request['expected_revision'])
+            if audio is not None:
+                touched.update(audio.get('touched',[]));continue
             from .finishing5_service import apply_command as apply_finishing
             finishing=apply_finishing(self,doc,cid,vid,op,request['expected_revision'])
             if finishing is not None:
@@ -645,9 +651,13 @@ class StudioService:
         if any(op.get('op') in ('alias_upsert','alias_remove') or 'glossary' in op.get('values',{}) for op in operations):
             from .transcript_correction import glossary_entries
             glossary_entries(self.config(doc))
-        for c,v in touched:doc['clips'][c]['variants'][v]['timeline_revision']+=1
+        for c,v in touched:
+            # M1 mute/solo can make previously inactive M6 assets audible.
+            # Validate the final transaction before committing any ratio.
+            if self.variant(doc,c,v).get('audio6',{}).get('enabled'):self.config(doc,c,v)
+            doc['clips'][c]['variants'][v]['timeline_revision']+=1
         return {'impact':list(dict.fromkeys(stage for op in operations for stage in settings_impact(
-            {'finishing5':True} if str(op.get('op','')).startswith('m5_') else op.get('values',{}))))}
+            {'audio6':True} if str(op.get('op','')).startswith('m6_') else {'finishing5':True} if str(op.get('op','')).startswith('m5_') else op.get('values',{}))))}
 
     def enqueue(self,project_id,kind,clip_id=None,variant_id='portrait',expected_revision=None,options=None):
         doc=self.store.get(project_id)
@@ -658,10 +668,10 @@ class StudioService:
             state=snapshot(self,doc,fresh=True,mode=mode,require_ready=True)
             return self.queue.enqueue_many(project_id,[(kind,{'clip_id':None,'variant_id':'both'},
                 {'dependency':state['dependency'],'options':{'mode':mode}})],doc['revision'])[0]
-        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation','selection_m3','camera_m4','gallery_m5','cover_m5'):raise ValueError('Tahap tidak dikenal')
+        if kind not in ('analyze','source_evidence','correction','asr_recheck','alignment','discovery','boundary_review','asset_proposals','asset_visual_review','visual_review','style_review','preview','render','export','waveform','evaluation','proxy','diarization','translation','selection_m3','camera_m4','gallery_m5','cover_m5','audio_m6'):raise ValueError('Tahap tidak dikenal')
         if kind in ('analyze','source_evidence','correction','discovery','waveform','proxy','diarization','translation','selection_m3'):clip_id=None
         if clip_id:self.variant(doc,clip_id,variant_id)
-        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation','camera_m4','gallery_m5','cover_m5') and not clip_id:raise ValueError('Pilih klip dahulu')
+        if kind in ('preview','render','export','asset_proposals','asset_visual_review','boundary_review','visual_review','style_review','evaluation','camera_m4','gallery_m5','cover_m5','audio_m6') and not clip_id:raise ValueError('Pilih klip dahulu')
         if kind not in ('analyze','source_evidence','waveform','proxy','selection_m3','camera_m4') and not doc.get('transcript_id'):raise ValueError('Transkripsi belum tersedia')
         if kind=='selection_m3':
             from .selection_contract import constraints
@@ -675,6 +685,10 @@ class StudioService:
         if kind=='translation':
             from .transcript_tracks import language
             options={'provider':'ollama','target_language':language((options or {}).get('target_language','en'))}
+        if kind=='audio_m6':
+            from .audio6_jobs import options as audio_options
+            if not self.config(doc,clip_id,variant_id).audio6:raise ValueError('Aktifkan dan simpan M6 dahulu')
+            options=audio_options(options or {})
         if kind in ('gallery_m5','cover_m5'):
             from .finishing5_jobs import options as m5_options
             if not self.variant(doc,clip_id,variant_id).get('finishing5',{}).get('enabled'):raise ValueError('Aktifkan dan simpan M5 dahulu')

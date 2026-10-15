@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.16.1'
+RENDER_VERSION = '4.0.17-m6'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -106,6 +106,7 @@ def source_plan(media_path,words,clip,cfg,info,*,context_words=None):
 
 def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: None, *, context_words=None):
     """Build a complete immutable core set before returning any new file URLs."""
+    if cfg.audio6 and not cfg.audio6.get('enabled',True):cfg=replace(cfg,audio6=None)
     if clip.get('created_from')=='M3' and clip.get('selection_status')!='accepted':
         raise ValueError('Kandidat M3 belum diterima; final tidak dibuat')
     import uuid
@@ -177,6 +178,7 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
     ffmpeg_util.filter_file_args('preflight')
     on_progress(3, 'Menyusun potongan dan komposisi')
     words,plan=source_plan(media_path,words,clip,cfg,info,context_words=context_words)
+    if cfg.audio6:plan['audio6_context']=clip.get('_audio6_context',{'source_revision':clip.get('revision',0),'direct_render':True})
     if clip.get('_editor_clock'):
         plan['editor']={'schema_version':1,'clock':clip['_editor_clock'],'tracks':clip['_editor_tracks'],
             'original_source':clip['_editor_source'],'original_bounds':clip['_editor_original_bounds'],
@@ -250,6 +252,9 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
         for a in cfg.finishing5.get('font_assets',[]):credits.append({'provider':'font_m5','id':a['id'],'sha256':a['sha256'],'origin':a['origin'],'license':a['license'],'permission':a['permission'],'credit':a['attribution']})
         write_json(report_base.with_suffix('.credits.json'),credits)
         report_base.with_suffix('.credits.txt').write_text('\n'.join(c['credit'] for c in credits),encoding='utf-8')
+    if cfg.audio6:
+        from .audio6 import finalize
+        mix=finalize(plan,cfg,mix,work)
     plan['style_report']=readability(plan['captions'],cfg)
     plan['style_report']['selected_alignment']=plan.get('selected_alignment')
     write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
@@ -308,6 +313,12 @@ def _render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: No
             if raster['status']=='needs_review':plan['warnings'].append('Sebagian sampel kontras raster belum memenuhi pengukuran; tinjau background pada preview.')
             write_json(report_base.with_suffix('.readability.json'),plan['style_report'])
         plan['audio_quality'] = audio_quality.inspect(rendered, cfg)
+        if cfg.audio6:
+            from .audio6_meter import measure
+            from .audio6_contract import effective
+            plan['audio6']['meter_encoded']=measure(rendered,effective(cfg),expected_duration=plan['duration'],fps=plan['fps'])
+            plan['audio_quality']=plan['audio6']['meter_encoded']
+            plan['warnings'].extend(plan['audio_quality']['issues'])
         checked['audio_quality'] = plan['audio_quality']
         plan['warnings'].extend(plan['audio_quality'].get('issues', []))
         checked['editorial'] = {'status': 'needs_review' if any(n.get('severity')!='info' for n in notices) or clip.get('boundary_review', {}).get('status') == 'needs_review' else 'not_human_verified',

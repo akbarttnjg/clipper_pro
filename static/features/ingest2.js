@@ -1,4 +1,4 @@
-import {localDrafts} from './draft_storage.js?v=4.0.16.1';
+import {localDrafts} from './draft_storage.js?v=4.0.17-m6';
 const element=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node};
 function field(host,label,value='',type='text'){const wrap=element('label',undefined,'m2-field'),title=element('span',label);const node=element(type==='textarea'?'textarea':'input');if(type!=='textarea')node.type=type;if(type==='checkbox')node.checked=value===true;else node.value=String(value??'');wrap.append(title,node);host.append(wrap);return node}
 function select(host,label,choices,value){const wrap=element('label',undefined,'m2-field'),node=element('select');for(const [id,text] of choices){const option=element('option',text);option.value=id;node.append(option)}node.value=value;wrap.append(element('span',label),node);host.append(wrap);return node}

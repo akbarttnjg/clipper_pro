@@ -1,6 +1,6 @@
-import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.16.1';
-import {settingsDelta} from './editor_state.js?v=4.0.16.1';
-import {outputSource,sourceOutput} from './editor_clock.js?v=4.0.16.1';
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.17-m6';
+import {settingsDelta} from './editor_state.js?v=4.0.17-m6';
+import {outputSource,sourceOutput} from './editor_clock.js?v=4.0.17-m6';
 
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n};
 const button=(parent,text,fn)=>{const n=node('button',text);n.type='button';n.onclick=async()=>{n.disabled=true;try{await fn()}catch(error){let status=parent.querySelector('[role="status"]');if(!status){status=node('p','','help');status.setAttribute('role','status');parent.append(status)}status.textContent=error.message}finally{n.disabled=false}};parent.append(n);return n};
@@ -57,7 +57,7 @@ export function consumeDraftStores(stores,projectId){
 export function collectDraftStores(projectId){
  const stores={};
  for(const key of ['clipper4-drafts','clipper-stage3-drafts']){const raw=localDrafts.getItem(key);if(raw){const selected=projectDraftBag(raw,projectId);if(selected)stores[key]=selected}}
- for(let i=0;i<localDrafts.length;i++){const key=localDrafts.key(i);if(/^(clipper5-style\||clipper4-visual-draft\||clipper4-visual-fields\||clipper-m1-fields\||clipper-m5-fields\|)/.test(key)&&key.split('|')[1]===projectId)stores[key]=localDrafts.getItem(key)}
+ for(let i=0;i<localDrafts.length;i++){const key=localDrafts.key(i);if(/^(clipper5-style\||clipper4-visual-draft\||clipper4-visual-fields\||clipper-m1-fields\||clipper-m5-fields\||clipper-m6-fields\|)/.test(key)&&key.split('|')[1]===projectId)stores[key]=localDrafts.getItem(key)}
  return stores;
 }
 
@@ -96,7 +96,7 @@ export async function mountCanonicalEditor(host,{project,clipId,variantId,api,ch
  for(const input of host.querySelectorAll('input,select,textarea')){const label=input.getAttribute('aria-label')||'';const entry=state.fields[input.dataset.settingKey]||Object.values(state.fields).find(r=>r.label===label);if(!entry)continue;
   const help=node('small',`${entry.help} Satuan: ${entry.unit}. Cakupan: ${entry.scope}.`,'control-help');const id='help-'+crypto.randomUUID();help.id=id;input.setAttribute('aria-describedby',id);input.parentElement.append(help)}
  const audioNormalize=host.querySelector('[aria-label="Normalisasi audio"]'),lufs=host.querySelector('[aria-label="Target loudness (LUFS)"]'),peak=host.querySelector('[aria-label="Batas true peak (dB)"]');
- const audioStatus=node('p','','help');sections.Audio.append(audioStatus);const normalizeChanged=()=>{const enabled=audioNormalize?.checked??state.fields.audio_normalize.value;if(lufs)lufs.disabled=!enabled;if(peak)peak.disabled=!enabled;audioStatus.textContent=enabled?'Target loudness dan puncak digunakan saat render.':'Normalisasi nonaktif. Target tersimpan untuk saat normalisasi diaktifkan.'};audioNormalize?.addEventListener('change',normalizeChanged);normalizeChanged();
+ const audioStatus=node('p','','help');sections.Audio.append(audioStatus);const normalizeChanged=()=>{if(project.clips[clipId]?.variants?.[variantId]?.audio6?.enabled){audioStatus.textContent='Audio master dan target loudness diatur melalui panel M6 pada rasio ini.';return}const enabled=audioNormalize?.checked??state.fields.audio_normalize.value;if(lufs)lufs.disabled=!enabled;if(peak)peak.disabled=!enabled;audioStatus.textContent=enabled?'Target loudness dan puncak digunakan saat render.':'Normalisasi nonaktif. Target tersimpan untuk saat normalisasi diaktifkan.'};audioNormalize?.addEventListener('change',normalizeChanged);normalizeChanged();
  const attributes=section(sections.Tampilan,'Salin atribut pilihan','Warna tidak menyalin font atau gerak. Potongan dan ucapan selalu memakai command terpisah.',true);
  const attributeChecks=[];for(const [group,keys] of Object.entries(state.attribute_groups)){const check=field(attributes,'Salin '+group,group==='warna','checkbox');attributeChecks.push({check,keys})}
  let clipboard=null;button(attributes,'Salin dari rasio aktif',async()=>{const keys=attributeChecks.filter(r=>r.check.checked).flatMap(r=>r.keys);clipboard=await api(`/editor/projects/${project.project_id}/copy-attributes`,{expected_revision:project.revision,clip_id:clipId,variant_id:variantId,keys});localDrafts.setItem('clipper-m1-clipboard',JSON.stringify(clipboard))});

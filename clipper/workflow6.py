@@ -98,6 +98,8 @@ def export_options(variant):
     rows=[]
     for mode,entry in EXPORT_MODES.items():
         reasons=native_reasons(plan) if mode=='native' else []
+        if mode!='preserved' and plan.get('audio6'):
+            reasons.append('Mix master M6 memakai ducking/normalisasi/limiter yang belum dipetakan identik ke editor. Pilih Tampilan terjaga; stem WAV terpisah tersedia dari panel M6.')
         if mode=='hybrid' and plan.get('captions',{}).get('censor_intervals'):reasons.append('Bleep M5 memakai mix final; pilih Tampilan terjaga agar sensor tetap terdengar.')
         style=plan.get('finishing5',{}).get('style',{})
         if mode=='hybrid' and style.get('source_caption_mode') in ('cover','reconstruct') and style.get('source_captions'):

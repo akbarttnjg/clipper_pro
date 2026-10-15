@@ -1,4 +1,4 @@
-import {localDrafts} from './draft_storage.js?v=4.0.16.1';
+import {localDrafts} from './draft_storage.js?v=4.0.17-m6';
 // Each tab owns string drafts; only changed fields are submitted to the engine.
 export async function mountFinishing5(host,{project,clipId,variantId,api,onChange=()=>{},isActive=()=>true,onDraftStatus=()=>{}}){
  let destroyed=false,preview=null,corrupt=false,draft=null;

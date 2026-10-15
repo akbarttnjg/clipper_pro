@@ -42,13 +42,16 @@ def request(service, doc, payload):
                 else:
                     cid,vid=parts[1:3];field='|'.join(parts[3:])
                 groups[(key,cid,vid)][field]=value
-        elif key.startswith(('clipper5-style|','clipper4-visual-draft|','clipper4-visual-fields|','clipper-m1-fields|')):
+        elif key.startswith(('clipper5-style|','clipper4-visual-draft|','clipper4-visual-fields|','clipper-m1-fields|','clipper-m6-fields|')):
             prefix,p,cid,vid=key.split('|',3)
             if p!=pid:continue
             value=json.loads(raw) if isinstance(raw,str) else raw
             if not isinstance(value,dict):raise ValueError('Objek draf tidak valid')
             base(value.get('revision'))
-            if prefix=='clipper5-style':
+            if prefix=='clipper-m6-fields':
+                from .audio6_draft import operations as audio_operations
+                for operation in audio_operations(value):add(cid,vid,operation)
+            elif prefix=='clipper5-style':
                 values=dict(value.get('values',{}))
                 cfg=service.config(doc,cid,vid)
                 if values.get('style_preset') not in (None,'legacy',cfg.style_preset):

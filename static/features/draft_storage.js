@@ -1,6 +1,6 @@
 // A tab owns its draft namespace. Reload restores it; another tab cannot overwrite it.
 const draftKey = key => /^(clipper4-drafts|clipper-stage3-drafts|clipper-analysis-drafts)$/.test(key) ||
- /^(clipper5-style\||clipper4-visual-draft\||clipper4-visual-fields\||clipper6-evaluation\||clipper-m1-fields\||clipper-m2-fields\||clipper-m3-fields\||clipper-m4-fields\||clipper-m5-fields\|)/.test(key);
+ /^(clipper5-style\||clipper4-visual-draft\||clipper4-visual-fields\||clipper6-evaluation\||clipper-m1-fields\||clipper-m2-fields\||clipper-m3-fields\||clipper-m4-fields\||clipper-m5-fields\||clipper-m6-fields\|)/.test(key);
 let tabId;
 if(typeof window!=='undefined'){
  if(!window.name.startsWith('clipper-m1:'))window.name='clipper-m1:'+crypto.randomUUID();

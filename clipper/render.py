@@ -21,6 +21,9 @@ def run_audio(args, target, log):
 
 def voice_stem(source, plan, cfg, folder):
     """Reuse measured speech across aspect/style renders with identical edits."""
+    if cfg.audio6 and cfg.audio6.get('enabled',True):
+        from .audio6 import source_stem
+        return source_stem(source,plan,cfg,folder)
     from .contracts import fingerprint
     from .dependency_cache import content_id
     from .storage import read_json,write_json
@@ -55,6 +58,9 @@ def voice_stem(source, plan, cfg, folder):
 
 
 def audio_stems(source, plan, cfg, folder):
+    if cfg.audio6 and cfg.audio6.get('enabled',True):
+        from .audio6 import premix
+        return premix(source,plan,cfg,folder)
     folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     duration=plan['duration']
     prior_cache=plan.get('voice_cache')

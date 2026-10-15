@@ -110,6 +110,9 @@ def check_lock(service, doc, cid, vid, op):
     if kind.startswith('m5_'):
         from .finishing5_service import affected_tracks
         affected = affected_tracks(service,doc,cid,vid,op)
+    if kind.startswith('m6_'):
+        from .audio6_service import affected_tracks
+        affected = affected_tracks(service,doc,cid,vid,op)
     if not affected:return
 
     corrections = ('correct_word','correct_token','correct_phrase','m2_timing','align_words')
@@ -134,6 +137,8 @@ def check_lock(service, doc, cid, vid, op):
         requested = [(r['clip_id'],r['variant_id']) for r in op.get('targets',[])] or [(cid,vid)]
     for c,v in requested:
         if kind.startswith('m5_'):
+            affected = affected_tracks(service,doc,c,v,op)
+        if kind.startswith('m6_'):
             affected = affected_tracks(service,doc,c,v,op)
         variant = service.variant(doc,c,v)
         locked = ec.track_state(variant.get('editor',{}))

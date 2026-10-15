@@ -1,0 +1,21 @@
+{
+  "source_commit": "9681af5fdb4529e7da96212fbdc6bd48ef905dd4",
+  "verified_local_import": "5a8988d5840720ae8334b8e8856f2cdc47ac1c5a",
+  "sha256": "5daa486f255a8e61f7239874ba689a40874bf8644e41eb4c5e806f8db4205b56",
+  "files": 445,
+  "excluded": "Historical binary fixture archives, font binaries, private environment files, user media, model weights",
+  "excluded_nonruntime_metadata": [
+    ".claude/launch.json",
+    ".env.example",
+    ".github/CODEOWNERS",
+    "intelligence/__init__.py",
+    "intelligence/editorial/__init__.py",
+    "intelligence/editorial/editorial_engine.py",
+    "intelligence/editorial/keyword_adapter.py",
+    "intelligence/editorial/semantic_adapter.py",
+    "intelligence/editorial/topic_adapter.py",
+    "landing/README.md",
+    "landing/assets/favicon.svg",
+    "landing/index.html"
+  ]
+}

@@ -227,7 +227,7 @@ def prepare(service,doc,cid,vid,source,words,clip,cfg,progress=lambda *_:None):
     width,height=info['width']//2*2,info['height']//2*2
     identities={k:{'content_id':r['content_id'],'offset_seconds':r['offset_seconds']} for k,r in cameras.items() if any(s['camera_id']==k for s in clock['slices'])}
     key=fingerprint([ec.VERSION,content_id(source),clock['digest'],identities,editor.get('curves'),
-        {k:v['enabled'] for k,v in tracks.items()},width,height])
+        {k:v['enabled'] for k,v in tracks.items()},width,height,bool(cfg.audio6)])
     folder=service.work/doc['project_id']/'editor-proxies'/key[:32]
     cached=read_json(folder/'receipt.json',{})
     proxy=folder/'edited.mp4'
@@ -256,7 +256,7 @@ def prepare(service,doc,cid,vid,source,words,clip,cfg,progress=lambda *_:None):
             else:
                 v=f'color=c=black:s={width}x{height}:r={cfg.output_fps}:d={duration:.9f},trim=end_frame={row["duration_frames"]}[v]'
             filt.append(v)
-            if tracks['voice']['enabled'] and row['kind']!='freeze':
+            if (tracks['voice']['enabled'] or cfg.audio6) and row['kind']!='freeze':
                 audio=f'[1:a]atrim=start={start:.9f}:end={end:.9f},asetpts=PTS-STARTPTS'
                 if row['reverse']:
                     audio+=',areverse'

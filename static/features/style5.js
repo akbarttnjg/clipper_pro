@@ -1,4 +1,4 @@
-import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.16.1';
+import {localDrafts,sessionDrafts} from './draft_storage.js?v=4.0.17-m6';
 const localStorage=localDrafts,sessionStorage=sessionDrafts;
 // Variant-scoped typography controls with revision-aware persistent drafts.
 export function mountStyle5(host,{project,clipId,variantId,api,onChange=()=>{},onListen=()=>{}}){
