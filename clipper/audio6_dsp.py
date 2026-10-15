@@ -123,3 +123,28 @@ def wpe(samples,strength=.35):
         out[origin:origin+len(original)]=processed
     if not np.isfinite(out).all():raise ValueError('WPE menghasilkan PCM tidak finite; sumber tetap tersedia')
     return out
+
+
+def loop_slice(samples,start,count,crossfade_seconds):
+    """Sample-exact slice of one continuous loop, including overlap context."""
+    overlap=min(round(crossfade_seconds*RATE),len(samples)//4);period=len(samples)-overlap
+    if len(samples)<2 or period<1:raise ValueError('Musik terlalu pendek untuk loop')
+    out=np.empty((count,2),np.float32)
+    for i in range(0,count,RATE):
+        t=np.arange(start+i,start+min(count,i+RATE),dtype=np.int64);pos=t%period;block=samples[pos].copy()
+        if overlap:
+            mask=(t>=period)&(pos<overlap);alpha=(pos[mask]/max(1,overlap-1)).astype(np.float32)[:,None]
+            block[mask]=samples[pos[mask]+period]*(1-alpha)+samples[pos[mask]]*alpha
+        out[i:i+len(block)]=block
+    return out
+
+def event_fade(samples,row):
+    """One envelope in the track's declared clock, never per internal slice."""
+    if 'fade_duration' not in row:return fade(samples,min(row['fade_in'],len(samples)/RATE/2),min(row['fade_out'],len(samples)/RATE/2))
+    n=len(samples);a=row['fade_position_start'];b=row['fade_position_end'];delta=(b-a)/max(1,n)
+    # Endpoint sampling preserves zero/one fades on a complete normal-speed track.
+    positions=np.linspace(a,b,n,endpoint=True,dtype=np.float64) if n>1 else np.array([a])
+    gain=np.ones(n,np.float32)
+    if row['fade_in']:gain*=np.sin(np.clip(positions/row['fade_in'],0,1)*math.pi/2).astype(np.float32)
+    if row['fade_out']:gain*=np.sin(np.clip((row['fade_duration']-positions)/row['fade_out'],0,1)*math.pi/2).astype(np.float32)
+    return samples*gain[:,None]

@@ -10,7 +10,7 @@ from .storage import source_key, read_json, write_json
 from . import intelligence
 from . import library_paths, placement, transcript_correction
 
-RENDER_VERSION = '4.0.17-m6'
+RENDER_VERSION = '4.0.18-m7'
 
 
 def analyze(media_path, cfg, on_progress=lambda p, m: None):
@@ -123,6 +123,15 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
         value['absolute_file']=str(media_file.resolve())
         value['output_content_id']=content_id(media_file,fresh=True)
         plan=read_json(value['plan_path'])
+        from .delivery7_sidecars import bound_caption_tail
+        if bound_caption_tail(plan):
+            # Tail changes are outside the encoded frame interval. Reissue all
+            # text representations with the exact same canonical clip boundary.
+            for path in txn.staging.rglob('*.ass'):
+                captions_pro.write_plan(plan['captions'],path,cfg)
+            from .projects import write_srt
+            for path in txn.staging.rglob('*.srt'):write_srt(plan,path)
+            plan['warnings'].append('Caption hold pada ekor diikat ke frame akhir klip; waktu ucapan dipertahankan.')
         for role in ('mix','voice','music','sfx'):
             original=plan.get('audio',{}).get(role)
             if isinstance(original,str) and Path(original).is_file():
@@ -142,6 +151,13 @@ def render_clip(media_path, words, clip, name, cfg, on_progress=lambda p, m: Non
             plan['runtime_receipt']['encoder_fallback_reason']=next((w for w in plan.get('warnings',[]) if 'NVENC' in str(w)),
                 'NVENC belum lulus pemeriksaan ketersediaan; encode aktual memakai CPU.')
         write(txn.staging/'runtime-receipt.json',plan['runtime_receipt'])
+        # Sidecars and font snapshots become mandatory members of the same core set.
+        from .delivery7_fonts import freeze as freeze_fonts
+        from .delivery7_sidecars import write as write_sidecars
+        plan['font_assets7']=freeze_fonts(rebase(plan,txn.final,txn.staging),txn.staging/'Fonts',cfg.fonts_dir)
+        from .delivery7_sidecars import capture_language
+        capture_language(plan,clip,cfg)
+        write_sidecars(plan,txn.staging/'Sidecars',reference={'output_content_id':value['output_content_id']},ass=subtitle)
         plan=rebase(plan,txn.staging,txn.final)
         write(txn.staging/'edit-plan.json',plan)
         value['plan_path']=str(txn.final/'edit-plan.json')

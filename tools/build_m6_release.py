@@ -14,7 +14,7 @@ from tools import complete_installer as installer
 
 def digest(data):return hashlib.sha256(data).hexdigest()
 
-def build(output,source_commit,verification=None):
+def _build_current_unsupported(output,source_commit,verification=None):
     if not re.fullmatch(r'[0-9a-f]{40}',source_commit):raise ValueError('SHA commit sumber harus lengkap')
     output=Path(output).resolve();archive=output.with_suffix('.zip')
     if output.exists() or archive.exists():raise ValueError('Pilih nama paket baru; paket lama tidak ditimpa')
@@ -87,6 +87,11 @@ def build(output,source_commit,verification=None):
     result={'archive':str(archive),'bytes':archive.stat().st_size,'sha256':digest(archive.read_bytes()),'payload_files':len(files),'guards':len(guards),
         'source_commit':source_commit,'baseline_github_commit':base['base_commit'],'milestone':'M6','zip_crc':'passed'}
     print(json.dumps(result,indent=2));return result
+
+def build(output,source_commit,verification=None):
+    from tools.frozen_producer import build as pinned
+    return pinned(ROOT,'m7_m6_producer','build_m6_release.py',output,source_commit,verification)
+
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--output',required=True);p.add_argument('--source-commit',required=True);p.add_argument('--verification')

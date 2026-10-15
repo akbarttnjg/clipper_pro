@@ -79,6 +79,9 @@ def execute(service,job):
 
 
 def _execute(service,job):
+    if job['kind']=='delivery_m7':
+        from .delivery7_jobs import execute
+        return execute(service,job)
     if job['kind']=='audio_m6':
         from .audio6_jobs import execute
         return execute(service,job)
@@ -275,6 +278,10 @@ def _execute(service,job):
                 render_source,render_display,render_clip,render_cfg,edit_receipt=prepare(service,doc,cid,vid,source,words,clip,cfg,progress)
                 if render_cfg.audio6:
                     render_clip['_audio6_context']={'project_id':pid,'clip_id':cid,'variant_id':vid,'input_revision':doc['revision'],'dependency':dependency}
+                render_clip['_source_language']=transcript.get('language')
+                display=transcript.get('m2_translation',{})
+                render_clip['_display_language']=display.get('language') or transcript.get('language')
+                render_clip['_display_mode']=display.get('display_mode','source')
                 result=pipeline.render_clip(render_source,render_display,render_clip,name,render_cfg,progress,
                     context_words=render_display if edit_receipt else transcript['words'])
                 if edit_receipt:result['editor_receipt']=edit_receipt

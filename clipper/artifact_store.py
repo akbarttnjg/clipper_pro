@@ -187,6 +187,11 @@ def studio_set(result,plan,doc,cid,vid,cfg,media,dependency,*,before_seal=lambda
                              'encode_provenance':value['encode_provenance'],'cache_reused':reused}
         if value.get('render_summary'):plan['publication']['render_summary']=value['render_summary']
         if value.get('draft_id'):plan['publication'].update(draft_id=value['draft_id'],is_draft=True,snapshot_digest=value['snapshot_digest'])
+        if (txn.staging/'Sidecars').is_dir():
+            from .delivery7_sidecars import write as write_sidecars
+            ass=next((p for p in txn.staging.rglob('*.ass') if p.parent.name!='Sidecars'),None)
+            write_sidecars(plan,txn.staging/'Sidecars',reference={'output_content_id':value['output_content_id'],
+                'project_id':doc['project_id'],'clip_id':cid,'variant_id':vid,'requested_revision':doc['revision'],'dependency':dependency},ass=ass)
         write(txn.staging/'edit-plan.json',plan)
         value['plan_content_id']=content_id(txn.staging/'edit-plan.json',fresh=True)
         exchange=records(plan,value,doc,cid,vid,cfg,media)

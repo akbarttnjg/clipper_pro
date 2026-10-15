@@ -100,6 +100,8 @@ def probe_runtime(target, after=False):
             "load_dotenv(Path(sys.argv[1])/'.env.pro',override=True); from clipper.config import Config; ")
     if after:
         code += 'import clipper.framing,clipper.batch7,clipper.projects,clipper.pipeline,clipper.visual4,clipper.visual_worker,clipper.stage3,clipper.speech_jobs,clipper.api_studio,clipper.studio_exchange,clipper.style5,clipper.caption_renderer,clipper.explanation5,clipper.asset_rank,clipper.workflow6,clipper.evaluation6,clipper.export6,clipper.metrics6; '
+        if (target/'clipper/delivery7.py').is_file():
+            code += 'import clipper.delivery7,clipper.delivery7_jobs,clipper.delivery7_review,clipper.api_delivery7; '
         if (target/'clipper/caption_director.py').is_file():
             code += 'import clipper.caption_director,clipper.text_area,clipper.segmentation; '
         if (target/'clipper/caption_fit.py').is_file():
@@ -131,7 +133,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17'):
+    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     managed = set()
     for key in ('files', 'guards'):
@@ -216,40 +218,49 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     database=record.get('database_backup') or {}
     current_database=Path(database.get('source',''))
     advanced=[]
-    m6=record.get('version')=='4.0.17'
-    m5=record.get('version') in ('4.0.16','4.0.16.1','4.0.17')
+    m6=record.get('version') in ('4.0.17','4.0.18')
+    m7=record.get('version')=='4.0.18'
+    m5=record.get('version') in ('4.0.16','4.0.16.1','4.0.17','4.0.18')
     baseline=str(record.get('baseline_version',''))
     capabilities=record.get('baseline_capabilities',{})
-    supports_m6=capabilities.get('m6',False) or m6 and baseline.startswith('4.0.17')
+    supports_m7=capabilities.get('m7',False) or m7 and baseline.startswith('4.0.18')
+    supports_m6=capabilities.get('m6',False) or m6 and baseline.startswith(('4.0.17','4.0.18'))
     supports_m5=capabilities.get('m5',False) or m5 and baseline.startswith('4.0.16')
     supports_m4=capabilities.get('m4',False) or m5 and baseline.startswith(('4.0.15','4.0.16'))
-    supports_m3=capabilities.get('m3',False) or record.get('version') in ('4.0.15','4.0.16','4.0.16.1','4.0.17') and baseline.startswith(('4.0.14','4.0.15','4.0.16'))
+    supports_m3=capabilities.get('m3',False) or record.get('version') in ('4.0.15','4.0.16','4.0.16.1','4.0.17','4.0.18') and baseline.startswith(('4.0.14','4.0.15','4.0.16'))
     supports_m2=capabilities.get('m2',False) or supports_m3 or m5 and baseline.startswith('4.0.13')
     supports_editor=capabilities.get('m1',False) or supports_m2 or m5 and baseline.startswith('4.0.12')
-    if record.get('version') in ('4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and record['status']=='installed' and current_database.is_file():
+    if record.get('version') in ('4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and record['status']=='installed' and current_database.is_file():
         with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
                 for project_id,document in db.execute('SELECT id,document FROM projects'):
                     value=json.loads(document)
-                    if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
+                    if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
                         advanced.append(project_id)
-                    if not supports_m3 and record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
+                    if not supports_m3 and record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
                         advanced.append(project_id)
                     for clip in value.get('clips',{}).values():
                         for variant in clip.get('variants',{}).values():
                             editor=variant.get('editor',{})
                             if m6 and not supports_m6 and variant.get('audio6'):advanced.append(project_id)
                             if m5 and not supports_m5 and variant.get('finishing5'):advanced.append(project_id)
-                            if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and not supports_m4 and any(variant.get(k) for k in ('camera4_report','camera4_controls','camera4_feedback','camera4_enabled','camera4_ratio')):advanced.append(project_id)
+                            if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and not supports_m4 and any(variant.get(k) for k in ('camera4_report','camera4_controls','camera4_feedback','camera4_enabled','camera4_ratio')):advanced.append(project_id)
                             if not (supports_editor or supports_m3) and (editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values())):
                                 advanced.append(project_id)
-            if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
+            if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
                 if db.execute("SELECT 1 FROM m2_imports WHERE status IN ('queued','running') LIMIT 1").fetchone():advanced.append('antrean-impor-M2')
-            if record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
+            if record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
                 if not supports_m3 and db.execute("SELECT 1 FROM jobs WHERE kind='selection_m3' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-seleksi-M3')
-                if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17') and not supports_m4 and db.execute("SELECT 1 FROM jobs WHERE kind='camera_m4' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-kamera-M4')
+                if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and not supports_m4 and db.execute("SELECT 1 FROM jobs WHERE kind='camera_m4' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-kamera-M4')
             if m6 and not supports_m6 and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
                 if db.execute("SELECT 1 FROM jobs WHERE kind='audio_m6' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-M6')
+            if m7 and not supports_m7:
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
+                    for project_id,document in db.execute('SELECT id,document FROM projects'):
+                        value=json.loads(document)
+                        if any(e.get('version')=='4.0.18-m7' for e in value.get('exports',[])):advanced.append(project_id+'-delivery-M7')
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='reviews7'").fetchone() and db.execute('SELECT 1 FROM reviews7 LIMIT 1').fetchone():advanced.append('tautan-review-M7')
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() and db.execute("SELECT 1 FROM jobs WHERE kind='delivery_m7' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-delivery-M7')
             if m5 and not supports_m5:
                 for table in ('assets5','asset_history5','kits5','kit_history5'):
                     if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone() and db.execute('SELECT 1 FROM '+table+' LIMIT 1').fetchone():advanced.append('data-M5-'+table)
@@ -339,11 +350,11 @@ def install(target, package, dry_run=False):
             atomic_copy(dest, safe_path(backup / 'original', row['path']))
         records.append({**row, 'existed': existed, 'original_sha256': checksum(dest) if existed else None})
     baseline_version=None
-    if manifest['version'] in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17'):
+    if manifest['version'] in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18'):
         for node in ast.parse((target/'clipper/pipeline.py').read_text(encoding='utf-8-sig')).body:
             if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='RENDER_VERSION' for t in node.targets) and isinstance(node.value,ast.Constant):baseline_version=node.value.value
     record = {'schema_version': 1, 'version': manifest['version'], 'source_commit': manifest['source_commit'],'baseline_version':baseline_version,
-              'baseline_capabilities':{key:(target/path).is_file() for key,path in {'m1':'clipper/editor_contract.py','m2':'clipper/transcript_service.py','m3':'clipper/selection_service.py','m4':'clipper/camera4_service.py','m5':'clipper/finishing5_service.py','m6':'clipper/audio6_service.py'}.items()} if manifest['version'] in ('4.0.15.1','4.0.16.1','4.0.17') else {},
+              'baseline_capabilities':{key:(target/path).is_file() for key,path in {'m1':'clipper/editor_contract.py','m2':'clipper/transcript_service.py','m3':'clipper/selection_service.py','m4':'clipper/camera4_service.py','m5':'clipper/finishing5_service.py','m6':'clipper/audio6_service.py','m7':'clipper/delivery7.py'}.items()} if manifest['version'] in ('4.0.15.1','4.0.16.1','4.0.17','4.0.18') else {},
               'target': str(target), 'status': 'prepared', 'files': records,
               'database_backup': backup_project_database(target, backup, runtime.get('work_dir'))}
     journal = backup / 'complete-backup.json'; atomic_json(journal, record)

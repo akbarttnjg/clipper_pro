@@ -23,7 +23,7 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def build(output, source_commit, verification=None):
+def _build_current_unsupported(output, source_commit, verification=None):
     if not re.fullmatch(r'[0-9a-f]{40}', source_commit):
         raise ValueError('SHA commit sumber harus lengkap.')
     output = Path(output).resolve()
@@ -128,6 +128,11 @@ def build(output, source_commit, verification=None):
         'milestone': 'M0-M5-repairs', 'installer_revision': 1, 'zip_crc': 'passed'}
     print(json.dumps(result, indent=2))
     return result
+
+
+def build(output,source_commit,verification=None):
+    from tools.frozen_producer import build as pinned
+    return pinned(ROOT,'m7_m5_fixed_producer','build_m0_m5_repair_release.py',output,source_commit,verification)
 
 
 if __name__ == '__main__':

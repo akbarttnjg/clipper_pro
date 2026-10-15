@@ -54,7 +54,7 @@ def package_members(package,doc):
     members=[];seen=set()
     for item in coverage:
         cid,vid=item.get('clip_id'),item.get('variant_id')
-        if vid not in ('portrait','landscape') or (cid,vid) in seen:continue
+        if vid not in ('portrait','landscape','square','feed','custom') or (cid,vid) in seen:continue
         seen.add((cid,vid));reference=item.get('reference')
         clip=doc.get('clips',{}).get(cid,{})
         current=clip.get('variants',{}).get(vid,{}).get('result') or {}
@@ -109,7 +109,7 @@ def export_options(variant):
             entry['baked_layers'] += ['source_time_edits','source_keyframes','camera_switches']
             entry['limitations'] += ['Clock asli dan provenance disimpan; time effects/keyframe/kamera menyatu dalam source layer.']
         rows.append({'id':mode,**copy.deepcopy(entry),'available':not reasons,'reasons':reasons,
-            'native_status':'not_tested','target_versions':{'capcut':'9.5.0','resolve':'21'},
+            'native_status':'not_tested','target_versions':{'capcut':'4.7.0','resolve':'18.6.6'},
             'architectural_regression_targets':{'capcut':'4.7.0','resolve':'18.6.6'}})
     return rows
 
@@ -241,7 +241,8 @@ class Workspace:
             if package.get('export_mode')=='preserved':continue
             members=package_members(package,doc)
             for member in members:
-                for editor,version in (('capcut','9.5.0'),('resolve','21')):
+                for editor,legacy_version in (('capcut','9.5.0'),('resolve','21')):
+                    version=package.get('target_versions',{}).get(editor,legacy_version)
                     match=next((e for e in reversed(evidence) if e['package_content_id']==package.get('package_content_id')
                         and e['editor']==editor and e['variant_id']==member['variant_id']
                         and (e.get('clip_id')==member['clip_id'] or len(members)==1 and 'clip_id' not in e and package.get('variant_id')!='both')),None)
@@ -255,7 +256,7 @@ class Workspace:
                     rows.append({**member,'package_content_id':package.get('package_content_id'),
                         'editor':editor,'target_version':version,'status':status,'evidence':match})
         for variant in ('portrait','landscape'):
-            for editor,version in (('capcut','9.5.0'),('resolve','21')):
+            for editor,version in (('capcut','4.7.0'),('resolve','18.6.6')):
                 if not any(r['variant_id']==variant and r['editor']==editor for r in rows):
                     rows.append({'package_content_id':None,'variant_id':variant,'editor':editor,
                         'target_version':version,'status':'not_tested','evidence':None})
@@ -277,8 +278,8 @@ class Workspace:
         if editor_state.get('construction_status')!='generated' or editor_state.get('structural_status')!='passed':
             raise ValueError('Pembuatan/struktur paket editor ini belum lolos; perbaiki paket dahulu.')
         version=str(data.get('version','')).strip()
-        required='9.5.0' if data['editor']=='capcut' else '21'
-        if not (version==required or data['editor']=='resolve' and version.startswith('21.')):raise ValueError('Gunakan versi target CapCut 9.5.0 atau Resolve 21.x.')
+        required=package.get('target_versions',{}).get(data['editor'],'9.5.0' if data['editor']=='capcut' else '21')
+        if not (version==required or required=='21' and data['editor']=='resolve' and version.startswith('21.')):raise ValueError('Gunakan versi target paket: '+required)
         flags={k:data.get(k) for k in ('opened','text_edited','saved','rendered','compared')}
         if any(type(v) is not bool for v in flags.values()):raise ValueError('Lengkapi lima langkah bukti impor.')
         from .evaluation6 import media_info

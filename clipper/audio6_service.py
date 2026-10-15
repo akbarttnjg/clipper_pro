@@ -20,7 +20,7 @@ def configure(service,doc,cid,vid,cfg):
             row['asset']=a
         resolved.append(row)
     return replace(cfg,audio_normalize=values['normalize'],audio_target_lufs=values['target_lufs'],audio_peak_db=values['peak_db'],join_fade_ms=values['smooth_ms'],
-        audio6={'enabled':True,'settings':values,'tracks':resolved,'track_state':{k:v['enabled'] for k,v in state.items()},'revision':saved.get('revision',0)})
+        audio6={'enabled':True,'settings':values,'tracks':resolved,'track_state':{k:v['enabled'] for k,v in state.items()},'revision':saved.get('revision',0),'source_speech':copy.deepcopy([w for w in service.transcript(doc,cid,vid)['words'] if w['end']>doc['clips'][cid]['start'] and w['start']<doc['clips'][cid]['end']]) if doc.get('transcript_id') else []})
 
 def affected_tracks(service,doc,cid,vid,op):
     kind=op['op']
@@ -35,10 +35,13 @@ def affected_tracks(service,doc,cid,vid,op):
     if changed&{'normalize','target_lufs','peak_db','limiter'}:out|={'voice','music','sfx'}
     if changed&{'ducking','duck_db','duck_attack_ms','duck_release_ms','separation_background_db'}:out.add('music')
     if 'sfx_enabled' in changed:out.add('sfx')
+    if changed&{'separation','model_directory','model_name'}:out|={'voice','music'}
     if changed-set({'ducking','duck_db','duck_attack_ms','duck_release_ms','separation_background_db','sfx_enabled','export_stems','target_lufs','peak_db','normalize','limiter'}):out.add('voice')
     for role,owner in [('music','music'),('sfx','sfx'),('voiceover','voice'),('reaction','voice'),('dubbing','voice')]:
         strip=lambda state:[{k:v for k,v in r.items() if k!='asset'} for r in state.get('tracks',[]) if r['role']==role]
-        if strip(a)!=strip(b):out.add(owner)
+        if strip(a)!=strip(b):
+            out.add(owner)
+            if owner=='voice' and (effective(before)['ducking'] or effective(after)['ducking']):out.add('music')
     return out
 
 def apply_command(service,doc,cid,vid,op,revision):

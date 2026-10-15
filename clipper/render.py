@@ -181,6 +181,9 @@ def video(source, plan, cfg, ass, target, mix, on_progress=None, *, mode='final'
     if finishing:
         idx=2+sum(extra_inputs[i]=='-i' for i in range(len(extra_inputs)))
         extra_inputs.extend(['-i',finishing['path']]);graph.append(f'[{previous}][{idx}:v]overlay=0:0:eof_action=pass:repeatlast=0[finished5]');previous='finished5'
+    covers=caption_free_covers(plan)
+    if covers:
+        graph.append(f'[{previous}]'+','.join(covers)+'[covered7]');previous='covered7'
     captions=plan.get('caption_renderer',{})
     if captions.get('engine') in ('remotion','raster') and captions.get('path'):
         idx=2+sum(extra_inputs[i]=='-i' for i in range(len(extra_inputs)))
@@ -242,3 +245,15 @@ def broll_plates(plan,cfg,folder):
                     row.update(status='skipped',reason='Konversi aset gagal; sumber asli dipakai')
             plan['warnings'].append('Aset B-roll gagal disiapkan; bagian itu memakai sumber asli.')
     plan['broll']=kept
+
+
+def caption_free_covers(plan):
+    """Preserve reviewed burned-caption covers in a caption-free M7 source plate."""
+    if not plan.get('_m7_caption_free'):return []
+    style=plan.get('captions',{}).get('effective_style',{})
+    if style.get('source_caption_mode') not in ('cover','reconstruct'):return []
+    out=[]
+    for row in style.get('source_captions',[]):
+        x,y,w,h=[row['rect'][i]*(plan['width'] if i%2==0 else plan['height'])/100 for i in range(4)]
+        out.append(f"drawbox=x={x:.6f}:y={y:.6f}:w={w:.6f}:h={h:.6f}:color=0x0e1218:t=fill:enable='gte(t,{row['start']:.8f})*lt(t,{row['end']:.8f})'")
+    return out

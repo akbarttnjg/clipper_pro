@@ -1,0 +1,114 @@
+{
+  "version": "4.0.18-m7",
+  "architecture_sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+  "architecture_pages": [
+    53,
+    64,
+    65,
+    104,
+    105
+  ],
+  "gate_g7": "pending_target_editor_acceptance",
+  "gate_g6": "pending_original_speech_and_models",
+  "m6_audit_repairs": [
+    "M6-A01",
+    "M6-A02",
+    "M6-A03",
+    "M6-A04",
+    "M6-A05",
+    "M6-A06"
+  ],
+  "requirements": [
+    {
+      "id": "EX01",
+      "package": "M7.1",
+      "requirement": "Final MP4 per ratio, technical QC and full decode",
+      "implementation_status": "implemented",
+      "regression": "clipper/tests/test_m7_media.py::test_real_four_final_coverage_full_decode_codec_alpha_stems_and_revision"
+    },
+    {
+      "id": "EX02",
+      "package": "M7.2",
+      "requirement": "Selected clip × ratio package and merged timelines",
+      "implementation_status": "implemented",
+      "regression": "clipper/tests/test_m7_media.py::test_real_four_final_coverage_full_decode_codec_alpha_stems_and_revision"
+    },
+    {
+      "id": "EX03",
+      "package": "M7.1",
+      "requirement": "SRT VTT ASS TXT JSON at same caption revision",
+      "implementation_status": "implemented",
+      "regression": "clipper/tests/test_m7_contract.py::test_all_sidecars_share_revision_text_language_and_millisecond_bounds"
+    },
+    {
+      "id": "EX04",
+      "package": "M7.3",
+      "requirement": "CapCut Desktop 4.7.0 native draft and regression",
+      "implementation_status": "implemented_native_acceptance_pending",
+      "regression": "clipper/tests/test_m7_media.py::test_native_candidates_use_one_exact_final_master_never_double_premaster"
+    },
+    {
+      "id": "EX05",
+      "package": "M7.4",
+      "requirement": "Resolve Free 18.6.6 timeline and text capability",
+      "implementation_status": "timeline_implemented_text_font_backlog",
+      "regression": "clipper/tests/test_m7_media.py::test_actual_extracted_package_moves_twice_checks_all_members_and_native_paths"
+    },
+    {
+      "id": "EX06",
+      "package": "M7.5",
+      "requirement": "Premiere FCP7 XML, Final Cut FCPXML, OTIO exchange",
+      "implementation_status": "implemented_native_acceptance_pending",
+      "regression": "clipper/tests/test_m7_contract.py::test_multiclip_exchange_roundtrip_preserves_order_frames_and_references"
+    },
+    {
+      "id": "EX07",
+      "package": "M7.3-M7.5",
+      "requirement": "Per editor/version/layer editable/baked/unsupported matrix",
+      "implementation_status": "implemented_candidates_explicit",
+      "regression": "clipper/tests/test_m7_contract.py::test_choices_are_isolated_and_no_native_acceptance_is_implied"
+    },
+    {
+      "id": "EX08",
+      "package": "M7.2",
+      "requirement": "Portable media/font/license and moved-folder relink",
+      "implementation_status": "implemented",
+      "regression": "clipper/tests/test_m7_media.py::test_actual_extracted_package_moves_twice_checks_all_members_and_native_paths"
+    },
+    {
+      "id": "EX09",
+      "package": "M7.1",
+      "requirement": "Resolution FPS codec quality profile and actual receipt",
+      "implementation_status": "implemented_CPU_delivery_profiles",
+      "regression": "clipper/tests/test_m7_media.py::test_explicit_delivery_profiles_encode_measured_H264_AAC"
+    },
+    {
+      "id": "EX10",
+      "package": "M7.6",
+      "requirement": "Clean video alpha caption overlay WAV stems and codec gates",
+      "implementation_status": "implemented",
+      "regression": "clipper/tests/test_m7_media.py::test_real_four_final_coverage_full_decode_codec_alpha_stems_and_revision"
+    },
+    {
+      "id": "EX11",
+      "package": "M7.6",
+      "requirement": "Revision-bound cover/title/description/tags/caption publish kit",
+      "implementation_status": "implemented_local_manual_publication",
+      "regression": "clipper/tests/test_m7_media.py::test_real_four_final_coverage_full_decode_codec_alpha_stems_and_revision"
+    },
+    {
+      "id": "EX12",
+      "package": "M7.6",
+      "requirement": "Review/download permissions expiry revocation fixed snapshot",
+      "implementation_status": "implemented_local_service",
+      "regression": "clipper/tests/test_m7_service.py::test_review_permission_expiry_revocation_hash_binding_and_no_token_storage"
+    },
+    {
+      "id": "EX13",
+      "package": "M7.1",
+      "requirement": "Atomic complete final/plan/QC/manifest publication",
+      "implementation_status": "implemented",
+      "regression": "clipper/tests/test_m7_service.py::test_change_during_delivery_never_replaces_previous_export"
+    }
+  ]
+}

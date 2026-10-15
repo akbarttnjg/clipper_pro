@@ -662,6 +662,11 @@ class StudioService:
     def enqueue(self,project_id,kind,clip_id=None,variant_id='portrait',expected_revision=None,options=None):
         doc=self.store.get(project_id)
         if expected_revision is not None and expected_revision!=doc['revision']:raise Conflict(doc['revision'])
+        if kind=='delivery_m7':
+            from .delivery7_contract import selection
+            state=selection(self,doc,options,fresh=True,require_ready=True)
+            return self.queue.enqueue_many(project_id,[(kind,{'clip_id':None,'variant_id':'both'},
+                {'dependency':state['dependency'],'options':state['options'],'input_revision':doc['revision']})],doc['revision'])[0]
         if kind=='export_project':
             from .batch7 import snapshot
             mode=(options or {}).get('mode','hybrid')

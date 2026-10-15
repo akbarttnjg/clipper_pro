@@ -19,6 +19,8 @@ def draw(source,plan,cfg,ass,target,mix,on_progress=None):
     finishing=plan.get('finishing5',{}).get('overlay')
     if finishing:
         extra.extend(['-i',finishing['path']]);graph+='[2:v]overlay=0:0:eof_action=pass:repeatlast=0[finished5];[finished5]';previous='finished5'
+    covers=render.caption_free_covers(plan)
+    if covers:graph+=','.join(covers)+'[covered7];[covered7]'
     captions=plan.get('caption_renderer',{})
     if captions.get('engine')=='raster':
         idx=2+len(extra)//2;extra.extend(['-i',captions['path']]);graph+=f'[{idx}:v]overlay=0:0:eof_action=pass:repeatlast=0[raster5];[raster5]';ass=None

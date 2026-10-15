@@ -21,6 +21,8 @@ def guarded(fn):
 
 def create_router(service):
     router=APIRouter(prefix='/api/studio',tags=['studio4'])
+    from .api_delivery7 import router as delivery_router
+    router.include_router(delivery_router(service,guarded))
     from .api_audio6 import router as audio_router
     router.include_router(audio_router(service,guarded))
     from .api_finishing5 import router as finishing_router

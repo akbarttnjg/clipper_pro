@@ -35,7 +35,8 @@ def source_stem(source,plan,cfg,folder):
     from .render import voice_stem
     from .audio6_contract import asset_signature
     s=effective(cfg);folder=Path(folder)/'audio6';folder.mkdir(parents=True,exist_ok=True)
-    signature=fingerprint([VERSION,content_id(source,fresh=True),plan['spans'],plan.get('editor',{}).get('clock'),s,asset_signature(cfg.audio6,fresh=True)])
+    from .audio6_plan import source_words,logical_spans
+    signature=fingerprint([source_words(plan,cfg),VERSION,content_id(source,fresh=True),plan['spans'],plan.get('editor',{}).get('clock'),s,asset_signature(cfg.audio6,fresh=True)])
     cache=read_json(folder/'source-receipt.json',{})
     if cache.get('signature')==signature and all(Path(p).is_file() and content_id(p,fresh=True)==digest for p,digest in cache.get('members',{}).items()) and cache.get('members'):
         plan['audio6_source']=cache['source'];return cache['source']['processed']
@@ -65,8 +66,8 @@ def source_stem(source,plan,cfg,folder):
         current=write(folder/'source-dereverb.wav',wpe(decode(current,seconds=plan['duration']),s['dereverb_strength']))
         source_info['dereverb']={'backend':'local delayed linear prediction WPE','strength':s['dereverb_strength'],'neural_model':None,'listening_required':True}
     # Microfades touch only a measured gap beside a cut, never a word body.
-    joins=[];fade_filters=[];words=plan.get('words',[]);smooth=s['smooth_ms']/1000
-    for span in plan['spans']:
+    joins=[];fade_filters=[];words=source_words(plan,cfg);smooth=s['smooth_ms']/1000
+    for span in logical_spans(plan):
         a,b=span['start'],span['end'];inside=[w for w in words if w['end']>a and w['start']<b]
         left=min(smooth,max(0.,min((w['start'] for w in inside),default=b)-a))
         right=min(smooth,max(0.,b-max((w['end'] for w in inside),default=a)))
@@ -94,20 +95,21 @@ def source_stem(source,plan,cfg,folder):
     plan['audio6_source']=source_info;return current
 
 def _track(row,plan,folder):
-    from .audio6_dsp import decode,write,loop,fixed,fade
+    from .audio6_dsp import decode,write,loop_slice,fixed,event_fade
     import numpy as np
     info=row['asset'];duration=info['metadata']['duration'];start=row['asset_start'];count=round(row['asset_seconds']*RATE)
     if row['loop']:
         origin=row.get('original_asset_start',0.);available=duration-origin
         if available<=.02:raise ValueError('Awal musik berada di luar aset')
         samples=decode(info['path'],start=origin,seconds=min(available,MAX_SECONDS))
-        period=max(1,len(samples)-min(round(row['loop_crossfade']*RATE),len(samples)//4))
-        offset=round(max(0.,start-origin)*RATE)%period
-        samples=loop(samples,count+offset,row['loop_crossfade'])[offset:offset+count]
+        offset=round(max(0.,start-origin)*RATE)
+        samples=loop_slice(samples,offset,count,row['loop_crossfade'])
     else:
         available=duration-start
         if available<=0:raise ValueError('Awal track '+row['id']+' di luar aset')
+        if available+1/RATE<row['asset_seconds']:raise ValueError('Aset track '+row['id']+' terlalu pendek untuk interval yang diminta; tinjau batas sebelum mengganti sumber')
         samples=decode(info['path'],start=start,seconds=min(available,row['asset_seconds'],MAX_SECONDS))
+        if len(samples)+1<count:raise ValueError('Coverage audio track '+row['id']+' lebih pendek dari interval; suara sumber tidak diganti')
         samples=fixed(samples,count)
     if row['reverse']:samples=samples[::-1].copy()
     raw=write(folder/(row['event_id']+'-raw.wav'),samples)
@@ -115,7 +117,7 @@ def _track(row,plan,folder):
         raw=_filter(raw,folder/(row['event_id']+'-speed.wav'),[_atempo(row['rate']),'apad',f"atrim=duration={row['end']-row['start']:.9f}"],row['end']-row['start'])
         samples=decode(raw,seconds=row['end']-row['start'])
     samples=fixed(samples,row['end_sample']-row['start_sample'])
-    samples=fade(samples,min(row['fade_in'],len(samples)/RATE/2),min(row['fade_out'],len(samples)/RATE/2))*10**(row['gain_db']/20)
+    samples=event_fade(samples,row)*10**(row['gain_db']/20)
     event=write(folder/(row['event_id']+'.wav'),samples)
     # adelay with the S suffix is sample based, not millisecond rounding.
     return run_float(['-i',event,'-af',f"adelay={row['start_sample']}S:all=1,apad,atrim=end_sample={round(plan['duration']*RATE)}"],folder/(row['event_id']+'-aligned.wav'))

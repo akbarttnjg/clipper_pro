@@ -1,0 +1,23 @@
+{
+  "source_commit": "9681af5fdb4529e7da96212fbdc6bd48ef905dd4",
+  "sha256": "116b87f2432015d52d401aae80ec13f33f2b08d39e9f65f25cb9f09e4876bfbe",
+  "files": 436,
+  "external_files": {
+    "docs/releases/m0_m2_aud06_fixture.zip": "8bdfa82844780efb7bf6cbfa3e07c2d0ba1d533f29ce820ec476b4cddcd067ef",
+    "docs/releases/m0_m2_repair_m2_fixture.zip": "e1a3276da39ac66c9c05a1e99e7d566c87f4a6d9fa11343a6306d05b1865162d",
+    "docs/releases/m0_m4_repair_m4_fixture.zip": "70bdf9a25f2b549ed065ae40767c53b79306022da84b8e5c8333d46e10328bf7",
+    "docs/releases/m0_m5_repair_m4_fixed.zip": "02cce3490572e80583a4141ab131526f3ddea6dfd8d7765bf94823b76a3f23cf",
+    "docs/releases/m0_m5_repair_m5.zip": "be334c13d04060f2285cdb139826f079ab18d8cc0d09312f5db02331058f2a02",
+    "docs/releases/m0_producer_fixture.zip": "900f10c893000aae7dcd4347eac468442cb86687dda4469754dc89711930d499",
+    "docs/releases/m1_fixture.zip": "9e073b739cb7779244c8ee2a797ef4311deed481a05a41e34b6e4257b8141c34",
+    "docs/releases/m1_initial_fixture.zip": "d738219513e73a6212de7a80268983c497c7334453c432ad012701f92c47e141",
+    "docs/releases/m2_m0_fixture.zip": "b2813575bcbaf6ccb795ef50e9f78c1b58c6bde51e0291151671a8a8447a1306",
+    "docs/releases/m2_m1_fixture.zip": "92314f0cb620da28106a48cfe9773cff817583e35309ff6c0b76f8968c1cb65b",
+    "docs/releases/m3_m2_fixture.zip": "26ab0971606f5bda37cfaa59dd8071736dcb1692516aa5e987a4bf78571b9fbd",
+    "docs/releases/m4_m3_producer.zip": "83d2f052c63aebccf79565aa981b3c535605c9081b76567df9937a819d4fa79d",
+    "docs/releases/m5_m4_producer.zip": "4a06542fe2ed27e07fe7ae00589da8cc37f07278f847aae95db25def8deae6bc",
+    "docs/releases/typography10_fixture.zip": "31af56d7ff6ec9fa4997e4067af854630e0344612e393625fce1ab0629d1a576",
+    "docs/releases/typography9_fixture.zip": "02a523ff9193d0ea24e1dc2a6c0ab00fbec9b4d8076f5c8173e6a254e78c5be7"
+  },
+  "scope": "Frozen historical producer; runtime code/fonts plus verified external archives; private environment and media excluded"
+}

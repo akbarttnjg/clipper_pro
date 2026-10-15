@@ -1,3 +1,12 @@
+## Upgrade 4.0.18 — perbaikan M6 + M7
+
+Enam temuan audit M6 diperbaiki; M7 menambahkan delivery atomik lintas rasio,
+lima sidecar, media/font portabel, kandidat editor CapCut 4.7.0 / Resolve 18.6.6,
+XML/FCPXML/OTIO, clean/alpha/stem, publish kit dan tautan review lokal dengan
+izin/expiry. G6/G7 native/human acceptance tetap pending; EX05 text/font backlog.
+Baca [panduan pemasangan](docs/UPGRADE_4_0_18_M6_M7.md),
+[laporan](docs/LAPORAN_M7.md) dan [trace EX01–13](docs/M7_REQUIREMENTS.json).
+
 # Clipper Pro 4.0.17 · M6 audio, musik dan mix
 
 M6 melanjutkan perbaikan M0–M5 4.0.16.1. Lima paket audio mencakup master loudness/limiter, restoration dan Demucs lokal opsional, musik/ducking, track SFX/voiceover/dubbing, serta cleanup yang ditinjau dan audiogram. Baca [panduan M6](docs/UPGRADE_4_0_17_M6.md), [laporan M6](docs/LAPORAN_M6.md) dan [AU01–AU15](docs/M6_REQUIREMENTS.json). G6 uji dengar video asli dan model/native target masih pending.
