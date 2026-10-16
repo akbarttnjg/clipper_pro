@@ -55,6 +55,16 @@ def apply_corrections(words,document,clip_id=None,variant_id=None):
 
 class StudioService:
     @cached_property
+    def lab(self):
+        from .m9 import Lab
+        return Lab(self)
+
+    @cached_property
+    def integrations(self):
+        from .m8 import M8
+        return M8(self)
+
+    @cached_property
     def imports(self):
         from .source_imports import SourceImports
         return SourceImports(self)
@@ -82,7 +92,7 @@ class StudioService:
         self.store=ProjectStore(db_path or self.work/'studio4.sqlite3')
         with self.store.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS files(id TEXT PRIMARY KEY,project_id TEXT,path TEXT,UNIQUE(project_id,path))')
-        self.queue=JobQueue(self.store,self.work,resource_lock,autostart=autostart,recover=recover)
+        self.queue=JobQueue(self.store,self.work,resource_lock,autostart=autostart,recover=recover,installation_root=self.root)
         def maintenance():
             from .studio_storage import enforce_limit
             return enforce_limit(self)
@@ -432,6 +442,9 @@ class StudioService:
             preview_only=preview_only)
 
     def _apply_changes(self,doc,request):
+        if request.get('source_guard'):
+            from .source_guard import verify
+            verify(self,request['source_guard'],doc,request['expected_revision'])
         cid=request.get("clip_id");vid=request.get("variant_id","portrait")
         operations=request["operations"]
         if cid:self.variant(doc,cid,vid)

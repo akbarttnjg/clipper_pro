@@ -24,7 +24,7 @@ class M5InstallerCase(unittest.TestCase):
         for name,data in self.private.items():p=self.target/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
         self.probe=patch.object(installer,'probe_runtime',return_value={'python':'explicit native-runtime protocol double','work_dir':str(self.work)});self.probe.start();self.stop=patch.object(installer,'require_stopped',return_value=None);self.stop.start();self.output=contextlib.redirect_stdout(io.StringIO());self.output.__enter__()
     def tearDown(self):self.output.__exit__(None,None,None);self.probe.stop();self.stop.stop();self.temp.cleanup()
-    def tree(self):return {str(p.relative_to(self.target)):hashlib.sha256(p.read_bytes()).hexdigest() for p in self.target.rglob('*') if p.is_file() and 'steezy_backups' not in p.parts and 'work' not in p.parts}
+    def tree(self):return {str(p.relative_to(self.target)):hashlib.sha256(p.read_bytes()).hexdigest() for p in self.target.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and 'steezy_backups' not in p.parts and 'work' not in p.parts}
     def test_M2_M3_M4_baselines_preflight_without_mutating(self):
         before=self.tree()
         for version in ('m2','m3','m4'):

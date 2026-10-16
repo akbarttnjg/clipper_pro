@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "version": "4.0.21-m8-m9",
+  "milestone": "M9",
+  "release_scope": "Continuation: reviewed single-voice dubbing from approved M2 tracks, explicit A/B acceptance and scoped creative context. Full M9 acceptance remains OPEN.",
+  "architecture": {
+    "document": "Arsitektur_Clipper_Pro_Terpadu_120_Halaman.pdf",
+    "sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+    "pages": [
+      55,
+      68,
+      69,
+      70,
+      99,
+      100,
+      102,
+      103,
+      104,
+      109,
+      110
+    ]
+  },
+  "packages": [
+    "M9.R1",
+    "M9.R2",
+    "M9.R3",
+    "M9.G1",
+    "M9.G2",
+    "M9.F1"
+  ],
+  "baseline_github_commit": "f6f1f6a11631f800c1749f8cb6fbcae6dfff384d",
+  "counts": {
+    "implemented_conditional": 9,
+    "partial": 19,
+    "implemented_local": 7,
+    "blocked": 10
+  },
+  "requirements": [
+    {
+      "id": "RC01",
+      "name": "Screen, webcam dan microphone capture",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Browser MediaRecorder layar/kamera/mikrofon/audio sistem; izin eksplisit, pilihan perangkat. Backend dan adapter JS diuji; capture perangkat/native Windows belum diuji."
+    },
+    {
+      "id": "RC02",
+      "name": "Remote room dan browser guest",
+      "status": "partial",
+      "scope_and_limit": "Room capability bertoken hash/expiry, unggahan progresif tamu dan origin/Host guard. Belum ada percakapan WebRTC, monitor langsung, STUN/TURN atau uji WAN."
+    },
+    {
+      "id": "RC03",
+      "name": "Track terpisah setiap peserta",
+      "status": "implemented_local",
+      "scope_and_limit": "Track per peserta dipertahankan dalam arsip, dengan SHA, jam dan offset. Program dibuat sebagai turunan; tidak menggabungkan original permanen."
+    },
+    {
+      "id": "RC04",
+      "name": "Upload bertahap dan recovery record",
+      "status": "implemented_conditional",
+      "scope_and_limit": "IndexedDB sebelum upload, retry SHA/sequence idempotent, fsync sebelum ACK dan pemulihan prefix eksplisit. Backend restart dan adapter offline diuji; browser quota/perangkat/jaringan nyata masih perlu uji."
+    },
+    {
+      "id": "RC05",
+      "name": "Multistream dan live broadcast",
+      "status": "blocked",
+      "scope_and_limit": "Multistream, RTMP/RTMPS dan probe on-air per platform belum diimplementasikan. Installer tidak menyiarkan apa pun."
+    },
+    {
+      "id": "RC06",
+      "name": "Live clipping dan buffer",
+      "status": "partial",
+      "scope_and_limit": "Clipping rentang rekaman yang sudah final memetakan source-time; belum clipping buffer sewaktu capture/live berlangsung."
+    },
+    {
+      "id": "RC07",
+      "name": "Webinar, slides dan layout studio",
+      "status": "partial",
+      "scope_and_limit": "Layout layar/slide host + kamera pada panel terpisah menjaga seluruh frame materi dengan padding. Belum webinar interaktif, pengarah kamera tamu, atau template studio lengkap."
+    },
+    {
+      "id": "RC08",
+      "name": "Guest producer dan backstage",
+      "status": "partial",
+      "scope_and_limit": "Interval onstage eksplisit mengatur audio tamu dalam program; uji FFT membuktikan backstage tidak ikut. Original terpisah tetap berisi backstage untuk host. Belum producer monitoring/siaran langsung."
+    },
+    {
+      "id": "RC09",
+      "name": "Recording ke editor dan clips",
+      "status": "implemented_local",
+      "scope_and_limit": "Finalisasi dalam antrean serial menghasilkan proyek sumber baru otomatis, identitas/hash/offset/lineage tersimpan; analisis/transkripsi di editor dijalankan eksplisit."
+    },
+    {
+      "id": "RC10",
+      "name": "Podcast audio publishing pack",
+      "status": "implemented_local",
+      "scope_and_limit": "ZIP WAV 48 kHz, bab, notes, cover/placeholder, stem bila tersedia, SHA dan revisi episode. Paket lokal untuk host, bukan unggahan podcast otomatis."
+    },
+    {
+      "id": "GN01",
+      "name": "AI co-editor lewat instruksi",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Ollama loopback mengusulkan operasi terbatas; citations word-ID, make_draft/diff dan revision guard. Tidak auto-apply. Protokol nyata HTTP diuji dengan fixture, model lokal asli belum diuji. Konteks kini dapat dipilih per klip/rentang sebelum batas 30.000 unit/40.000 karakter; usulan co-editor terikat klip/rasio asal."
+    },
+    {
+      "id": "GN02",
+      "name": "Script dan storyboard generator",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Skrip/storyboard tersimpan terpisah dan dapat dibuat lewat Ollama lokal; dilabeli sintetis/draf, bukan kutipan sumber. Acceptance kualitas model terbuka. Konteks kini dapat dipilih per klip/rentang sebelum batas 30.000 unit/40.000 karakter; usulan co-editor terikat klip/rasio asal."
+    },
+    {
+      "id": "GN03",
+      "name": "Text-to-speech multilingual",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Adapter Piper CLI dengan pin executable/model/config SHA, bahasa dan persetujuan hash teks; WAV diperiksa/decode. CLI diuji dengan tone fixture; suara neural multibahasa asli belum diuji."
+    },
+    {
+      "id": "GN04",
+      "name": "Voice clone milik pengguna",
+      "status": "partial",
+      "scope_and_limit": "Profil suara menyimpan izin own/authorized/licensed, bahasa, lisensi dan provenance sampel. Pelatihan/inference voice cloning belum diimplementasikan."
+    },
+    {
+      "id": "GN05",
+      "name": "Dubbing dan terjemahan suara",
+      "status": "partial",
+      "scope_and_limit": "Dubbing satu suara dari track terjemahan M2 yang disetujui, review setiap cue/angka/nama/negasi/glossary, SHA suara/sumber, timing per cue tanpa pemotongan ekor, stem A/B dan persetujuan dengar sebelum proyek baru. CLI dan PCM fixture diuji; kualitas bahasa/model neural asli, multi-voice, lipsync dan pelestarian latar belum diterima."
+    },
+    {
+      "id": "GN06",
+      "name": "Lip-sync terjemahan",
+      "status": "blocked",
+      "scope_and_limit": "Adapter lip-sync dan face quality gate belum tersedia; hasil luar dapat diimpor sebagai aset sintetis dengan izin/provenance."
+    },
+    {
+      "id": "GN07",
+      "name": "Perbaikan ucapan dengan teks",
+      "status": "partial",
+      "scope_and_limit": "Hasil speech repair luar dapat diimpor terpisah dengan provenance; belum regenerasi ucapan berbasis teks/AB repair otomatis di Clipper."
+    },
+    {
+      "id": "GN08",
+      "name": "Eye-contact correction",
+      "status": "blocked",
+      "scope_and_limit": "Eye-contact/gaze inference dan face/materi before-after belum diimplementasikan."
+    },
+    {
+      "id": "GN09",
+      "name": "Avatar dan presenter AI",
+      "status": "blocked",
+      "scope_and_limit": "Avatar/presenter inference belum diimplementasikan; aset luar berizin dapat diimpor dengan identitas sintetis."
+    },
+    {
+      "id": "GN10",
+      "name": "UGC dan faceless short generator",
+      "status": "partial",
+      "scope_and_limit": "Skrip, narasi dan aset dapat dibuat/diimpor lalu dipakai melalui workflow inti. Belum orkestrator UGC/faceless satu klik dan template lengkap."
+    },
+    {
+      "id": "GN11",
+      "name": "Text/image-to-image assets",
+      "status": "implemented_conditional",
+      "scope_and_limit": "ComfyUI text-to-image lokal, core-node allowlist, SHA workflow dan checkpoint yang dinyatakan operator (hash bobot server belum terattestasi), prompt/seed/lisensi, ukuran maksimal 768 dan batch 1. Tidak image-to-image. Protokol fixture diuji; inference model asli/VRAM aktual belum diuji."
+    },
+    {
+      "id": "GN12",
+      "name": "Text/image-to-video dan video-to-video",
+      "status": "blocked",
+      "scope_and_limit": "Text/image-to-video dan video-to-video adapter/budget quality belum tersedia; hanya impor hasil luar berlabel."
+    },
+    {
+      "id": "GN13",
+      "name": "Extend video dan generative fill",
+      "status": "blocked",
+      "scope_and_limit": "Extend/generative fill inference belum tersedia; hasil luar dipisah dan tidak dianggap bukti sumber asli."
+    },
+    {
+      "id": "GN14",
+      "name": "Object remove, replace dan add",
+      "status": "blocked",
+      "scope_and_limit": "Object removal/replacement/addition generatif belum tersedia; mask blur biasa merupakan kemampuan FX10 yang berbeda."
+    },
+    {
+      "id": "GN15",
+      "name": "Musik dan SFX generatif",
+      "status": "blocked",
+      "scope_and_limit": "Generator musik/SFX belum diimplementasikan; aset luar yang diizinkan dapat diimpor dan mix memakai M6."
+    },
+    {
+      "id": "GN16",
+      "name": "Ringkasan, show notes, blog dan copy",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Ringkasan, notes, blog dan copy terkait segmen/kata sumber, angka terlihat dan klaim baru wajib review. Ollama lokal asli belum diuji. Konteks kini dapat dipilih per klip/rentang sebelum batas 30.000 unit/40.000 karakter; usulan co-editor terikat klip/rasio asal."
+    },
+    {
+      "id": "GN17",
+      "name": "Image animation dan template-driven video",
+      "status": "blocked",
+      "scope_and_limit": "Image animation/motion generation belum tersedia; default no-pan tetap berlaku."
+    },
+    {
+      "id": "FX01",
+      "name": "Punch-in dan punch-out",
+      "status": "partial",
+      "scope_and_limit": "Reuse zoom/kamera inti M4 dan review materi; penjadwalan punch otomatis M9 dari cue editorial belum ditambahkan."
+    },
+    {
+      "id": "FX02",
+      "name": "Pan dan Ken Burns opt-in",
+      "status": "partial",
+      "scope_and_limit": "No-pan ditolak pada resep M9 dari semua input. Pan/Ken Burns opt-in belum tersedia pada resep turunan ini."
+    },
+    {
+      "id": "FX03",
+      "name": "Transisi cut, fade, blur dan glitch",
+      "status": "partial",
+      "scope_and_limit": "Cut sumber dan fade in/out berparameter durasi tersedia; blur/glitch transition lengkap dengan alasan dan budget belum tersedia."
+    },
+    {
+      "id": "FX04",
+      "name": "Hook dan teaser opsional",
+      "status": "partial",
+      "scope_and_limit": "Hook tetap off dan tidak disisipkan ke ucapan. Review/editor inti dipertahankan; generator teaser baru belum tersedia."
+    },
+    {
+      "id": "FX05",
+      "name": "Micro-hook dan montage intro",
+      "status": "partial",
+      "scope_and_limit": "Timeline manual inti menyimpan provenance dan dapat dibatalkan; belum generator micro-hook/montage otomatis."
+    },
+    {
+      "id": "FX06",
+      "name": "Kinetic typography",
+      "status": "implemented_local",
+      "scope_and_limit": "Reuse kinetic typography dan aturan frasa/angka/negasi M5 yang sudah diuji regresi; render pipeline inti tetap 4.0.18-m7."
+    },
+    {
+      "id": "FX07",
+      "name": "Animated charts dan diagram",
+      "status": "partial",
+      "scope_and_limit": "Reuse ilustrasi/list/diagram inti M5; animated chart dari tabel data persis dan count gate lengkap belum ditambahkan."
+    },
+    {
+      "id": "FX08",
+      "name": "B-roll, split dan crossfade",
+      "status": "implemented_local",
+      "scope_and_limit": "Reuse B-roll/split/crossfade dan ranker failure inti M4/M5; tidak mengubah pipeline final yang telah diaudit."
+    },
+    {
+      "id": "FX09",
+      "name": "Chroma key dan background replacement",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Chroma key dengan similarity/blend dan latar warna pilihan; diuji pixel foreground/background/overlay pada media buatan. Motion/tepi rambut video nyata perlu review."
+    },
+    {
+      "id": "FX10",
+      "name": "Mask, blur dan mosaic",
+      "status": "partial",
+      "scope_and_limit": "Blur/mosaic pada ROI statis dan interval source-time, area terlindungi ditolak. Tracking objek otomatis dan feather mask belum tersedia."
+    },
+    {
+      "id": "FX11",
+      "name": "Color wheels, curves dan LUT",
+      "status": "partial",
+      "scope_and_limit": "EQ warna, kurva dan LUT .cube tervalidasi pada salinan sumber SDR. Belum color wheels/HDR/color-management preview penuh."
+    },
+    {
+      "id": "FX12",
+      "name": "Color match dan relighting",
+      "status": "blocked",
+      "scope_and_limit": "Automatic color match dan relighting belum diimplementasikan."
+    },
+    {
+      "id": "FX13",
+      "name": "Stabilization dan lens correction",
+      "status": "implemented_conditional",
+      "scope_and_limit": "FFmpeg deshake dan lenscorrection dengan persetujuan tepi/crop serta larangan area terlindungi. Decode media buatan diuji; gerakan kamera/materi nyata perlu A/B."
+    },
+    {
+      "id": "FX14",
+      "name": "Video denoise dan enhancement",
+      "status": "partial",
+      "scope_and_limit": "HQDN3D denoise berparameter, hasil decode dan manifest A/B. Belum neural enhancement dan quality corpus wajah/teks."
+    },
+    {
+      "id": "FX15",
+      "name": "Upscale dan frame interpolation",
+      "status": "implemented_local",
+      "scope_and_limit": "Lanczos upscale menjaga rasio, FPS interpolasi 24-60 eksplisit, batas CPU 1080p/120 detik untuk interpolasi; hasil metadata/durasi/full decode diuji. Bukan neural upscale."
+    },
+    {
+      "id": "FX16",
+      "name": "360 dan reframing panorama",
+      "status": "partial",
+      "scope_and_limit": "Viewport equirectangular ke flat dengan yaw/pitch/FOV statis, sumber panorama dipertahankan. Belum keyframe viewport bergerak."
+    },
+    {
+      "id": "FX17",
+      "name": "Photo, overlay, sticker dan compositing",
+      "status": "partial",
+      "scope_and_limit": "Overlay gambar terdaftar, ukuran/posisi/opacity/rentang dan urutan layer eksplisit; materi terlindungi ditolak. Belum semua blend modes/animasi sticker."
+    },
+    {
+      "id": "FX18",
+      "name": "Effect library dan preset packs",
+      "status": "implemented_local",
+      "scope_and_limit": "Preset/pack JSON schema v1 berlisensi, export/import dan versi; tanpa aset proprietary. Pack tidak membawa LUT/overlay eksternal atau executable."
+    }
+  ],
+  "pending_acceptance": [
+    "Windows/i5-12500H/40GB/RTX3050 4GB actual capture/NVENC/DPAPI",
+    "Native browser microphone/screen/camera permission, quota, long recording and crash recovery",
+    "Actual WAN/HTTPS/guest device clock drift and listening",
+    "Actual Ollama/Piper/ComfyUI model inference, licences, language quality and peak VRAM",
+    "GN05 actual neural voice/translation listening across intended languages; multi-voice, background preservation and lip sync remain open",
+    "Real speech, hair/face, text/material before-after FX quality",
+    "RC05 multistream and RC06 live buffer implementation",
+    "Blocked GN and advanced FX implementations listed individually",
+    "M6 G6 actual Demucs/listening; M7 native CapCut/Resolve including EX05 remain open"
+  ],
+  "evidence_scope": "FFmpeg/SQLite/HTTP/CLI/core serial subprocess real; authored test media and protocol doubles labelled. No native browser/device/neural/live account quality claim."
+}

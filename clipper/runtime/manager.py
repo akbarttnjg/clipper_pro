@@ -21,6 +21,8 @@ ACTIONS=('install','probe','sample','calibrate','rollback')
 class RuntimeManager:
     def __init__(self, repo, root=None, *, autostart=True, recover=True):
         self.repo=Path(repo).resolve();self.root=Path(root or runtime_root(repo)).resolve()
+        from ..installation_lock import InstallationLease
+        self.installation_lease=InstallationLease(self.repo)
         self.root.mkdir(parents=True,exist_ok=True);self.db=self.root/'runtime.sqlite3'
         self.autostart=autostart;self.stop_event=threading.Event();self.thread=None;self.guard=threading.Lock()
         self.queue_owner=uuid.uuid4().hex
@@ -229,6 +231,7 @@ class RuntimeManager:
     def close(self):
         self.stop_event.set()
         if self.thread:self.thread.join(timeout=12)
+        if not (self.thread and self.thread.is_alive()):self.installation_lease.close()
 
 
 def redact(text,limit=3000):

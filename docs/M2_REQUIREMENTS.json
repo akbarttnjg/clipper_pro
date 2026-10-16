@@ -2043,8 +2043,8 @@
       "title": "MP4 multi-rasio siap pakai",
       "phase": "M7",
       "page": 104,
-      "target": "Target. Final untuk rasio yang dipilih diterbitkan sebagai satu set. Uji penerimaan.\nDurasi/resolusi/fps/audio dan full decode lolos.\n\nBaseline: Parsial / perlu",
-      "acceptance": "",
+      "target": "Final untuk rasio yang dipilih diterbitkan sebagai satu set.",
+      "acceptance": "Durasi/resolusi/fps/audio dan full decode lolos.",
       "release_scope": "M7",
       "implementation_status": "planned_outside_this_release",
       "acceptance_status": "not_claimed_closed_by_m1"
@@ -2648,8 +2648,8 @@
       "title": "Recording ke editor dan clips",
       "phase": "M9",
       "page": 110,
-      "target": "Target. Hasil capture masuk transkrip/timeline tanpa impor ulang manual. Uji penerimaan.\nTrack/offset/identitas sumber dipertahankan.\n\nBaseline: Belum terverifi",
-      "acceptance": "",
+      "target": "Hasil capture masuk transkrip/timeline tanpa impor ulang manual.",
+      "acceptance": "Track/offset/identitas sumber dipertahankan.",
       "release_scope": "M9",
       "implementation_status": "planned_outside_this_release",
       "acceptance_status": "not_claimed_closed_by_m1"

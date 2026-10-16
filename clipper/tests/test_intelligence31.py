@@ -199,7 +199,7 @@ def test_manual_content_edit_marks_assessment_stale_but_style_edit_does_not(tmp_
     monkeypatch.setattr(app, 'JOB_STATE', {'s': {'cfg': cfg, 'media': '', 'scored': [c],
         'transcript': {'words': words, 'duration': c['end']}, 'edits': {}, 'clip_settings': {}}})
     monkeypatch.setattr(app, 'JOBS', {'s': {'status': 'review', 'clips': []}})
-    client = TestClient(app.app)
+    client = TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000))
     data = {**c, 'words': words, 'settings': {'caption_scale': 1.2}}
     assert client.post('/api/editor/s/0', json=data).json()['clip']['intelligence']['status'] == 'ready'
     data['title'] = 'Judul yang berbeda'

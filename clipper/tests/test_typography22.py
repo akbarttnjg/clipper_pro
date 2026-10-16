@@ -106,7 +106,7 @@ def test_batch_style_preserves_analysis_and_blocks_busy_writes(tmp_path,monkeypa
     job={'status':'review','clips':[],'export':{'zip':'old.zip'},'preview':{'index':1}}
     monkeypatch.setattr(app,'STATES',tmp_path/'sessions')
     monkeypatch.setattr(app,'JOBS',{'style-test':job});monkeypatch.setattr(app,'JOB_STATE',{'style-test':st})
-    client=TestClient(app.app);before=copy.deepcopy(st)
+    client=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000));before=copy.deepcopy(st)
     assert len(client.get('/api/templates').json())==8
     assert client.get('/api/template-preview/unknown').status_code==404
     data={'indices':[1],'settings':{'caption_style':'slide','motion_intensity':'calm','layout':'fill','aspect':'16:9'}}

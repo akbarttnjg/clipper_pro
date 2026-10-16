@@ -1,5 +1,6 @@
 """M2 immutable tracks, scoped source edits, revisioned review and export."""
 import copy
+from .source_lineage import describe as describe_lineage
 import json
 import time
 from pathlib import Path
@@ -134,7 +135,7 @@ class TranscriptService:
             'language':data.get('language') if data else None,'runtime_receipt':data.get('runtime_receipt') if data else None,
             'vad':data.get('vad') if data else None,'tracks':translated,'language_matrix':language_matrix(self.service.config(doc)),
             'critical_review':tracks.critical_review(data['words'],doc['settings'].get('glossary',''))[:200] if data else [],
-            'translation_proposals':doc.get('translation_proposals',[]),'source_lineage':doc['source'].get('lineage',[])}
+            'translation_proposals':doc.get('translation_proposals',[]),'source_lineage':describe_lineage(doc['source'])['origins'],'source_provenance':describe_lineage(doc['source'])}
 
     def import_review(self,pid,data):
         doc=self._doc(pid,data['expected_revision'])
@@ -209,7 +210,7 @@ class TranscriptService:
         fmt=data['format'];metadata={'project_id':pid,'revision':doc['revision'],'transcript_revision':doc['transcript_revision'],
             'track_id':tid or doc['transcript_id'],'clip_id':cid,'variant_id':vid,'timebase':'source_seconds',
             'chapters':[{'clip_id':k,'start':c['start'],'end':c['end'],'title':c.get('title','')} for k,c in doc['clips'].items()],
-            'critical_review':tracks.critical_review(track['words'],doc['settings'].get('glossary','')),'source_lineage':doc['source'].get('lineage',[])}
+            'critical_review':tracks.critical_review(track['words'],doc['settings'].get('glossary','')),'source_lineage':describe_lineage(doc['source'])['origins'],'source_provenance':describe_lineage(doc['source'])}
         text=tracks.export_track(track,fmt,metadata=metadata);key=fingerprint([text,metadata]);folder=self.service.work/pid/'transcript-exports'/key[:24];folder.mkdir(parents=True,exist_ok=True)
         path=folder/('transcript.'+fmt);path.write_text(text,encoding='utf-8');sidecar=folder/'provenance.json';sidecar.write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding='utf-8')
         self._doc(pid,doc['revision'])

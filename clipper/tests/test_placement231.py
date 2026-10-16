@@ -90,7 +90,7 @@ def test_old_session_and_preset_keep_position_without_banner(tmp_path,monkeypatc
     restored=app.JOB_STATE['placement']
     assert not restored['cfg'].title_card
     assert not restored['clip_settings']['0']['title_card']
-    client=TestClient(app.app)
+    client=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000))
     data=client.get('/api/editor/placement/0').json()
     assert data['settings']['caption_align']=='auto' and data['settings']['caption_position']=='left'
     oldpreset={'id':'old','name':'Gaya saya','settings':{**LOOKS[0]['settings'],'safe_placement':True}}

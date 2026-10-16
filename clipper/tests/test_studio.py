@@ -113,7 +113,7 @@ def test_editor_validation_is_transactional_and_exports_reject_stale(tmp_path,mo
     c={'start':0,'end':4,'title':'Uji','reason':'r','keywords':[],'revision':0}
     app.JOB_STATE['studio-test']={'cfg':cfg,'media':'source.mp4','transcript':{'words':ws,'duration':4},'scored':[c],'edits':{}}
     app.JOBS['studio-test']={'status':'review','clips':[{'index':0,'revision':0}]}
-    client=TestClient(app.app)
+    client=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000))
     data={'start':0,'end':4,'words':ws,'keywords':['isi'],'cold_open_span':[3,8]}
     old=copy.deepcopy(app.JOB_STATE['studio-test'])
     assert client.post('/api/editor/studio-test/0',json=data).status_code==400
@@ -129,7 +129,7 @@ def test_editor_validation_is_transactional_and_exports_reject_stale(tmp_path,mo
 def test_cross_origin_local_path_write_rejected():
     import app
     from fastapi.testclient import TestClient
-    c=TestClient(app.app)
+    c=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000))
     assert c.post('/api/local',json={'path':'anything'},headers={'Origin':'https://unrelated.example'}).status_code==403
 
 

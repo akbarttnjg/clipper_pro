@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clipper M8 Command v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "action",
+    "args"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "command_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 160
+    },
+    "action": {
+      "enum": [
+        "account.disconnect",
+        "account.list",
+        "account.probe",
+        "account.save",
+        "analytics.export",
+        "analytics.get",
+        "analytics.observe",
+        "analytics.refresh",
+        "backup.create",
+        "backup.restore",
+        "capabilities",
+        "comment.save",
+        "cost.record",
+        "diagnostics.create",
+        "effort.record",
+        "events",
+        "experiment.assign",
+        "experiment.create",
+        "feedback.policy",
+        "feedback.rollback",
+        "job.cancel",
+        "job.list",
+        "job.resume",
+        "job.submit",
+        "plugin.list",
+        "plugin.register",
+        "project.apply",
+        "project.create",
+        "project.get",
+        "project.list",
+        "project.propose",
+        "publish.approve",
+        "publish.cancel",
+        "publish.draft",
+        "publish.get",
+        "publish.list",
+        "publish.manual_receipt",
+        "publish.preflight",
+        "publish.remote_edit",
+        "publish.retry",
+        "publish.revise",
+        "record.list",
+        "review.list",
+        "review.revoke",
+        "session.revoke",
+        "status",
+        "topic.import",
+        "webhook.list",
+        "webhook.save",
+        "workflow.resume",
+        "workflow.run",
+        "workflow.save",
+        "workspace.configure",
+        "workspace.create",
+        "workspace.get",
+        "workspace.member",
+        "workspace.organize"
+      ]
+    },
+    "args": {
+      "type": "object"
+    }
+  },
+  "description": "Mutations additionally require command_id. Per-action strict validation, revision, actor, QC and budgets execute in the same application facade."
+}

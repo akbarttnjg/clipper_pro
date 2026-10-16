@@ -17,7 +17,7 @@ def module(name):
 installer=module('stage6_installer');builder=module('build_stage6_release')
 BASE=ROOT.parent/'clipper_stage5'
 def snapshot(root):
-    return {p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'steezy_backups' not in p.parts}
+    return {p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and 'steezy_backups' not in p.parts}
 
 
 @unittest.skipUnless(BASE.is_dir(),'Full source 4.0.5 fixture not present beside checkout; run from release QA workspace')

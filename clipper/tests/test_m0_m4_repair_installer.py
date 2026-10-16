@@ -36,7 +36,7 @@ class RepairInstallerCase(unittest.TestCase):
     def user_hashes(self):
         return {str(p.relative_to(self.target)):hashlib.sha256(p.read_bytes()).hexdigest() for d in ['work','clips','uploads','models'] for p in (self.target/d).rglob('*') if p.is_file()}
     def code_tree(self):
-        return {str(p.relative_to(self.target)):p.read_bytes() for p in self.target.rglob('*') if p.is_file() and 'steezy_backups' not in p.parts}
+        return {str(p.relative_to(self.target)):p.read_bytes() for p in self.target.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and 'steezy_backups' not in p.parts}
     def test_check_install_reinstall_rollback_and_user_bytes(self):
         before=self.code_tree();users=self.user_hashes();legacy=(self.target/'docs/releases/m0_fixture.zip').read_bytes()
         installer.install(self.target,self.package,dry_run=True);self.assertEqual(self.code_tree(),before)

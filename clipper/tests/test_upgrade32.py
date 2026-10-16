@@ -281,7 +281,7 @@ def app_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(app,'STATES',tmp_path/'work/studio-jobs')
     monkeypatch.setattr(app,'base_cfg',replace(cfg,work_dir=str(tmp_path/'work')))
     monkeypatch.setattr(app,'JOB_STATE',{ident:st});monkeypatch.setattr(app,'JOBS',{ident:job})
-    return app,TestClient(app.app),ident,st,job
+    return app,TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)),ident,st,job
 
 
 def test_cache_endpoint_rejects_active_process_and_preserves_final(tmp_path,monkeypatch):

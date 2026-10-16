@@ -177,6 +177,6 @@ def test_resume_uses_saved_candidates_without_analysis(tmp_path,monkeypatch):
     monkeypatch.setattr(app,'JOBS',{'saved':{'status':'error','clips':[]}})
     monkeypatch.setattr(app,'JOB_STATE',{'saved':{'cfg':Config(),'scored':[{'title':'Utuh'}],'edits':{}}})
     monkeypatch.setattr(app,'enqueue',lambda *a:pytest.fail('Analysis must not run again'))
-    r=TestClient(app.app).post('/api/resume/saved')
+    r=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)).post('/api/resume/saved')
     assert r.status_code==200 and r.json()['status']=='review'
     assert r.json()['candidates'][0]['title']=='Utuh'

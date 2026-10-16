@@ -75,7 +75,7 @@ def api_state(tmp_path,monkeypatch):
     monkeypatch.setattr(app,'STATES',tmp_path/'sessions')
     monkeypatch.setattr(app,'PRESETS_FILE',tmp_path/'presets.json')
     monkeypatch.setattr(app,'JOBS',{'v23':job});monkeypatch.setattr(app,'JOB_STATE',{'v23':st})
-    return app,TestClient(app.app),st,job
+    return app,TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)),st,job
 
 
 def test_presets_persist_without_timeline_changes_and_reject_bad_settings(api_state):

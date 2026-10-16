@@ -7,6 +7,9 @@ import threading
 from contextlib import contextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
+if __name__=='__main__':
+    from clipper.installation_lock import InstallationLease
+    _entry_code_lease=InstallationLease(Path(__file__).resolve().parents[1])
 from .studio_service import StudioService, identifier, CONFIG_FIELDS
 from .config import Config
 from .project_store import Conflict,JobLeaseLost
@@ -79,6 +82,8 @@ def execute(service,job):
 
 
 def _execute(service,job):
+    if job['kind'].endswith('_m9'):
+        return service.lab.execute(job)
     if job['kind']=='delivery_m7':
         from .delivery7_jobs import execute
         return execute(service,job)
@@ -455,8 +460,12 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--db',required=True);parser.add_argument('--job',required=True);args=parser.parse_args()
     from .project_store import ProjectStore
     from .job_queue import JobQueue
-    store=ProjectStore(args.db);queue=JobQueue(store,Path(args.db).parent,autostart=False,recover=False);job=queue.get(args.job)
-    doc=store.get(job['project_id']);settings=doc.get('settings',{})
+    store=ProjectStore(args.db);queue=JobQueue(store,Path(args.db).parent,autostart=False,recover=False,installation_root=Path(__file__).resolve().parents[1]);job=queue.get(args.job)
+    if job['kind'].endswith('_m9'):
+        try:doc=store.get(job['request']['m9'].get('project_id') or job['project_id'])
+        except KeyError:doc={'settings':job['request']['m9'].get('config',{})}
+    else:doc=store.get(job['project_id'])
+    settings=doc.get('settings',{})
     cfg=Config(**{k:v for k,v in settings.items() if k in CONFIG_FIELDS})
     cfg=replace(cfg,work_dir=str(Path(args.db).resolve().parent))
     service=StudioService(Path(__file__).resolve().parent.parent,cfg,db_path=args.db,autostart=False,recover=False)
@@ -475,7 +484,7 @@ def main():
             try:execute(service,job)
             finally:
                 from .editorial import release
-                release(service.config(doc))
+                release(cfg if job['kind'].endswith('_m9') else service.config(doc))
     except (StaleJob,JobLeaseLost) as exc:
         active=queue.get(args.job)
         if active.get('owner')==job.get('owner') and active.get('lease_token')==job.get('lease_token'):

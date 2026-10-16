@@ -43,7 +43,7 @@ class M3InstallerCase(unittest.TestCase):
     def tearDown(self):self.output.__exit__(None,None,None);self.probe.stop();self.stop.stop();self.temp.cleanup()
     def tree(self):
         return {str(p.relative_to(self.target)):hashlib.sha256(p.read_bytes()).hexdigest() for p in self.target.rglob('*')
-            if p.is_file() and 'steezy_backups' not in p.parts and 'work' not in p.parts}
+            if p.is_file() and p.name!='.clipper-install.lock' and 'steezy_backups' not in p.parts and 'work' not in p.parts}
     def test_preflight_declares_verified_m2_github_and_does_not_mutate(self):
         before=self.tree();manifest,changes,_=installer.preflight(self.target,self.package,runtime=False,stopped=False)
         self.assertEqual(manifest['baseline_github_commit'],'b8d12eb972b742a75379c39dc8fa7d35752b9e5e');self.assertEqual(manifest['milestone'],'M3');self.assertTrue(changes)

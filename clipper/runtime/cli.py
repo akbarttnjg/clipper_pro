@@ -3,6 +3,9 @@ import argparse
 import json
 from pathlib import Path
 import sys
+if __name__=='__main__':
+    from clipper.installation_lock import InstallationLease
+    _entry_code_lease=InstallationLease(Path(__file__).resolve().parents[2])
 from .state import runtime_root
 from .manager import RuntimeManager, redact
 from .download import Canceled

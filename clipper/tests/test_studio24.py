@@ -127,7 +127,7 @@ def test_stock_api_key_never_in_job_persistence_or_editor_response(stock_home,mo
     st={'cfg':cfg,'transcript':{'words':words('isi lengkap'), 'duration':10},'scored':[{'start':0,'end':5,'title':'t'}]}
     monkeypatch.setattr(app,'JOB_STATE',{'s':st});monkeypatch.setattr(app,'JOBS',{'s':{'status':'review','clips':[]}})
     app.persist('s');assert 'never-export-this' not in (app.STATES/'s.json').read_text()
-    client=TestClient(app.app)
+    client=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000))
     assert 'never-export-this' not in client.get('/api/editor/s/0').text
     r=client.post('/api/stock-settings',json={'pexels':'new-secret'})
     assert r.status_code==200 and 'new-secret' not in r.text
@@ -144,11 +144,11 @@ def test_unavailable_illustration_reason_survives_poll_without_poisoning_cache(s
     monkeypatch.setattr(app,'JOB_STATE',{'s':st})
     monkeypatch.setattr(app,'JOBS',{'s':{'status':'review','clips':[]}})
     app.worker('s','illustrating',[0])
-    response=TestClient(app.app).get('/api/illustrations/s/0').json()
+    response=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)).get('/api/illustrations/s/0').json()
     assert 'folder koleksi' in ' '.join(response['notes'])
     assert c['revision']==1 and not illustrations.recipe_path(ws,c,cfg).exists()
     st['clip_settings']['0']={'broll_mode':'off'}
-    assert 'Siapkan ilustrasi' in ' '.join(TestClient(app.app).get('/api/illustrations/s/0').json()['notes'])
+    assert 'Siapkan ilustrasi' in ' '.join(TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)).get('/api/illustrations/s/0').json()['notes'])
 
 
 @pytest.mark.skipif(not OPENCV_AVAILABLE,reason=OPENCV_REASON)

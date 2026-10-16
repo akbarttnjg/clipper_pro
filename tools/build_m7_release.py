@@ -9,7 +9,7 @@ from tools import complete_installer as installer
 def sha(data):return hashlib.sha256(data).hexdigest()
 
 
-def build(output,source_commit,verification=None):
+def _build_current_unsupported(output,source_commit,verification=None):
     if not isinstance(source_commit,str) or not re.fullmatch('[0-9a-f]{40}',source_commit):raise ValueError('SHA commit sumber harus lengkap')
     output=Path(output).resolve();archive=output.with_suffix('.zip')
     if output.exists() or archive.exists():raise ValueError('Paket lama tidak ditimpa; pilih nama baru')
@@ -68,6 +68,11 @@ def build(output,source_commit,verification=None):
     value={'archive':str(archive),'bytes':archive.stat().st_size,'sha256':sha(archive.read_bytes()),'payload_files':len(files),'guards':len(guards),
         'source_commit':source_commit,'baseline_github_commit':base['base_commit'],'zip_crc':'passed'}
     print(json.dumps(value,indent=2));return value
+
+
+def build(output,source_commit,verification=None):
+    from tools.frozen_producer import build as frozen
+    return frozen(ROOT,'m8_m7_producer','build_m7_release.py',output,source_commit,verification)
 
 
 if __name__=='__main__':

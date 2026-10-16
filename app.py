@@ -14,6 +14,8 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Reques
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 
 ROOT = Path(__file__).resolve().parent
+from clipper.installation_lock import InstallationLease
+_app_code_lease = InstallationLease(ROOT)
 load_dotenv(ROOT / '.env')
 load_dotenv(ROOT / '.env.pro', override=True)
 from clipper.config import Config, validate_overrides, validate_brand
@@ -28,7 +30,7 @@ PRESETS_FILE = ROOT / 'style-presets.json'
 base_cfg = replace(Config(), **validate_brand(read_json(BRAND_FILE, {})))
 base_cfg = replace(base_cfg, work_dir=str((ROOT / base_cfg.work_dir).resolve()),
                    out_dir=str((ROOT / base_cfg.out_dir).resolve()))
-app = FastAPI(title='Clipper Studio Local', version=pipeline.RENDER_VERSION)
+app = FastAPI(title='Clipper Studio Local', version='4.0.22-m8-m9')
 STATIC = ROOT / 'static'
 UPLOADS = ROOT / 'uploads'
 UPLOADS.mkdir(exist_ok=True)

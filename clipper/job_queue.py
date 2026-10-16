@@ -81,7 +81,10 @@ def terminate_owned(pid,birth,*,force=False):
 
 
 class JobQueue:
-    def __init__(self,store,work_root,resource_lock=None,*,autostart=True,recover=True,lease_seconds=30):
+    def __init__(self,store,work_root,resource_lock=None,*,autostart=True,recover=True,lease_seconds=30,installation_root=None):
+        from .installation_lock import InstallationLease
+        self.installation_lease=InstallationLease(installation_root) if installation_root else None
+        self.closed=False
         self.store=store;self.work=Path(work_root);self.lock=resource_lock or threading.Lock()
         self.guard=threading.Lock();self.thread=None;self.owner=uuid.uuid4().hex;self.stop_event=threading.Event();self.autostart=autostart;self.on_idle=None
         self.lease_seconds=max(5,float(lease_seconds))
@@ -138,6 +141,7 @@ class JobQueue:
             return db.execute("SELECT 1 FROM jobs WHERE status='queued' LIMIT 1").fetchone() is not None
 
     def enqueue(self,project_id,kind,target,request):
+        if self.closed:raise ValueError('Antrean sudah ditutup; buka ulang mesin sebelum menjalankan tugas')
         request={**request,'queue_key':fingerprint([project_id,kind,target,request])}
         with self.store.connect() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -151,12 +155,14 @@ class JobQueue:
         self.start();return self.get(ident)
 
     def start(self):
+        if self.closed:raise ValueError('Antrean sudah ditutup; buka ulang mesin sebelum menjalankan tugas')
         if not self.autostart:return
         with self.guard:
             if self.thread and self.thread.is_alive():return
             self.stop_event.clear();self.thread=threading.Thread(target=self.run,daemon=True,name='clipper-resource-queue');self.thread.start()
 
     def enqueue_many(self,project_id,entries,expected_revision):
+        if self.closed:raise ValueError('Antrean sudah ditutup; buka ulang mesin sebelum menjalankan tugas')
         """Validate the snapshot and add a whole batch in one SQLite transaction."""
         from .project_store import Conflict
         ids=[]
@@ -238,9 +244,12 @@ class JobQueue:
         return self.enqueue(job['project_id'],job['kind'],job['target'],request or {k:v for k,v in job['request'].items() if k!='queue_key'})
 
     def claim(self,ident=None):
+        if self.closed:raise ValueError('Antrean sudah ditutup; buka ulang mesin sebelum menjalankan tugas')
         with self.store.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             if db.execute("SELECT 1 FROM jobs WHERE status IN ('running','cancel_requested') LIMIT 1").fetchone():db.commit();return None
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m9_resource_holds'").fetchone() and db.execute("SELECT 1 FROM m9_resource_holds WHERE state!='released' LIMIT 1").fetchone():
+                db.commit();return None
             row=db.execute("SELECT id FROM jobs WHERE status='queued' ORDER BY created LIMIT 1").fetchone()
             if row and ident and row['id']!=ident:db.commit();return None
             if row:db.execute("UPDATE jobs SET status='running',owner=?,lease_token=lease_token+1,lease_expires=?,updated=? WHERE id=? AND status='queued'",
@@ -338,7 +347,10 @@ class JobQueue:
                 except subprocess.TimeoutExpired:pass
 
     def close(self):
+        self.closed=True
         for job in self.list():
             if job.get('owner')==self.owner and job['status']=='running':self.cancel(job['id'])
         self.stop_event.set()
         if self.thread:self.thread.join(timeout=6)
+        if self.installation_lease and not (self.thread and self.thread.is_alive()):
+            self.installation_lease.close();self.installation_lease=None

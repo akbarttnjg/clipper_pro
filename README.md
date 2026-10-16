@@ -1,3 +1,19 @@
+## Upgrade 4.0.21 — kelanjutan M9: dubbing dan konteks per klip
+
+Dubbing satu suara dari track terjemahan M2 yang disetujui, review per cue,
+kandidat A/B, dan persetujuan dengar sebelum proyek editor baru. Konteks
+Ollama dapat dibatasi per klip/rentang sumber panjang. Paket kumulatif untuk
+M7, M8 terpin atau 4.0.20 yang cocok checksum. M9 tetap belum selesai penuh.
+Baca [panduan](docs/UPGRADE_4_0_21_M9.md) dan [audit perubahan](docs/LAPORAN_M9_4_0_21.md).
+
+## Upgrade 4.0.20 - M8 dan M9 lokal
+
+Paket kumulatif dari GitHub M7 f6f1f6a. M8 distribusi/workspace dan M9 rekaman terpisah, pemulihan, podcast, draf kreatif, adapter lokal opsional serta efek turunan. Seluruh acceptance M8/M9 masih terbuka; M9 mempunyai 7 kebutuhan lokal, 9 bersyarat, 18 sebagian dan 11 belum diimplementasikan. Baca [panduan gabungan](docs/UPGRADE_4_0_20_M8_M9.md), [laporan](docs/LAPORAN_M8_M9.md), [trace 45 ID M9](docs/M9_REQUIREMENTS.json) dan [aksi M9](docs/m9/COMMANDS.md). Tidak ada model/akun/post/broadcast otomatis.
+
+## Upgrade 4.0.19 — M8
+
+Distribusi dengan approval file/revisi, YouTube resumable opsional, handoff lintas platform, workflow lokal, analytics nullable, workspace/role, backup dan API/CLI/MCP. Baca [panduan M8](docs/UPGRADE_4_0_19_M8.md), [trace 44 kebutuhan](docs/M8_REQUIREMENTS.json) dan [aksi API](docs/m8/COMMANDS.md). Gerbang seluruh M8 tetap terbuka untuk live/native acceptance dan backlog yang dicatat eksplisit.
+
 ## Upgrade 4.0.18 — perbaikan M6 + M7
 
 Enam temuan audit M6 diperbaiki; M7 menambahkan delivery atomik lintas rasio,

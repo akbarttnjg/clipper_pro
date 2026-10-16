@@ -36,7 +36,15 @@ def router(service,guarded):
     @guarded
     def origins(pid:str):
         doc=service.store.get(pid)
-        return {'source_id':doc['source']['source_id'],'origins':[{**r,'url':service.register_file(pid,r['source_path'])} for r in doc['source'].get('lineage',[])]}
+        from .source_lineage import describe
+        value=describe(doc['source'])
+        # A child project never grants access to its parent's private media.
+        # Legacy assembly embeds reviewed source paths; derivative parents are metadata only.
+        if value['kind']=='assembly':
+            for row in value['origins']:
+                row['url']=service.register_file(pid,row['source_path']) if row.get('source_path') else None
+                row['available']=bool(row['url'])
+        return {'source_id':doc['source']['source_id'],**value}
     @api.get('/projects/{pid}/transcript-tracks')
     @guarded
     def tracks(pid:str):return service.transcripts.snapshot(pid)

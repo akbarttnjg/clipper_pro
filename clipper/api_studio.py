@@ -21,6 +21,10 @@ def guarded(fn):
 
 def create_router(service):
     router=APIRouter(prefix='/api/studio',tags=['studio4'])
+    from .api_m8 import router as m8_router
+    router.include_router(m8_router(service))
+    from .api_m9 import router as m9_router
+    router.include_router(m9_router(service))
     from .api_delivery7 import router as delivery_router
     router.include_router(delivery_router(service,guarded))
     from .api_audio6 import router as audio_router
@@ -217,6 +221,12 @@ def install(app,root,base,states,resource_lock):
     service=StudioService(root,base,resource_lock=resource_lock)
     service.migrate(states)
     app.include_router(create_router(service))
+    from .api_m8 import install_security
+    install_security(app,service)
+    @app.get('/m8',include_in_schema=False)
+    def m8_console():return FileResponse(Path(root)/'static/m8.html',headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self' blob:; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"})
+    @app.get('/m9',include_in_schema=False)
+    def m9_console():return FileResponse(Path(root)/'static/m9.html',headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self' blob:; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"})
     def analysis_changes(data):
         try:return service.changes(data)
         except Conflict as exc:return {'status':'conflict','revision':exc.revision,'message':str(exc)}
@@ -232,9 +242,10 @@ def install(app,root,base,states,resource_lock):
             if known.intersection(request.url.path.split('/')):return JSONResponse({'detail':'Proyek telah memakai revisi Studio 4. Muat ulang editor; draf tab lama jangan ditutup sebelum disalin.'},status_code=409)
         return await call_next(request)
     @app.on_event('startup')
-    def start():service.queue.start();service.imports.start()
+    def start():service.queue.start();service.imports.start();service.integrations.start()
     @app.on_event('shutdown')
     def stop():
+        service.integrations.close()
         service.queue.close()
         if 'imports' in service.__dict__:service.imports.close()
         if 'runtime' in service.__dict__:service.runtime.close()

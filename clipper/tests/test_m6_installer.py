@@ -28,7 +28,7 @@ def machine(tmp_path,monkeypatch):
     return target,private
 
 def hashes(target):
-    return {p.relative_to(target).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in target.rglob('*') if p.is_file() and not {'steezy_backups','__pycache__'}&set(p.parts)}
+    return {p.relative_to(target).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in target.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and not {'steezy_backups','__pycache__'}&set(p.parts)}
 
 def test_install_check_reinstall_exact_rollback_preserves_private_files_SQLite(package,machine):
     target,private=machine;before=hashes(target)

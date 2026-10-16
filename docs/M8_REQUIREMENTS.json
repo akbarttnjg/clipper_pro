@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "version": "4.0.19-m8",
+  "milestone": "M8",
+  "release_scope": "M8 local operational release across six packages; complete milestone acceptance remains open",
+  "baseline_github_commit": "f6f1f6a11631f800c1749f8cb6fbcae6dfff384d",
+  "architecture": {
+    "document": "Arsitektur_Clipper_Pro_Terpadu_120_Halaman.pdf",
+    "sha256": "76685871f95074d95c44fffaa4a0de4a65ab7b6a19fb28fa640a54d04f2dec36",
+    "pages": [
+      54,
+      65,
+      66,
+      67,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111
+    ]
+  },
+  "packages": [
+    "M8.1",
+    "M8.2",
+    "M8.3",
+    "M8.4",
+    "M8.5",
+    "M8.6"
+  ],
+  "counts": {
+    "implemented_local": 26,
+    "implemented_conditional": 8,
+    "partial": 9,
+    "blocked": 1
+  },
+  "requirements": [
+    {
+      "id": "AP01",
+      "name": "API terstruktur",
+      "status": "implemented_local",
+      "scope_and_limit": "Command schema v1 berbagi facade dengan UI M8, CLI, Python dan MCP; proposal memakai service editor inti."
+    },
+    {
+      "id": "AP02",
+      "name": "CLI dan Python",
+      "status": "implemented_local",
+      "scope_and_limit": "Receipt JSON, exit code, token dari environment, command_id stabil; client HTTP tidak memakai jalur mutasi lain."
+    },
+    {
+      "id": "AP03",
+      "name": "MCP tools",
+      "status": "implemented_local",
+      "scope_and_limit": "MCP stdio 2025-06-18, lifecycle, tools/list, tools/call, error receipt; status queued dibedakan dari hasil QC."
+    },
+    {
+      "id": "AP04",
+      "name": "Rencana dan approval agent",
+      "status": "implemented_local",
+      "scope_and_limit": "project.propose menghasilkan diff; project.apply memakai draft/revision core. Publish memerlukan hash persetujuan."
+    },
+    {
+      "id": "AP05",
+      "name": "Webhook dan event stream",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Event bernomor per workspace, SSE resume, outbox HMAC SHA-256 ke host HTTPS yang diizinkan operator."
+    },
+    {
+      "id": "AP06",
+      "name": "Cancel retry resume",
+      "status": "implemented_local",
+      "scope_and_limit": "Perintah dan queue inti idempotent; sesi upload direkonsiliasi sebelum byte berikutnya; sesi tak diketahui berhenti untuk inspeksi."
+    },
+    {
+      "id": "AP07",
+      "name": "Batch workflow",
+      "status": "implemented_local",
+      "scope_and_limit": "Template proyek/folder, langkah inti serial, batas harian dan resource GPU core. Alur berhenti pada review bila guard inti memblokir."
+    },
+    {
+      "id": "AP08",
+      "name": "CMS dan automation connectors",
+      "status": "partial",
+      "scope_and_limit": "Webhook umum bertanda tangan tersedia. Adapter CMS vendor tertentu belum diuji."
+    },
+    {
+      "id": "AP09",
+      "name": "Provider/model SDK",
+      "status": "partial",
+      "scope_and_limit": "Manifest capabilities dan kontrak probe terdaftar. Eksekusi plugin baru tetap blocked sampai probe nyata dan isolasi deployment tersedia."
+    },
+    {
+      "id": "AP10",
+      "name": "Versioned schema dan sandbox",
+      "status": "partial",
+      "scope_and_limit": "Schema M8 additive dan rollback checkpoint tersedia. Subprocess biasa tidak dilabeli security sandbox; eksekusi plugin tidak dipercaya belum diaktifkan."
+    },
+    {
+      "id": "PB01",
+      "name": "Hub akun",
+      "status": "implemented_local",
+      "scope_and_limit": "Banyak profil, platform, remote channel ID, granted scopes, expiry dan versi akun. Token berada di vault."
+    },
+    {
+      "id": "PB02",
+      "name": "YouTube upload dan schedule",
+      "status": "implemented_conditional",
+      "scope_and_limit": "OAuth Desktop PKCE, resumable upload, remote schedule, processing/privacy aktual. Uji akun nyata dan API project pengguna masih diperlukan."
+    },
+    {
+      "id": "PB03",
+      "name": "TikTok publish atau handoff",
+      "status": "implemented_local",
+      "scope_and_limit": "Paket handoff final, caption, cover dan metadata; tidak mengklaim Direct Post publik pribadi."
+    },
+    {
+      "id": "PB04",
+      "name": "Instagram dan Facebook Reels",
+      "status": "partial",
+      "scope_and_limit": "Paket unggah manual tersedia. Adapter API container/publish Meta belum diaktifkan atau diuji akun nyata."
+    },
+    {
+      "id": "PB05",
+      "name": "LinkedIn X dan lainnya",
+      "status": "implemented_local",
+      "scope_and_limit": "Profil dan handoff eksplisit; tidak ada klaim konektor API langsung tanpa izin."
+    },
+    {
+      "id": "PB06",
+      "name": "Kalender dan timezone",
+      "status": "implemented_local",
+      "scope_and_limit": "Jadwal lokal plus UTC instant, Asia/Jakarta awal, DST ambigu/nonexistent ditolak atau memakai fold eksplisit."
+    },
+    {
+      "id": "PB07",
+      "name": "Metadata per platform",
+      "status": "implemented_local",
+      "scope_and_limit": "Batas awal title/description/tags dan privacy eksplisit; isi draf dibekukan untuk ditinjau. Final platform validation tetap berlaku."
+    },
+    {
+      "id": "PB08",
+      "name": "Approval dan queue",
+      "status": "implemented_local",
+      "scope_and_limit": "Approval mengikat file SHA, ArtifactSet, clip/ratio, revisi, akun versi, metadata dan jadwal. Revisi baru memblokir pengiriman berikutnya."
+    },
+    {
+      "id": "PB09",
+      "name": "Retry aman",
+      "status": "implemented_local",
+      "scope_and_limit": "Simpan sesi terenkripsi sebelum byte, query status sesi sebelum melanjutkan, receipt durable menahan duplikasi setelah rollback SQLite."
+    },
+    {
+      "id": "PB10",
+      "name": "Worker saat laptop tidur",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Worker CLI dapat dijalankan pada host selalu aktif dengan filesystem/vault yang sesuai. UI menyatakan host offline tidak menjalankan jadwal. Provisioning host jarak jauh belum disediakan."
+    },
+    {
+      "id": "PB11",
+      "name": "Autopilot folder dan channel",
+      "status": "implemented_local",
+      "scope_and_limit": "Watch folder dua kali stabil, content identity dan operation ID; analyze/selection/render/delivery core. Publish tetap memerlukan approval per final."
+    },
+    {
+      "id": "PB12",
+      "name": "Webhook dan otomasi",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Outbox, event ID, scope workspace, signature, retry; penerima harus deduplicate. Tidak ada secret pada event."
+    },
+    {
+      "id": "PB13",
+      "name": "Cover subtitles dan cross-post",
+      "status": "partial",
+      "scope_and_limit": "Handoff membawa cover/sidecar yang ada dalam M7; permintaan per akun dapat dibuat terpisah. API thumbnail/subtitle YouTube belum diaktifkan."
+    },
+    {
+      "id": "PB14",
+      "name": "Cancel edit rekonsiliasi",
+      "status": "implemented_conditional",
+      "scope_and_limit": "YouTube metadata edit dan cancel-to-private/unschedule memerlukan scope manage dan konfirmasi GET. Handoff dilaporkan manual, bukan API verified."
+    },
+    {
+      "id": "AN01",
+      "name": "Views engagement",
+      "status": "implemented_conditional",
+      "scope_and_limit": "YouTube Analytics API atau impor operator berlabel; nilai hilang null dan reason, bukan nol."
+    },
+    {
+      "id": "AN02",
+      "name": "Retention watch time",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Metrik yang disediakan API seperti estimatedMinutesWatched dan averageViewPercentage; data tidak tersedia tetap null. Kurva granular tidak dijanjikan."
+    },
+    {
+      "id": "AN03",
+      "name": "Performa per revisi",
+      "status": "implemented_local",
+      "scope_and_limit": "Observasi menunjuk publish ID, source project revision, clip, ratio, package SHA dan output SHA."
+    },
+    {
+      "id": "AN04",
+      "name": "Eksperimen A/B",
+      "status": "implemented_local",
+      "scope_and_limit": "Assignment sebelum approval, mode randomized_assignment/observational, hypothesis/context/primary metric, tanpa klaim kausal otomatis."
+    },
+    {
+      "id": "AN05",
+      "name": "Trend topic scouting",
+      "status": "partial",
+      "scope_and_limit": "Impor topik dengan URL sumber, umur data, biaya dan provenance. Pengambilan tren otomatis belum diaktifkan."
+    },
+    {
+      "id": "AN06",
+      "name": "Prediksi drop-off",
+      "status": "blocked",
+      "scope_and_limit": "Belum ada corpus dan evaluasi held-out yang cukup; nilai prediksi null dan status not_calibrated."
+    },
+    {
+      "id": "AN07",
+      "name": "Waktu koreksi manusia",
+      "status": "implemented_local",
+      "scope_and_limit": "API menerima interval aktif review/correction maksimal 120 detik, menolak overlap dan render_wait; sumber operator_confirmed."
+    },
+    {
+      "id": "AN08",
+      "name": "Biaya compute",
+      "status": "implemented_local",
+      "scope_and_limit": "Catatan measured_import/estimate, waktu proses, GPU, disk dan biaya provider USD terpisah; tidak mencampur waktu antrean dengan waktu manusia."
+    },
+    {
+      "id": "AN09",
+      "name": "Feedback versi dan rollback",
+      "status": "partial",
+      "scope_and_limit": "Promosi template memakai perbandingan A/B dan feedback manusia core, menyimpan versi sebelumnya dan rollback eksplisit. Pelatihan ranking otomatis belum tersedia."
+    },
+    {
+      "id": "AN10",
+      "name": "Dashboard dan laporan",
+      "status": "implemented_local",
+      "scope_and_limit": "Dashboard periode terpisah, null coverage, CSV aman dari formula injection dan JSON dengan provenance."
+    },
+    {
+      "id": "TM01",
+      "name": "Proyek koleksi arsip",
+      "status": "implemented_local",
+      "scope_and_limit": "Organisasi metadata tidak menggandakan sumber. Pemindahan workspace memerlukan akses owner pada keduanya dan antrean publikasi selesai."
+    },
+    {
+      "id": "TM02",
+      "name": "Workspace/sub-team",
+      "status": "implemented_local",
+      "scope_and_limit": "Scope proyek dan keanggotaan; session workspace tetap. Endpoint lokal lama ditutup bagi token anggota dan pada mode server."
+    },
+    {
+      "id": "TM03",
+      "name": "Roles",
+      "status": "implemented_local",
+      "scope_and_limit": "Owner, editor, reviewer dan publisher; reviewer tidak dapat publish, role/session diperiksa kembali pada setiap perintah dan receipt replay."
+    },
+    {
+      "id": "TM04",
+      "name": "Komentar dan review",
+      "status": "implemented_local",
+      "scope_and_limit": "Komentar timecode sumber+revision; link review M7 dapat kedaluwarsa/dicabut, review vs download tetap berbeda."
+    },
+    {
+      "id": "TM05",
+      "name": "Conflict handling",
+      "status": "implemented_local",
+      "scope_and_limit": "Expected revision/version pada editor, publikasi, workspace dan catatan. Konflik tidak ditimpa diam-diam."
+    },
+    {
+      "id": "TM06",
+      "name": "Backup dan cloud sync",
+      "status": "partial",
+      "scope_and_limit": "Backup checksum snapshot/history/transcripts/media/current asset registries, restore proyek baru pada workspace lokal. Credential/sesi/publish tidak diputar ulang. Cloud sync belum tersedia."
+    },
+    {
+      "id": "TM07",
+      "name": "Login session SSO",
+      "status": "partial",
+      "scope_and_limit": "Sesi bearer 1–168 jam, hash-only dan revocation; solo offline tanpa login. SSO provider belum dikonfigurasi."
+    },
+    {
+      "id": "TM08",
+      "name": "Credential dan audit",
+      "status": "implemented_conditional",
+      "scope_and_limit": "Windows DPAPI atau AES-GCM dengan kunci eksternal pada host lain; tidak ada plaintext fallback. Audit/event/diagnosis tidak membawa account secret."
+    },
+    {
+      "id": "TM09",
+      "name": "Quota budget",
+      "status": "implemented_local",
+      "scope_and_limit": "Ledger atomic per workspace/hari/zona untuk job/publish/provider reservation. Dompet berbayar/credits tidak diperlukan; biaya provider aktual dicatat terpisah."
+    },
+    {
+      "id": "TM10",
+      "name": "Bantuan diagnosis",
+      "status": "implemented_local",
+      "scope_and_limit": "Panduan instalasi/penggunaan, konsol M8 dan diagnosis yang dapat ditinjau sebelum dibagikan; tidak dikirim otomatis."
+    }
+  ],
+  "pending_acceptance": [
+    "Live OAuth/API user channel upload, processing/privacy/scheduling/cancel/analytics, using operator consent and account permissions",
+    "Windows user DPAPI execution, native browser and user hardware",
+    "Complete production server audit and deployment TLS; SSO and external untrusted-worker isolation",
+    "Meta direct publishing, vendor CMS connectors, automated trend collection, calibrated dropoff, automatic ranking training, cloud sync",
+    "M7 target native editor imports and Resolve EX05 text/font backlog remain separate"
+  ]
+}

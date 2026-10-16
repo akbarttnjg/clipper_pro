@@ -101,7 +101,7 @@ def test_app_edit_and_regenerate(tmp_path,monkeypatch):
     c={'start':0,'end':3,'title':'Test','reason':'Test','score':50,'keywords':[]}
     app.JOB_STATE['testjob']={'cfg':cfg,'media':'unused.mp4','transcript':{'words':original,'duration':3},'scored':[c],'edits':{}}
     app.JOBS['testjob']={'status':'done','clips':[{}]}
-    client=TestClient(app.app)
+    client=TestClient(app.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000))
     corrected=[{**w,'word':'pendapatan' if i==2 else w['word']} for i,w in enumerate(original)]
     r=client.post('/api/editor/testjob/0',json={'start':0,'end':3,'words':corrected,'keywords':['pendapatan']})
     assert r.status_code==200, r.text

@@ -23,7 +23,7 @@ def base(path,name):
     return path
 
 def hashes(target):
-    return {p.relative_to(target).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in target.rglob('*') if p.is_file() and 'steezy_backups' not in p.parts}
+    return {p.relative_to(target).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in target.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and 'steezy_backups' not in p.parts}
 
 def runtime_double(monkeypatch,target):
     monkeypatch.setattr(installer,'probe_runtime',lambda *a,**kw:{'python':'explicit native runtime protocol double','work_dir':str(target/'work')})

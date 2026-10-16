@@ -18,6 +18,56 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 
+# BEGIN STANDALONE INSTALLATION LEASE
+class InstallationLease:
+    def __init__(self, root, exclusive=False):
+        self.handle = None
+        path = Path(root).resolve()/'.clipper-install.lock'
+        try:
+            if os.name == 'nt':
+                import ctypes
+                from ctypes import wintypes
+                kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+                kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                              wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+                kernel.CreateFileW.restype = wintypes.HANDLE
+                kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+                handle = kernel.CreateFileW(str(path), 0x80000000 | (0x40000000 if exclusive else 0),
+                                            0 if exclusive else 1, None, 4, 0x80, None)
+                if handle == wintypes.HANDLE(-1).value:
+                    raise OSError(ctypes.get_last_error(), 'installation lease unavailable')
+                self.handle = handle
+                self.kernel = kernel
+            else:
+                import fcntl
+                handle = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+                try:
+                    fcntl.flock(handle, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB)
+                except BaseException:
+                    os.close(handle)
+                    raise
+                self.handle = handle
+        except OSError as exc:
+            raise ValueError('Instalasi sedang dipakai server/worker atau pemasang. Hentikan semua proses Clipper sebelum upgrade/pemulihan.') from exc
+
+    def close(self):
+        handle, self.handle = self.handle, None
+        if handle is not None:
+            if os.name == 'nt':
+                self.kernel.CloseHandle(handle)
+            else:
+                os.close(handle)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def __del__(self):
+        self.close()
+# END STANDALONE INSTALLATION LEASE
+
 ROOT_FILES = {'README.md', 'app.py', 'doctor_pro.py', 'requirements.txt',
               'requirements-pro.txt', 'JALANKAN_PRO.cmd', 'CEK_PRO.cmd', '.gitignore', 'CEK_PEMBENAHAN.cmd'}
 
@@ -80,6 +130,34 @@ def require_stopped(port=8765):
     raise ValueError(f'Tutup server Clipper pada port {port} dengan Ctrl+C sebelum melanjutkan.')
 
 
+
+def require_processes_stopped(target):
+    """First upgrade also checks old runtimes that do not know the OS lease."""
+    target=Path(target).resolve()
+    if os.name=='nt':
+        command=["powershell.exe","-NoProfile","-NonInteractive","-Command",
+                 "Get-CimInstance Win32_Process | Select-Object ProcessId,Name,CommandLine | ConvertTo-Json -Compress"]
+        process=subprocess.run(command,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=20)
+        if process.returncode:raise ValueError('Tidak dapat memeriksa proses Windows; pemeriksaan upgrade dibatalkan.')
+        rows=json.loads(process.stdout or '[]');rows=rows if isinstance(rows,list) else [rows]
+        for row in rows:
+            if row.get('ProcessId')==os.getpid():continue
+            name=(row.get('Name') or '').lower();args=(row.get('CommandLine') or '').replace('\\','/').lower()
+            if 'python' in name and (str(target).replace('\\','/').lower() in args or 'clipper.' in args or 'app.py' in args):
+                raise ValueError('Hentikan proses Python/Clipper sebelum upgrade; proses server dapat memakai port selain 8765.')
+    elif Path('/proc').is_dir():
+        current=Path('/proc/self').resolve()
+        for entry in Path('/proc').iterdir():
+            if not entry.name.isdigit() or entry==current:continue
+            try:
+                args=(entry/'cmdline').read_bytes().decode(errors='replace').split('\0')
+                if not args or not any(x in Path(args[0]).name.lower() for x in ('python','uvicorn')):continue
+                cwd=(entry/'cwd').resolve()
+                rooted=cwd==target or cwd.is_relative_to(target) or any(str(target) in arg for arg in args)
+                if rooted:raise ValueError('Hentikan server/worker Clipper pada instalasi ini sebelum mengubah kode (termasuk port khusus).')
+            except (OSError,RuntimeError):continue
+
+
 def python_for(target):
     path = target / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
     if not path.is_file():
@@ -118,6 +196,12 @@ def probe_runtime(target, after=False):
         code += 'import clipper.camera4_contract,clipper.camera4_observe,clipper.camera4_plan,clipper.camera4_tracking,clipper.camera4_render,clipper.camera4_service,clipper.api_camera4; '
     if after and (target/'clipper/audio6_service.py').is_file():
         code += 'import numpy,clipper.audio6,clipper.audio6_contract,clipper.audio6_dsp,clipper.audio6_meter,clipper.audio6_models,clipper.audio6_plan,clipper.audio6_cleanup,clipper.audio6_draft,clipper.audio6_service,clipper.audio6_jobs,clipper.api_audio6; '
+    if after and (target/'clipper/m9.py').is_file():
+        code += 'import clipper.m9,clipper.api_m9,clipper.m9_recording,clipper.m9_effects,clipper.m9_providers; '
+    if after and (target/'clipper/m9_dubbing.py').is_file():
+        code += 'import clipper.m9_dubbing; '
+    if after and (target/'clipper/m8.py').is_file():
+        code += 'import clipper.m8,clipper.api_m8,clipper.m8_cli,clipper.m8_mcp; '
     code += "print(json.dumps({'python':sys.version.split()[0],'core_modules':'available','work_dir':str((Path(sys.argv[1])/Config().work_dir).resolve())}))"
     process = subprocess.run([str(python), '-I', '-c', code, str(target)], cwd=target,
                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45)
@@ -133,7 +217,7 @@ def probe_runtime(target, after=False):
 
 def load_manifest(package):
     data = json.loads((package / 'manifest.json').read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18'):
+    if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('version') not in ('4.0.8','4.0.9','4.0.10','4.0.11','4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22'):
         raise ValueError('Manifest bukan paket Pembenahan Lengkap yang didukung.')
     managed = set()
     for key in ('files', 'guards'):
@@ -168,6 +252,11 @@ def load_manifest(package):
 
 
 def preflight(target, package, runtime=True, stopped=True):
+    with InstallationLease(target,exclusive=True):
+        return _preflight(target,package,runtime,stopped)
+
+
+def _preflight(target, package, runtime=True, stopped=True):
     target, package = target.resolve(), package.resolve()
     if target == package or target.is_relative_to(package / 'payload'):
         raise ValueError('Pilih folder mesin lama, bukan folder paket upgrade atau payload.')
@@ -194,16 +283,47 @@ def preflight(target, package, runtime=True, stopped=True):
                          '\n'.join(sorted(set(conflicts))))
     if stopped:
         require_stopped()
+        require_processes_stopped(target)
     report = probe_runtime(target) if runtime else {}
+    if stopped:
+        require_m8_stopped(Path(report.get('work_dir',target/'work'))/'studio4.sqlite3')
     changes = [row for row in manifest['files'] if not safe_path(target, row['path']).is_file()
                or checksum(safe_path(target, row['path'])) != row['sha256']]
     return manifest, changes, report
 
 
+def require_m8_stopped(database):
+    import time
+    runtime=database.parent/'runtime'/'runtime.sqlite3'
+    if runtime.is_file():
+        with sqlite3.connect(runtime.as_uri()+'?mode=ro',uri=True) as db:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() and db.execute("SELECT 1 FROM jobs WHERE status IN ('running','cancel_requested') LIMIT 1").fetchone():
+                raise ValueError('Hentikan tugas komponen runtime sebelum mengubah kode.')
+    if not database.is_file():return
+    with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as db:
+        for table in ('jobs','m2_imports'):
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone() and db.execute("SELECT 1 FROM "+table+" WHERE status IN ('running','cancel_requested') LIMIT 1").fetchone():
+                raise ValueError('Hentikan tugas inti/impor yang masih berjalan sebelum mengubah kode.')
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m9_resource_holds'").fetchone() and db.execute("SELECT 1 FROM m9_resource_holds WHERE state!='released' LIMIT 1").fetchone():
+            raise ValueError('Rekonsiliasi inference M9 yang belum berhenti sebelum mengubah kode.')
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m9_items'").fetchone():
+            for row in db.execute("SELECT data FROM m9_items WHERE kind='recording'"):
+                if json.loads(row[0]).get('status') in ('capturing','finalizing'):raise ValueError('Jeda/finalisasi sesi rekaman M9 dan hentikan server sebelum mengubah kode.')
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m8_worker'").fetchone():
+            if db.execute('SELECT 1 FROM m8_worker WHERE expires>? OR heartbeat>? LIMIT 1',(time.time(),time.time()-15)).fetchone():
+                raise ValueError('Hentikan worker M8/CLI dan tunggu lease selesai sebelum memasang atau memulihkan kode.')
+
+
 def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
+    with InstallationLease(target,exclusive=True):
+        return _rollback(target,backup,stopped,restore_project_state=restore_project_state)
+
+
+def _rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     target = target.resolve()
     if stopped:
         require_stopped()
+        require_processes_stopped(target)
     states = {'installed', 'prepared', 'restoring', 'rollback_required'}
     if backup is None:
         journals = sorted((target / 'steezy_backups').glob('complete-*/complete-backup.json'), reverse=True)
@@ -216,42 +336,62 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
     if Path(record['target']).resolve() != target or record['status'] not in states:
         raise ValueError('Cadangan tidak sesuai target atau sudah dipulihkan.')
     database=record.get('database_backup') or {}
-    current_database=Path(database.get('source',''))
+    current_database=Path(database.get('source',record.get('database_location','')))
     advanced=[]
-    m6=record.get('version') in ('4.0.17','4.0.18')
-    m7=record.get('version')=='4.0.18'
-    m5=record.get('version') in ('4.0.16','4.0.16.1','4.0.17','4.0.18')
+    m6=record.get('version') in ('4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22')
+    m7=record.get('version') in ('4.0.18','4.0.19','4.0.20','4.0.21','4.0.22')
+    m8=record.get('version') in ('4.0.19','4.0.20','4.0.21','4.0.22')
+    m9=record.get('version') in ('4.0.20','4.0.21','4.0.22')
+    m5=record.get('version') in ('4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22')
     baseline=str(record.get('baseline_version',''))
     capabilities=record.get('baseline_capabilities',{})
-    supports_m7=capabilities.get('m7',False) or m7 and baseline.startswith('4.0.18')
-    supports_m6=capabilities.get('m6',False) or m6 and baseline.startswith(('4.0.17','4.0.18'))
+    supports_m8=capabilities.get('m8',False)
+    supports_m9=capabilities.get('m9',False)
+    supports_m7=capabilities.get('m7',False) or m7 and baseline.startswith(('4.0.18','4.0.19','4.0.20','4.0.21','4.0.22'))
+    supports_m6=capabilities.get('m6',False) or m6 and baseline.startswith(('4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22'))
     supports_m5=capabilities.get('m5',False) or m5 and baseline.startswith('4.0.16')
     supports_m4=capabilities.get('m4',False) or m5 and baseline.startswith(('4.0.15','4.0.16'))
-    supports_m3=capabilities.get('m3',False) or record.get('version') in ('4.0.15','4.0.16','4.0.16.1','4.0.17','4.0.18') and baseline.startswith(('4.0.14','4.0.15','4.0.16'))
+    supports_m3=capabilities.get('m3',False) or record.get('version') in ('4.0.15','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and baseline.startswith(('4.0.14','4.0.15','4.0.16'))
     supports_m2=capabilities.get('m2',False) or supports_m3 or m5 and baseline.startswith('4.0.13')
     supports_editor=capabilities.get('m1',False) or supports_m2 or m5 and baseline.startswith('4.0.12')
-    if record.get('version') in ('4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and record['status']=='installed' and current_database.is_file():
+    if record.get('version') in ('4.0.12','4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and record['status']=='installed' and current_database.is_file():
+        if m8:require_m8_stopped(current_database)
         with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as db:
+            if record.get('version')=='4.0.22' and not capabilities.get('m9_audit_repairs',False):
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m9_items'").fetchone() and db.execute("SELECT 1 FROM m9_items WHERE json_extract(data,'$.restored_evidence_only') IS NOT NULL LIMIT 1").fetchone():advanced.append('backup-M9-schema2-dipulihkan')
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='editor_drafts'").fetchone() and db.execute("SELECT 1 FROM editor_drafts WHERE json_extract(request,'$.source_guard') IS NOT NULL LIMIT 1").fetchone():advanced.append('draf-dengan-penjagaan-sumber-4.0.22')
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() and db.execute("SELECT 1 FROM jobs WHERE status IN ('queued','running','cancel_requested') AND json_extract(request,'$.m9.audit_release')='4.0.22' LIMIT 1").fetchone():advanced.append('antrean-M9-4.0.22')
+            if m9 and not supports_m9:
+                for table in ('m9_items','m9_tracks','m9_chunks','m9_invites','m9_resource_holds'):
+                    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone() and db.execute('SELECT 1 FROM '+table+' LIMIT 1').fetchone():advanced.append('data-M9-'+table)
+            if record.get('version') in ('4.0.21','4.0.22') and not capabilities.get('m9_dubbing',False):
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m9_items'").fetchone() and db.execute("SELECT 1 FROM m9_items WHERE kind='dubbing' LIMIT 1").fetchone():advanced.append('kandidat-dubbing-M9-4.0.21')
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone() and db.execute("SELECT 1 FROM jobs WHERE kind IN ('dubbing_m9','dubbing_accept_m9') LIMIT 1").fetchone():advanced.append('tugas-dubbing-M9-4.0.21')
+            if m8 and not supports_m8:
+                for table in ('m8_accounts','m8_sessions','m8_publish','m8_records','m8_subscriptions'):
+                    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone() and db.execute('SELECT 1 FROM '+table+' LIMIT 1').fetchone():advanced.append('data-M8-'+table)
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m8_workspaces'").fetchone() and db.execute("SELECT 1 FROM m8_workspaces WHERE id!='solo' LIMIT 1").fetchone():advanced.append('workspace-M8')
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects'").fetchone():
                 for project_id,document in db.execute('SELECT id,document FROM projects'):
                     value=json.loads(document)
-                    if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
+                    if m9 and not supports_m9 and isinstance(value.get('source',{}).get('lineage'),dict):advanced.append('proyek-turunan-M9-'+project_id)
+                    if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and (any(value.get(k) for k in ('transcript_track_history','translation_tracks','translation_proposals','source_timing_overrides','clip_source_timing_overrides','variant_source_timing_overrides','variant_corrections','manual_speakers','diarization')) or value.get('source',{}).get('info',{}).get('kind')=='audio' or value.get('source',{}).get('lineage')):
                         advanced.append(project_id)
-                    if not supports_m3 and record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
+                    if not supports_m3 and record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and (any(value.get(k) for k in ('selection3','selection3_history','m3_decisions','m3_feedback','m3_markers','m3_selected_set')) or any(c.get('created_from')=='M3' for c in value.get('clips',{}).values())):
                         advanced.append(project_id)
                     for clip in value.get('clips',{}).values():
                         for variant in clip.get('variants',{}).values():
                             editor=variant.get('editor',{})
                             if m6 and not supports_m6 and variant.get('audio6'):advanced.append(project_id)
                             if m5 and not supports_m5 and variant.get('finishing5'):advanced.append(project_id)
-                            if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and not supports_m4 and any(variant.get(k) for k in ('camera4_report','camera4_controls','camera4_feedback','camera4_enabled','camera4_ratio')):advanced.append(project_id)
+                            if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and not supports_m4 and any(variant.get(k) for k in ('camera4_report','camera4_controls','camera4_feedback','camera4_enabled','camera4_ratio')):advanced.append(project_id)
                             if not (supports_editor or supports_m3) and (editor.get('segments') or any(editor.get('curves',{}).values()) or editor.get('hidden_caption_word_ids') or any(r.get('mute') or r.get('solo') for r in editor.get('tracks',{}).values())):
                                 advanced.append(project_id)
-            if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
+            if not (supports_m2 or supports_m3) and record.get('version') in ('4.0.13','4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='m2_imports'").fetchone():
                 if db.execute("SELECT 1 FROM m2_imports WHERE status IN ('queued','running') LIMIT 1").fetchone():advanced.append('antrean-impor-M2')
-            if record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
+            if record.get('version') in ('4.0.14','4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
                 if not supports_m3 and db.execute("SELECT 1 FROM jobs WHERE kind='selection_m3' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-seleksi-M3')
-                if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18') and not supports_m4 and db.execute("SELECT 1 FROM jobs WHERE kind='camera_m4' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-kamera-M4')
+                if record.get('version') in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') and not supports_m4 and db.execute("SELECT 1 FROM jobs WHERE kind='camera_m4' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-kamera-M4')
             if m6 and not supports_m6 and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='jobs'").fetchone():
                 if db.execute("SELECT 1 FROM jobs WHERE kind='audio_m6' AND status IN ('queued','running','cancel_requested') LIMIT 1").fetchone():advanced.append('antrean-M6')
             if m7 and not supports_m7:
@@ -281,10 +421,11 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
         if current not in {row['sha256'], row['original_sha256']}:
             raise ValueError('File berubah setelah upgrade; simpan atau bandingkan dahulu: ' + row['path'])
     if advanced and restore_project_state:
-        original_database=Path(database['copy'])
-        if not original_database.is_file() or checksum(original_database)!=database['sha256']:
+        original_database=Path(database['copy']) if database.get('copy') else None
+        if original_database is not None and (not original_database.is_file() or checksum(original_database)!=database['sha256']):
             raise ValueError('Cadangan SQLite pra-upgrade tidak valid; database terbaru tidak diubah.')
         checkpoint=journal.parent/'data'/'studio4-latest-before-rollback.sqlite3'
+        checkpoint.parent.mkdir(parents=True,exist_ok=True)
         if checkpoint.exists():raise ValueError('Checkpoint terbaru sudah ada; periksa cadangan sebelum mengulang pemulihan data.')
         with sqlite3.connect(current_database.as_uri()+'?mode=ro',uri=True) as source:
             with sqlite3.connect(checkpoint) as destination:
@@ -292,10 +433,13 @@ def rollback(target, backup=None, stopped=True,*,restore_project_state=False):
                 if destination.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Checkpoint SQLite terbaru belum valid')
         record['latest_project_checkpoint']={'path':str(checkpoint),'sha256':checksum(checkpoint)}
         atomic_json(journal,record)
-        with sqlite3.connect(original_database.as_uri()+'?mode=ro',uri=True) as source:
-            with sqlite3.connect(current_database) as destination:
-                source.backup(destination)
-                if destination.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Pemulihan SQLite perlu ditinjau; checkpoint terbaru tersedia: '+str(checkpoint))
+        if original_database is not None:
+            with sqlite3.connect(original_database.as_uri()+'?mode=ro',uri=True) as source:
+                with sqlite3.connect(current_database) as destination:
+                    source.backup(destination)
+                    if destination.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Pemulihan SQLite perlu ditinjau; checkpoint terbaru tersedia: '+str(checkpoint))
+        else:
+            for suffix in ('','-wal','-shm'):Path(str(current_database)+suffix).unlink(missing_ok=True)
         record['project_state_restored']=True
         atomic_json(journal,record)
     record['status'] = 'restoring'; atomic_json(journal, record)
@@ -329,8 +473,13 @@ def backup_project_database(target, backup, work_dir=None):
 
 
 def install(target, package, dry_run=False):
+    with InstallationLease(target,exclusive=True):
+        return _install(target,package,dry_run)
+
+
+def _install(target, package, dry_run=False):
     target, package = target.resolve(), package.resolve()
-    manifest, changes, runtime = preflight(target, package)
+    manifest, changes, runtime = _preflight(target, package)
     print(f"Target: {target}\nVersi paket: {manifest['version']}\nFile yang diperbarui: {len(changes)}")
     if manifest.get('installer_revision'):
         print('Revisi installer: ' + str(manifest['installer_revision']))
@@ -350,17 +499,18 @@ def install(target, package, dry_run=False):
             atomic_copy(dest, safe_path(backup / 'original', row['path']))
         records.append({**row, 'existed': existed, 'original_sha256': checksum(dest) if existed else None})
     baseline_version=None
-    if manifest['version'] in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18'):
+    if manifest['version'] in ('4.0.15','4.0.15.1','4.0.16','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22'):
         for node in ast.parse((target/'clipper/pipeline.py').read_text(encoding='utf-8-sig')).body:
             if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='RENDER_VERSION' for t in node.targets) and isinstance(node.value,ast.Constant):baseline_version=node.value.value
     record = {'schema_version': 1, 'version': manifest['version'], 'source_commit': manifest['source_commit'],'baseline_version':baseline_version,
-              'baseline_capabilities':{key:(target/path).is_file() for key,path in {'m1':'clipper/editor_contract.py','m2':'clipper/transcript_service.py','m3':'clipper/selection_service.py','m4':'clipper/camera4_service.py','m5':'clipper/finishing5_service.py','m6':'clipper/audio6_service.py','m7':'clipper/delivery7.py'}.items()} if manifest['version'] in ('4.0.15.1','4.0.16.1','4.0.17','4.0.18') else {},
+              'baseline_capabilities':{key:(target/path).is_file() for key,path in {'m1':'clipper/editor_contract.py','m2':'clipper/transcript_service.py','m3':'clipper/selection_service.py','m4':'clipper/camera4_service.py','m5':'clipper/finishing5_service.py','m6':'clipper/audio6_service.py','m7':'clipper/delivery7.py','m8':'clipper/m8.py','m9':'clipper/m9.py','m9_dubbing':'clipper/m9_dubbing.py','m9_audit_repairs':'clipper/installation_lock.py'}.items()} if manifest['version'] in ('4.0.15.1','4.0.16.1','4.0.17','4.0.18','4.0.19','4.0.20','4.0.21','4.0.22') else {},
               'target': str(target), 'status': 'prepared', 'files': records,
-              'database_backup': backup_project_database(target, backup, runtime.get('work_dir'))}
+              'database_backup': backup_project_database(target, backup, runtime.get('work_dir')),
+              'database_location':str(Path(runtime.get('work_dir',target/'work'))/'studio4.sqlite3')}
     journal = backup / 'complete-backup.json'; atomic_json(journal, record)
     try:
         # Detect edits made after the initial check and before the first copy.
-        preflight(target, package)
+        _preflight(target, package)
         for row in records:
             dest = safe_path(target, row['path'])
             current = checksum(dest) if dest.is_file() else None
@@ -371,7 +521,7 @@ def install(target, package, dry_run=False):
         record['status'] = 'installed'; atomic_json(journal, record)
     except Exception:
         try:
-            rollback(target, backup, stopped=False)
+            _rollback(target, backup, stopped=False)
         except Exception as recovery:
             record['status'] = 'rollback_required'; atomic_json(journal, record)
             raise ValueError('Pemasangan gagal dan pemulihan perlu dilanjutkan. Cadangan: ' + str(backup) +

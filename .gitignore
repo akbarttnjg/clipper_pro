@@ -36,3 +36,6 @@ node_modules/
 
 # Isolated test reports
 /m1-test-results/
+
+# OS-owned installation/runtime lease (never remove while Clipper is open)
+.clipper-install.lock

@@ -1,0 +1,9 @@
+{
+  "archive_name": "Clipper_Pro_4_0_20_Upgrade_M8_M9_Lokal.zip",
+  "archive_sha256": "34089d0717fa70b32ff7160e1ffaf188b2e0c56a663bac205825222dc8dae866",
+  "original_declared_commit": "6c05c88fa88bd98168618255f69f90d4a67332c0",
+  "recovered_from": "Saved and checksum-verified release package plus its frozen M8 source snapshot; original local git object unavailable after transient workspace reset",
+  "m8_source_snapshot_sha256": "8b5adcd648b080a18629460f4aa16e4bc0dd40233f0e6e91deb8107ba317458c",
+  "m9_payload_files": 84,
+  "tests_note": "M8 and older tests recovered from frozen M8 source; all four M9 Python suites and recorder9 adapter recovered as checksum-verified package payload. Historical reports will be supplemented by a fresh regression run."
+}

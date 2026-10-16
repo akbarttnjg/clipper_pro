@@ -33,7 +33,7 @@ def machine(tmp_path,monkeypatch):
     return target,private
 
 
-def hashes(root):return {p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and not {'steezy_backups','__pycache__'}&set(p.parts)}
+def hashes(root):return {p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and not {'steezy_backups','__pycache__'}&set(p.parts)}
 
 
 def test_check_install_reinstall_rollback_exactly_preserves_private_files(package,machine):

@@ -25,7 +25,7 @@ class M4InstallerCase(unittest.TestCase):
         for name,data in self.private.items():p=self.target/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
         self.probe=patch.object(installer,'probe_runtime',return_value={'python':'explicit-runtime-double','work_dir':str(self.work)});self.probe.start();self.stop=patch.object(installer,'require_stopped',return_value=None);self.stop.start();self.out=contextlib.redirect_stdout(io.StringIO());self.out.__enter__()
     def tearDown(self):self.out.__exit__(None,None,None);self.probe.stop();self.stop.stop();self.temp.cleanup()
-    def tree(self):return {str(p.relative_to(self.target)):hashlib.sha256(p.read_bytes()).hexdigest() for p in self.target.rglob('*') if p.is_file() and 'steezy_backups' not in p.parts and 'work' not in p.parts}
+    def tree(self):return {str(p.relative_to(self.target)):hashlib.sha256(p.read_bytes()).hexdigest() for p in self.target.rglob('*') if p.is_file() and p.name!='.clipper-install.lock' and 'steezy_backups' not in p.parts and 'work' not in p.parts}
     def test_M3_and_M2_baselines_preflight_and_dry_run(self):
         before=self.tree();m,changes,_=installer.preflight(self.target,self.package,runtime=False,stopped=False);self.assertEqual(m['milestone'],'M4');self.assertTrue(changes);installer.install(self.target,self.package,dry_run=True);self.assertEqual(self.tree(),before);self.assertFalse((self.target/'steezy_backups').exists())
         m2=baseline(Path(self.temp.name)/'m2',False);self.assertTrue(installer.preflight(m2,self.package,runtime=False,stopped=False)[1])
